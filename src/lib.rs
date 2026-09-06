@@ -5,17 +5,25 @@
 //! front end (`src/main.rs`). The library is the intended integration point
 //! for anyone who wants to embed PMI extraction in their own tooling.
 //!
+//! - [`model`] is the JSON data model (ADR 0002).
+//! - [`step`] reads STEP AP242 files: a Part 21 parser plus PMI walkers.
+//! - [`reader`] is the format-independent entry point.
+//!
 //! # Status
 //!
-//! The project is at the scaffolding stage. Format detection and the JSON
-//! data model exist; the STEP and JT readers are not implemented yet.
+//! The STEP reader extracts units, features, and dimensions with their
+//! tolerances. Geometric tolerances, datums, presentation, and JT are not
+//! implemented yet; their entities are reported in the document's
+//! `unknown` list rather than dropped.
 
 pub mod format;
 pub mod model;
+pub mod reader;
 pub mod step;
 
 pub use format::Format;
 pub use model::PmiDocument;
+pub use reader::{Reader, read_path};
 
 use std::path::Path;
 
@@ -30,6 +38,10 @@ pub enum Error {
     #[error("{0} support is not implemented yet")]
     Unsupported(Format),
 
+    /// The input is not a STEP Part 21 file at all.
+    #[error("STEP parse error: {0}")]
+    StepParse(#[from] step::p21::ParseError),
+
     /// An I/O failure while reading the input.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -40,13 +52,5 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Read the file at `path`, detect its format, and extract the PMI it contains.
 pub fn extract(path: &Path) -> Result<PmiDocument> {
-    let format =
-        Format::from_path(path).ok_or_else(|| Error::UnknownFormat(path.display().to_string()))?;
-    tracing::debug!(path = %path.display(), %format, "detected input format");
-
-    // Fail early on unreadable input so callers get an I/O error rather than
-    // an "unsupported" error for a file that does not exist.
-    std::fs::metadata(path)?;
-
-    Err(Error::Unsupported(format))
+    read_path(path)
 }

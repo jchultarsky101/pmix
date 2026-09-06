@@ -99,7 +99,7 @@ excluded from comparison by default.
 
 | Field | Type | Notes |
 | ----- | ---- | ----- |
-| `kind` | enum | `face`, `edge`, `vertex`, `axis`, `center_plane`, `center_point`, `apex`, `tangent`, `derived`, `all_around`, `between`, `composite_group`, `composite_union`, `datum_target_area` |
+| `kind` | enum | `face`, `edge`, `vertex`, `axis`, `center_plane`, `center_point`, `center`, `apex`, `tangent`, `derived`, `all_around`, `between`, `composite` (AP242 `composite_shape_aspect`), `composite_group` (`composite_group_shape_aspect`), `parallel_offset`, `geometric_alignment`, `perpendicular_to`, `datum_target_area`, `mixed` |
 | `name` | string? | `shape_aspect.name` when meaningful |
 | `geometry` | `GeometryRef[]` | The B-rep entities: `{kind: face\|edge\|vertex, surface: plane\|cylinder\|cone\|sphere\|torus\|bspline\|other, source_ref}` from `geometric_item_specific_usage` and `item_identified_representation_usage`. The geometry fingerprint used for identity is deferred. |
 | `members` | id[] | Child features of a composite (AP242 `composite_shape_aspect`, `all_around_shape_aspect`, `between_shape_aspect`) |
@@ -139,7 +139,8 @@ excluded from comparison by default.
 | `qualifier` | enum? | `basic` (theoretical), `reference` (auxiliary), `maximum`, `minimum` |
 | `modifiers` | enum[] | `controlled_radius`, `square`, `statistical`, `continuous_feature`, `two_point_size`, `local_size`, `least_squares`, `envelope`, `free_state`, ... from `descriptive_representation_item` |
 | `features` | id[] | One for size, two for location |
-| `orientation` | `Direction?` | For oriented and directed locations |
+| `directed` | bool | `true` for `directed_dimensional_location`: the order of `features` is significant |
+| `orientation` | `Direction?` | For oriented locations |
 | `path` | id? | Feature along which a `_with_path` dimension is measured |
 | `decimal_places` | integer? | |
 | `text` | string? | As displayed, e.g. `⌀12.5 ±0.05` |
