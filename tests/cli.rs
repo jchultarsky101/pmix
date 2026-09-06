@@ -35,3 +35,12 @@ fn reports_missing_input() {
         .failure()
         .stderr(predicate::str::contains("does-not-exist.stp"));
 }
+
+#[test]
+fn verbose_flag_logs_to_stderr() {
+    pmix()
+        .args(["-v", "extract", "does-not-exist.stp"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("extracting PMI"));
+}
