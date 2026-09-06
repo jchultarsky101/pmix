@@ -99,3 +99,96 @@ fn dimension_basics_semantics() {
     assert_eq!((form.as_str(), grade.as_str()), ("H", "7"));
     assert_eq!(fit.modifiers, vec![DimensionModifier::Statistical]);
 }
+
+#[test]
+fn tolerance_datum_basics() {
+    check("tolerance_datum_basics");
+}
+
+#[test]
+fn tolerance_datum_basics_semantics() {
+    use pmix::model::{DatumModifier, DatumTargetKind, ToleranceKind, ToleranceModifier, ZoneForm};
+    let doc = pmix::extract(&synthetic_dir().join("tolerance_datum_basics.stp")).unwrap();
+    let s = &doc.semantic;
+    assert!(doc.unknown.is_empty(), "{:?}", doc.unknown);
+    assert!(doc.diagnostics.is_empty(), "{:?}", doc.diagnostics);
+    assert_eq!(s.datums.len(), 3);
+    assert_eq!(s.datum_systems.len(), 4);
+    assert_eq!(s.tolerances.len(), 6);
+
+    let datum = |label: &str| s.datums.iter().find(|d| d.label == label).expect("datum");
+    let a = datum("A");
+    assert_eq!(a.features.len(), 1);
+    assert_eq!(a.targets.len(), 1);
+    let a1 = &a.targets[0];
+    assert_eq!(a1.label, "A1");
+    assert_eq!(a1.kind, DatumTargetKind::Point);
+    assert_eq!(a1.diameter.as_ref().unwrap().value, 2.0);
+    assert_eq!(a1.placement.as_ref().unwrap().origin, [10.0, 10.0, 0.0]);
+    assert!(a1.feature.is_some());
+
+    let system = |text: &str| {
+        s.datum_systems
+            .iter()
+            .find(|d| d.text == text)
+            .expect("datum system")
+    };
+    let drf = system("A|B(M)|C");
+    assert_eq!(drf.compartments.len(), 3);
+    assert_eq!(
+        drf.compartments[1].datums[0].modifiers,
+        vec![DatumModifier::MaximumMaterial]
+    );
+    assert_eq!(drf.compartments[1].datums[0].datum, datum("B").meta.id);
+    let common = system("A-B");
+    assert!(common.compartments[0].common);
+    assert_eq!(common.compartments[0].datums.len(), 2);
+
+    let tol = |kind: ToleranceKind| -> Vec<&pmix::model::GeometricTolerance> {
+        s.tolerances.iter().filter(|t| t.kind == kind).collect()
+    };
+    let positions = tol(ToleranceKind::Position);
+    assert_eq!(positions.len(), 2);
+    let upper = positions.iter().find(|t| t.composite_of.is_none()).unwrap();
+    let lower = positions.iter().find(|t| t.composite_of.is_some()).unwrap();
+    assert_eq!(upper.value.as_ref().unwrap().value, 0.1);
+    assert_eq!(upper.decimal_places, Some(2));
+    assert_eq!(upper.modifiers, vec![ToleranceModifier::MaximumMaterial]);
+    let zone = upper.zone.as_ref().unwrap();
+    assert_eq!(zone.form, Some(ZoneForm::CylindricalOrCircular));
+    assert_eq!(zone.projected.as_ref().unwrap().value, 10.0);
+    assert_eq!(upper.datum_system.as_deref(), Some(drf.meta.id.as_str()));
+    assert_eq!(upper.text.as_deref(), Some("⌖ ⌀0.1 Ⓟ10 Ⓜ | A | B Ⓜ | C"));
+    assert_eq!(lower.composite_of.as_deref(), Some(upper.meta.id.as_str()));
+    assert_eq!(lower.value.as_ref().unwrap().value, 0.05);
+
+    let flat = &tol(ToleranceKind::Flatness)[0];
+    let ub = flat.unit_basis.as_ref().unwrap();
+    assert_eq!(
+        (ub.length.value, ub.area_type.as_deref()),
+        (25.0, Some("square"))
+    );
+
+    let perp = &tol(ToleranceKind::Perpendicularity)[0];
+    assert_eq!(
+        perp.zone.as_ref().unwrap().form,
+        Some(ZoneForm::BetweenTwoEquidistantSurfaces)
+    );
+    assert_eq!(
+        perp.datum_system.as_deref(),
+        Some(system("A").meta.id.as_str())
+    );
+
+    let prof = &tol(ToleranceKind::SurfaceProfile)[0];
+    assert_eq!(prof.unequally_disposed.as_ref().unwrap().value, 0.1);
+    assert!(prof.modifiers.contains(&ToleranceModifier::FreeState));
+    assert!(
+        prof.modifiers
+            .contains(&ToleranceModifier::UnequallyDisposed)
+    );
+    assert_eq!(prof.datum_system.as_deref(), Some(common.meta.id.as_str()));
+
+    let runout = &tol(ToleranceKind::CircularRunout)[0];
+    let angle = runout.zone.as_ref().unwrap().runout_angle.as_ref().unwrap();
+    assert_eq!((angle.value, angle.unit.as_str()), (30.0, "deg"));
+}

@@ -1,0 +1,546 @@
+{
+  "schema_version": 1,
+  "source": {
+    "file_name": "tolerance_datum_basics.stp",
+    "format": "STEP",
+    "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF",
+    "writer": "pmix synthetic",
+    "time_stamp": "2026-09-06T00:00:00"
+  },
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "semantic": {
+    "features": [
+      {
+        "id": "feat:15ca9e2e73534022",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#120",
+          "#121"
+        ],
+        "kind": "face",
+        "name": "boss",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#35"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:184d0959c1e6763c",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#110",
+          "#111"
+        ],
+        "kind": "face",
+        "name": "side",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#29"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:1a1625fc17b4fc49",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#80",
+          "#81"
+        ],
+        "kind": "face",
+        "name": "hole",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "cylinder",
+            "source_ref": "#31"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:3362f86a3d98904a",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#60",
+          "#61"
+        ],
+        "kind": "face",
+        "name": "Datum Feature B",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#29"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:7540e47d1fa99f9e",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#100",
+          "#101"
+        ],
+        "kind": "face",
+        "name": "base",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#25"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:9b52997e63fdfd73",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#40",
+          "#41"
+        ],
+        "kind": "face",
+        "name": "Datum Feature A",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#25"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:fb2b1f380b1668f5",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#64",
+          "#65"
+        ],
+        "kind": "face",
+        "name": "Datum Feature C",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "cylinder",
+            "source_ref": "#31"
+          }
+        ],
+        "members": []
+      }
+    ],
+    "datums": [
+      {
+        "id": "datum:742d9c498e4798be",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#62",
+          "#63"
+        ],
+        "label": "B",
+        "features": [
+          "feat:3362f86a3d98904a"
+        ],
+        "targets": []
+      },
+      {
+        "id": "datum:b640bf1e059baed5",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#42",
+          "#43",
+          "#45"
+        ],
+        "label": "A",
+        "features": [
+          "feat:9b52997e63fdfd73"
+        ],
+        "targets": [
+          {
+            "label": "A1",
+            "kind": "point",
+            "diameter": {
+              "value": 2.0,
+              "unit": "mm"
+            },
+            "placement": {
+              "origin": [
+                10.0,
+                10.0,
+                0.0
+              ],
+              "axis": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0
+              },
+              "ref_direction": {
+                "x": 1.0,
+                "y": 0.0,
+                "z": 0.0
+              }
+            },
+            "feature": "feat:9b52997e63fdfd73",
+            "unmapped": []
+          }
+        ]
+      },
+      {
+        "id": "datum:e964bd896ab0678a",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#66",
+          "#67"
+        ],
+        "label": "C",
+        "features": [
+          "feat:fb2b1f380b1668f5"
+        ],
+        "targets": []
+      }
+    ],
+    "datum_systems": [
+      {
+        "id": "dsys:12a40d782a9e0b8a",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#131",
+          "#130"
+        ],
+        "compartments": [
+          {
+            "datums": [
+              {
+                "datum": "datum:e964bd896ab0678a",
+                "modifiers": [],
+                "modifier_values": []
+              }
+            ],
+            "common": false
+          }
+        ],
+        "text": "C"
+      },
+      {
+        "id": "dsys:8f5412c776bd4771",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#114",
+          "#113"
+        ],
+        "compartments": [
+          {
+            "datums": [
+              {
+                "datum": "datum:b640bf1e059baed5",
+                "modifiers": [],
+                "modifier_values": []
+              }
+            ],
+            "common": false
+          }
+        ],
+        "text": "A"
+      },
+      {
+        "id": "dsys:9e85368bb8dc5dd3",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#77",
+          "#74",
+          "#75",
+          "#76"
+        ],
+        "compartments": [
+          {
+            "datums": [
+              {
+                "datum": "datum:b640bf1e059baed5",
+                "modifiers": [],
+                "modifier_values": []
+              },
+              {
+                "datum": "datum:742d9c498e4798be",
+                "modifiers": [],
+                "modifier_values": []
+              }
+            ],
+            "common": true
+          }
+        ],
+        "text": "A-B"
+      },
+      {
+        "id": "dsys:df7c934bc5af4fae",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#73",
+          "#70",
+          "#71",
+          "#72"
+        ],
+        "compartments": [
+          {
+            "datums": [
+              {
+                "datum": "datum:b640bf1e059baed5",
+                "modifiers": [],
+                "modifier_values": []
+              }
+            ],
+            "common": false
+          },
+          {
+            "datums": [
+              {
+                "datum": "datum:742d9c498e4798be",
+                "modifiers": [
+                  "maximum_material"
+                ],
+                "modifier_values": []
+              }
+            ],
+            "common": false
+          },
+          {
+            "datums": [
+              {
+                "datum": "datum:e964bd896ab0678a",
+                "modifiers": [],
+                "modifier_values": []
+              }
+            ],
+            "common": false
+          }
+        ],
+        "text": "A|B(M)|C"
+      }
+    ],
+    "dimensions": [],
+    "tolerances": [
+      {
+        "id": "tol:0ef06fb91c9d5e54",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#115",
+          "#112",
+          "#117"
+        ],
+        "kind": "perpendicularity",
+        "value": {
+          "value": 0.05,
+          "unit": "mm"
+        },
+        "zone": {
+          "form": "between_two_equidistant_surfaces"
+        },
+        "modifiers": [],
+        "datum_system": "dsys:8f5412c776bd4771",
+        "features": [
+          "feat:184d0959c1e6763c"
+        ],
+        "text": "⟂ 0.05 | A"
+      },
+      {
+        "id": "tol:15ec33acf18cc39c",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [
+          {
+            "attribute": "projection_end",
+            "raw": "#40"
+          }
+        ],
+        "source_refs": [
+          "#84",
+          "#82",
+          "#87",
+          "#86"
+        ],
+        "kind": "position",
+        "value": {
+          "value": 0.1,
+          "unit": "mm"
+        },
+        "zone": {
+          "form": "cylindrical_or_circular",
+          "projected": {
+            "value": 10.0,
+            "unit": "mm"
+          }
+        },
+        "modifiers": [
+          "maximum_material"
+        ],
+        "datum_system": "dsys:df7c934bc5af4fae",
+        "features": [
+          "feat:1a1625fc17b4fc49"
+        ],
+        "decimal_places": 2,
+        "text": "⌖ ⌀0.1 Ⓟ10 Ⓜ | A | B Ⓜ | C"
+      },
+      {
+        "id": "tol:2263cfc8234e090a",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#90",
+          "#89",
+          "#91",
+          "#92"
+        ],
+        "kind": "position",
+        "value": {
+          "value": 0.05,
+          "unit": "mm"
+        },
+        "zone": {
+          "form": "cylindrical_or_circular"
+        },
+        "modifiers": [],
+        "datum_system": "dsys:df7c934bc5af4fae",
+        "features": [
+          "feat:1a1625fc17b4fc49"
+        ],
+        "composite_of": "tol:15ec33acf18cc39c",
+        "text": "⌖ ⌀0.05 | A | B Ⓜ | C"
+      },
+      {
+        "id": "tol:326f71b83a5a4ed8",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#133",
+          "#132",
+          "#136",
+          "#135"
+        ],
+        "kind": "circular_runout",
+        "value": {
+          "value": 0.03,
+          "unit": "mm"
+        },
+        "zone": {
+          "form": "cylindrical_or_circular",
+          "runout_angle": {
+            "value": 30.0,
+            "unit": "deg"
+          }
+        },
+        "modifiers": [],
+        "datum_system": "dsys:12a40d782a9e0b8a",
+        "features": [
+          "feat:15ca9e2e73534022"
+        ],
+        "text": "↗ ⌀0.03 | C"
+      },
+      {
+        "id": "tol:6d7f6ad5069a34f0",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#104",
+          "#102",
+          "#103"
+        ],
+        "kind": "flatness",
+        "value": {
+          "value": 0.02,
+          "unit": "mm"
+        },
+        "unit_basis": {
+          "length": {
+            "value": 25.0,
+            "unit": "mm"
+          },
+          "area_type": "square"
+        },
+        "modifiers": [],
+        "features": [
+          "feat:7540e47d1fa99f9e"
+        ],
+        "text": "⏥ 0.02"
+      },
+      {
+        "id": "tol:c300e2f36f8c3c4b",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#124",
+          "#122",
+          "#123"
+        ],
+        "kind": "surface_profile",
+        "value": {
+          "value": 0.4,
+          "unit": "mm"
+        },
+        "unequally_disposed": {
+          "value": 0.1,
+          "unit": "mm"
+        },
+        "modifiers": [
+          "free_state",
+          "unequally_disposed"
+        ],
+        "datum_system": "dsys:9e85368bb8dc5dd3",
+        "features": [
+          "feat:15ca9e2e73534022"
+        ],
+        "text": "⌓ 0.4 Ⓕ Ⓤ | A-B"
+      }
+    ],
+    "notes": [],
+    "other": []
+  },
+  "presentation": {
+    "annotations": []
+  },
+  "unknown": [],
+  "diagnostics": []
+}

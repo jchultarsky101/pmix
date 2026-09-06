@@ -6,16 +6,18 @@
 //! any PMI-family instance that no walker consumed is reported in the
 //! document's `unknown` list (ADR 0002: never drop silently).
 
+pub(crate) mod datums;
 pub(crate) mod dimensions;
 pub(crate) mod features;
 pub(crate) mod measures;
+pub(crate) mod tolerances;
 pub(crate) mod units;
 
 use std::collections::{HashMap, HashSet};
 
 use crate::model::{
-    ContentId, Diagnostic, Dimension, Feature, Layer, PmiDocument, Presentation, SCHEMA_VERSION,
-    Semantic, Source, Unknown,
+    ContentId, Datum, DatumSystem, Diagnostic, Dimension, Feature, GeometricTolerance, Layer,
+    PmiDocument, Presentation, SCHEMA_VERSION, Semantic, Source, Unknown,
 };
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
@@ -23,7 +25,9 @@ use crate::step::p21::{Exchange, Id, Instance, Parameter};
 pub fn extract(ex: &Exchange, file_name: &str) -> PmiDocument {
     let mut ctx = Ctx::new(ex);
     let units = units::document_units(&mut ctx);
+    datums::walk(&mut ctx);
     dimensions::walk(&mut ctx);
+    tolerances::walk(&mut ctx);
     let unknown = ctx.collect_unknown();
 
     let mut diagnostics: Vec<Diagnostic> = ex
@@ -38,7 +42,10 @@ pub fn extract(ex: &Exchange, file_name: &str) -> PmiDocument {
 
     let mut semantic = Semantic {
         features: ctx.features,
+        datums: ctx.datums,
+        datum_systems: ctx.datum_systems,
         dimensions: ctx.dimensions,
+        tolerances: ctx.tolerances,
         ..Default::default()
     };
     semantic.sort();
@@ -71,26 +78,42 @@ pub fn extract(ex: &Exchange, file_name: &str) -> PmiDocument {
 /// unconsumed indicate a gap in a walker. Leaf values such as
 /// `TOLERANCE_VALUE` are not listed: they are only meaningful through their
 /// parent, which is what gets reported.
-const HANDLED_FAMILY: &[&str] = &[
-    "DIMENSIONAL_SIZE",
-    "DIMENSIONAL_SIZE_WITH_PATH",
-    "DIMENSIONAL_SIZE_WITH_DATUM_FEATURE",
-    "DIMENSIONAL_LOCATION",
-    "DIMENSIONAL_LOCATION_WITH_PATH",
-    "DIMENSIONAL_LOCATION_WITH_DATUM_FEATURE",
-    "DIRECTED_DIMENSIONAL_LOCATION",
-    "ANGULAR_SIZE",
-    "ANGULAR_LOCATION",
-    "DIMENSIONAL_CHARACTERISTIC_REPRESENTATION",
-    "SHAPE_DIMENSION_REPRESENTATION",
-    "PLUS_MINUS_TOLERANCE",
-];
-
-/// PMI entity families with no walker yet, each with the reason reported.
-const PENDING_FAMILY: &[(&[&str], &str)] = &[
+const HANDLED_FAMILY: &[(&[&str], &str)] = &[
+    (
+        &[
+            "DIMENSIONAL_SIZE",
+            "DIMENSIONAL_SIZE_WITH_PATH",
+            "DIMENSIONAL_SIZE_WITH_DATUM_FEATURE",
+            "DIMENSIONAL_LOCATION",
+            "DIMENSIONAL_LOCATION_WITH_PATH",
+            "DIMENSIONAL_LOCATION_WITH_DATUM_FEATURE",
+            "DIRECTED_DIMENSIONAL_LOCATION",
+            "ANGULAR_SIZE",
+            "ANGULAR_LOCATION",
+            "DIMENSIONAL_CHARACTERISTIC_REPRESENTATION",
+            "SHAPE_DIMENSION_REPRESENTATION",
+            "PLUS_MINUS_TOLERANCE",
+        ],
+        "recognised as a dimension entity but not consumed by the dimension walker",
+    ),
     (
         &[
             "GEOMETRIC_TOLERANCE",
+            "ANGULARITY_TOLERANCE",
+            "CIRCULAR_RUNOUT_TOLERANCE",
+            "COAXIALITY_TOLERANCE",
+            "CONCENTRICITY_TOLERANCE",
+            "CYLINDRICITY_TOLERANCE",
+            "FLATNESS_TOLERANCE",
+            "LINE_PROFILE_TOLERANCE",
+            "PARALLELISM_TOLERANCE",
+            "PERPENDICULARITY_TOLERANCE",
+            "POSITION_TOLERANCE",
+            "ROUNDNESS_TOLERANCE",
+            "STRAIGHTNESS_TOLERANCE",
+            "SURFACE_PROFILE_TOLERANCE",
+            "SYMMETRY_TOLERANCE",
+            "TOTAL_RUNOUT_TOLERANCE",
             "TOLERANCE_ZONE",
             "TOLERANCE_ZONE_FORM",
             "PROJECTED_ZONE_DEFINITION",
@@ -98,7 +121,7 @@ const PENDING_FAMILY: &[(&[&str], &str)] = &[
             "NON_UNIFORM_ZONE_DEFINITION",
             "GEOMETRIC_TOLERANCE_RELATIONSHIP",
         ],
-        "geometric tolerances are not supported yet",
+        "recognised as a geometric tolerance entity but not consumed by the tolerance walker",
     ),
     (
         &[
@@ -106,22 +129,21 @@ const PENDING_FAMILY: &[(&[&str], &str)] = &[
             "DATUM_FEATURE",
             "DATUM_TARGET",
             "PLACED_DATUM_TARGET_FEATURE",
+            "FEATURE_FOR_DATUM_TARGET_RELATIONSHIP",
             "DATUM_SYSTEM",
             "DATUM_REFERENCE_COMPARTMENT",
             "DATUM_REFERENCE_ELEMENT",
             "GENERAL_DATUM_REFERENCE",
             "REFERENCED_MODIFIED_DATUM",
+            "DATUM_REFERENCE_MODIFIER_WITH_VALUE",
         ],
-        "datums are not supported yet",
+        "recognised as a datum entity but not consumed by the datum walker",
     ),
 ];
 
 /// Reason for an unconsumed instance, if it belongs to a PMI family.
 fn unknown_reason(inst: &Instance) -> Option<&'static str> {
-    if inst.type_names().any(|t| HANDLED_FAMILY.contains(&t)) {
-        return Some("recognised as a dimension entity but not consumed by the dimension walker");
-    }
-    for (keywords, reason) in PENDING_FAMILY {
+    for (keywords, reason) in HANDLED_FAMILY {
         if inst.type_names().any(|t| keywords.contains(&t)) {
             return Some(reason);
         }
@@ -145,8 +167,35 @@ pub(crate) struct Ctx<'a> {
     pub feature_ids: HashMap<Id, Option<String>>,
     pub features: Vec<Feature>,
     pub dimensions: Vec<Dimension>,
+    pub datums: Vec<Datum>,
+    pub datum_systems: Vec<DatumSystem>,
+    pub tolerances: Vec<GeometricTolerance>,
+    /// Datum instance id to record id.
+    pub datum_ids: HashMap<Id, Option<String>>,
+    /// Datum record id to its label, for rendering.
+    pub datum_labels: HashMap<String, String>,
+    /// Datum system instance id to record id.
+    pub datum_system_ids: HashMap<Id, Option<String>>,
+    /// Tolerance instance id to record id.
+    pub tolerance_ids: HashMap<Id, Option<String>>,
     /// `SHAPE_ASPECT_RELATIONSHIP.relating` to its `related` ids, file order.
     pub composite_members: HashMap<Id, Vec<(Id, Id)>>,
+    /// Datum id to `(relationship id, relating shape aspect)` for every
+    /// `SHAPE_ASPECT_RELATIONSHIP` whose `related` is that datum.
+    pub datum_links: HashMap<Id, Vec<(Id, Id)>>,
+    /// Datum target id to `(relationship id, feature)` from
+    /// `FEATURE_FOR_DATUM_TARGET_RELATIONSHIP`.
+    pub target_features: HashMap<Id, Vec<(Id, Id)>>,
+    /// Definition id to `(property_definition, definition_representation,
+    /// representation)` triples.
+    pub property_reprs: HashMap<Id, Vec<(Id, Id, Id)>>,
+    /// Tolerance id to the `TOLERANCE_ZONE`s defining it.
+    pub zones: HashMap<Id, Vec<Id>>,
+    /// Zone id to its `*_ZONE_DEFINITION`s.
+    pub zone_definitions: HashMap<Id, Vec<Id>>,
+    /// `(relationship id, relating, related, name)` of every
+    /// `GEOMETRIC_TOLERANCE_RELATIONSHIP`.
+    pub tolerance_relationships: Vec<(Id, Id, Id, String)>,
     /// Shape aspect id to the geometry items it identifies, with the id of
     /// the usage instance that links them.
     pub geometry_usage: HashMap<Id, Vec<(Id, Id)>>,
@@ -168,7 +217,20 @@ impl<'a> Ctx<'a> {
             feature_ids: HashMap::new(),
             features: Vec::new(),
             dimensions: Vec::new(),
+            datums: Vec::new(),
+            datum_systems: Vec::new(),
+            tolerances: Vec::new(),
+            datum_ids: HashMap::new(),
+            datum_labels: HashMap::new(),
+            datum_system_ids: HashMap::new(),
+            tolerance_ids: HashMap::new(),
             composite_members: HashMap::new(),
+            datum_links: HashMap::new(),
+            target_features: HashMap::new(),
+            property_reprs: HashMap::new(),
+            zones: HashMap::new(),
+            zone_definitions: HashMap::new(),
+            tolerance_relationships: Vec::new(),
             geometry_usage: HashMap::new(),
             dimension_reprs: HashMap::new(),
             plus_minus: HashMap::new(),
@@ -179,18 +241,42 @@ impl<'a> Ctx<'a> {
 
     fn build_indexes(&mut self) {
         let ex = self.ex;
-        for inst in ex.of_type("SHAPE_ASPECT_RELATIONSHIP") {
+        let refs2 = |inst: &Instance, a: usize, b: usize| -> Option<(Id, Id)> {
             let p = inst.parameters();
-            if let (Some(relating), Some(related)) = (
-                p.get(2).and_then(Parameter::as_ref),
-                p.get(3).and_then(Parameter::as_ref),
-            ) {
+            Some((
+                p.get(a).and_then(Parameter::as_ref)?,
+                p.get(b).and_then(Parameter::as_ref)?,
+            ))
+        };
+
+        // shape_aspect_relationship: datum links (related is a datum) vs.
+        // composite membership (everything else).
+        for inst in ex.of_type("SHAPE_ASPECT_RELATIONSHIP") {
+            let Some((relating, related)) = refs2(inst, 2, 3) else {
+                continue;
+            };
+            if ex.get(related).is_some_and(|r| r.has_type("DATUM")) {
+                self.datum_links
+                    .entry(related)
+                    .or_default()
+                    .push((inst.id, relating));
+            } else {
                 self.composite_members
                     .entry(relating)
                     .or_default()
                     .push((inst.id, related));
             }
         }
+        for inst in ex.of_type("FEATURE_FOR_DATUM_TARGET_RELATIONSHIP") {
+            if let Some((feature, target)) = refs2(inst, 2, 3) {
+                self.target_features
+                    .entry(target)
+                    .or_default()
+                    .push((inst.id, feature));
+            }
+        }
+
+        // Geometry identification.
         for keyword in [
             "GEOMETRIC_ITEM_SPECIFIC_USAGE",
             "ITEM_IDENTIFIED_REPRESENTATION_USAGE",
@@ -208,12 +294,32 @@ impl<'a> Ctx<'a> {
                 entry.extend(items.into_iter().map(|item| (inst.id, item)));
             }
         }
+
+        // Property definitions on shape aspects (datum target parameters).
+        for keyword in [
+            "SHAPE_DEFINITION_REPRESENTATION",
+            "PROPERTY_DEFINITION_REPRESENTATION",
+        ] {
+            for inst in ex.of_type(keyword) {
+                let Some((pd_id, rep_id)) = refs2(inst, 0, 1) else {
+                    continue;
+                };
+                let Some(pd) = ex.get(pd_id) else { continue };
+                if !pd.has_type("PROPERTY_DEFINITION") {
+                    continue;
+                }
+                if let Some(def) = pd.parameters().get(2).and_then(Parameter::as_ref) {
+                    self.property_reprs
+                        .entry(def)
+                        .or_default()
+                        .push((pd_id, inst.id, rep_id));
+                }
+            }
+        }
+
+        // Dimensions.
         for inst in ex.of_type("DIMENSIONAL_CHARACTERISTIC_REPRESENTATION") {
-            let p = inst.parameters();
-            if let (Some(dim), Some(repr)) = (
-                p.first().and_then(Parameter::as_ref),
-                p.get(1).and_then(Parameter::as_ref),
-            ) {
+            if let Some((dim, repr)) = refs2(inst, 0, 1) {
                 self.dimension_reprs
                     .entry(dim)
                     .or_default()
@@ -223,6 +329,40 @@ impl<'a> Ctx<'a> {
         for inst in ex.of_type("PLUS_MINUS_TOLERANCE") {
             if let Some(dim) = inst.parameters().get(1).and_then(Parameter::as_ref) {
                 self.plus_minus.entry(dim).or_default().push(inst.id);
+            }
+        }
+
+        // Tolerance zones and composites.
+        for inst in ex.of_type("TOLERANCE_ZONE") {
+            let mut tols = Vec::new();
+            if let Some(p) = inst.parameters().get(4) {
+                p.collect_refs(&mut tols);
+            }
+            for t in tols {
+                self.zones.entry(t).or_default().push(inst.id);
+            }
+        }
+        for keyword in [
+            "PROJECTED_ZONE_DEFINITION",
+            "RUNOUT_ZONE_DEFINITION",
+            "NON_UNIFORM_ZONE_DEFINITION",
+        ] {
+            for inst in ex.of_type(keyword) {
+                if let Some(z) = inst.parameters().first().and_then(Parameter::as_ref) {
+                    self.zone_definitions.entry(z).or_default().push(inst.id);
+                }
+            }
+        }
+        for inst in ex.of_type("GEOMETRIC_TOLERANCE_RELATIONSHIP") {
+            if let Some((relating, related)) = refs2(inst, 2, 3) {
+                let name = inst
+                    .parameters()
+                    .first()
+                    .and_then(Parameter::as_str)
+                    .unwrap_or_default()
+                    .to_owned();
+                self.tolerance_relationships
+                    .push((inst.id, relating, related, name));
             }
         }
     }

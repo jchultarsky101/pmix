@@ -99,7 +99,7 @@ excluded from comparison by default.
 
 | Field | Type | Notes |
 | ----- | ---- | ----- |
-| `kind` | enum | `face`, `edge`, `vertex`, `axis`, `center_plane`, `center_point`, `center`, `apex`, `tangent`, `derived`, `all_around`, `between`, `composite` (AP242 `composite_shape_aspect`), `composite_group` (`composite_group_shape_aspect`), `parallel_offset`, `geometric_alignment`, `perpendicular_to`, `datum_target_area`, `mixed` |
+| `kind` | enum | `face`, `edge`, `vertex`, `axis`, `center_plane`, `center_point`, `center`, `apex`, `tangent`, `derived`, `all_around`, `between`, `composite` (AP242 `composite_shape_aspect`), `composite_group` (`composite_group_shape_aspect`), `parallel_offset`, `geometric_alignment`, `perpendicular_to`, `datum_target_area`, `mixed`, `all_over` (the whole part, when a tolerance targets the `product_definition_shape`) |
 | `name` | string? | `shape_aspect.name` when meaningful |
 | `geometry` | `GeometryRef[]` | The B-rep entities: `{kind: face\|edge\|vertex, surface: plane\|cylinder\|cone\|sphere\|torus\|bspline\|other, source_ref}` from `geometric_item_specific_usage` and `item_identified_representation_usage`. The geometry fingerprint used for identity is deferred. |
 | `members` | id[] | Child features of a composite (AP242 `composite_shape_aspect`, `all_around_shape_aspect`, `between_shape_aspect`) |
@@ -111,7 +111,7 @@ excluded from comparison by default.
 | ----- | ---- | ----- |
 | `label` | string | The letter, from `datum.identification` |
 | `features` | id[] | `datum_feature` shape aspects, via `shape_aspect_relationship` |
-| `targets` | `DatumTarget[]` | `{label: "A1", kind: point\|line\|rectangle\|circle\|area, size: Measure[], location: Placement?, feature: id?}` from `placed_datum_target_feature` and `shape_representation_with_parameters` |
+| `targets` | `DatumTarget[]` | `{label: "A1", kind: point\|line\|rectangle\|circle\|circular_line\|area, diameter: Measure?, length: Measure?, width: Measure?, placement: Placement?, feature: id?, unmapped}` from `placed_datum_target_feature`, `datum_target`, `feature_for_datum_target_relationship`, and `shape_representation_with_parameters` |
 
 **DatumSystem**: an ordered datum reference frame.
 
@@ -151,15 +151,16 @@ excluded from comparison by default.
 | ----- | ---- | ----- |
 | `kind` | enum | `angularity`, `circular_runout`, `coaxiality`, `concentricity`, `cylindricity`, `flatness`, `line_profile`, `parallelism`, `perpendicularity`, `position`, `roundness`, `straightness`, `surface_profile`, `symmetry`, `total_runout` |
 | `value` | `Measure?` | `geometric_tolerance.magnitude` |
-| `zone` | `Zone?` | `{form: within_cylinder\|within_sphere\|within_circle\|within_two_parallel_planes\|non_uniform\|..., projected: Measure?, runout_angle: Measure?}` from `tolerance_zone_form`, `projected_zone_definition`, `runout_zone_definition` |
+| `zone` | `Zone?` | `{form, projected: Measure?, runout_angle: Measure?}` from `tolerance_zone_form` (rec. practice table 13 names: `cylindrical_or_circular`, `spherical`, `within_circle`, `between_two_concentric_circles`, `between_two_equidistant_curves`, `within_cylinder`, `between_two_coaxial_cylinders`, `between_two_equidistant_surfaces`, `non_uniform`), `projected_zone_definition`, `runout_zone_definition` |
 | `unequally_disposed` | `Measure?` | The Ⓤ displacement |
 | `maximum_value` | `Measure?` | `geometric_tolerance_with_maximum_tolerance` |
-| `unit_basis` | `{length: Measure, width: Measure?}?` | Per-unit tolerances, `_with_defined_unit` and `_with_defined_area_unit` |
+| `unit_basis` | `{length: Measure, width: Measure?, area_type: string?}?` | Per-unit tolerances, `_with_defined_unit` and `_with_defined_area_unit` |
 | `modifiers` | enum[] | `maximum_material`, `least_material`, `free_state`, `tangent_plane`, `statistical`, `common_zone`, `any_cross_section`, `circle`, `reciprocity`, `separate_requirement`, `each_radial_element`, `line_element`, `not_convex`, `major_diameter`, `minor_diameter`, `pitch_diameter`, `unequally_disposed` |
 | `datum_system` | id? | |
 | `features` | id[] | Toleranced shape aspects |
 | `affected_plane` | `Direction?` | Orientation plane / intersection plane |
 | `composite_of` | id? | The parent when this is a lower segment of a composite frame (`geometric_tolerance_relationship`) |
+| `decimal_places` | integer? | From the magnitude's value format qualifier |
 | `text` | string? | The frame as text, e.g. `⌖ ⌀0.1 Ⓜ \| A \| B Ⓜ \| C` |
 
 **Note**: semantic text notes and flag notes when the file marks them as

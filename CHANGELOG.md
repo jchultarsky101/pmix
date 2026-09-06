@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- STEP AP242 walkers for geometric tolerances (all fifteen types in simple
+  and complex instance form, magnitude with decimal places, modifiers,
+  tolerance zones with projection and runout angle, unequally disposed and
+  maximum values, per-unit basis, composite frames, rendered text such as
+  `⌖ ⌀0.1 Ⓟ10 Ⓜ | A | B Ⓜ | C`) and for datums (datum features, point,
+  line, circle, rectangle, circular-line and area targets with placement and
+  size, datum reference frames with per-datum modifiers and common datums).
+  Every tolerance, datum, target, and datum system in the NIST corpus is
+  extracted.
+- Synthetic fixture `tolerance_datum_basics` with expected JSON.
 - Semantic data model (`pmix::model`) implementing ADR 0002: features,
   datums, datum systems, dimensions, geometric tolerances, notes, and an
   `unknown` list for content that is recognised but not mapped.

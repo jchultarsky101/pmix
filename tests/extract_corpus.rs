@@ -1,6 +1,6 @@
-//! Consistency of the STEP reader over the NIST corpus: every dimension
-//! entity becomes a dimension record, nothing in a handled family is left
-//! unconsumed, and spot values match the files.
+//! Consistency of the STEP reader over the NIST corpus: every dimension,
+//! tolerance, datum, and datum system entity becomes a record, nothing in
+//! a handled family is left unconsumed, and spot values match the files.
 
 use std::path::{Path, PathBuf};
 
@@ -74,15 +74,109 @@ fn every_dimension_entity_becomes_a_record() {
             );
         }
 
+        // Tolerances: one record per instance in either form.
+        let tolerance_entities = ex
+            .instances()
+            .filter(|i| {
+                i.has_type("GEOMETRIC_TOLERANCE")
+                    || i.type_names().any(|t| {
+                        t.ends_with("_TOLERANCE")
+                            && !matches!(
+                                t,
+                                "PLUS_MINUS_TOLERANCE" | "GEOMETRIC_TOLERANCE_RELATIONSHIP"
+                            )
+                    })
+            })
+            .filter(|i| !i.has_type("PLUS_MINUS_TOLERANCE"))
+            .count();
+        assert_eq!(
+            doc.semantic.tolerances.len(),
+            tolerance_entities,
+            "{name}: tolerance count"
+        );
+        for t in &doc.semantic.tolerances {
+            assert!(
+                t.value.is_some(),
+                "{name}: tolerance {:?} has no magnitude",
+                t.meta.source_refs
+            );
+            assert_eq!(
+                t.features.len(),
+                1,
+                "{name}: tolerance {:?} feature count",
+                t.meta.source_refs
+            );
+        }
+        let with_datums = doc
+            .semantic
+            .tolerances
+            .iter()
+            .filter(|t| t.datum_system.is_some())
+            .count();
+        let datum_ref_entities = ex.count_of_type("GEOMETRIC_TOLERANCE_WITH_DATUM_REFERENCE")
+            + ex.instances()
+                .filter(|i| {
+                    !i.is_complex()
+                        && i.parameters().len() == 5
+                        && i.type_names().any(|t| t.ends_with("_TOLERANCE"))
+                })
+                .count();
+        assert_eq!(
+            with_datums, datum_ref_entities,
+            "{name}: tolerances with datum references"
+        );
+        let composites = doc
+            .semantic
+            .tolerances
+            .iter()
+            .filter(|t| t.composite_of.is_some())
+            .count();
+        assert_eq!(
+            composites,
+            ex.count_of_type("GEOMETRIC_TOLERANCE_RELATIONSHIP"),
+            "{name}: composite count"
+        );
+
+        // Datums and datum systems.
+        assert_eq!(
+            doc.semantic.datums.len(),
+            ex.count_of_type("DATUM"),
+            "{name}: datum count"
+        );
+        assert_eq!(
+            doc.semantic.datum_systems.len(),
+            ex.count_of_type("DATUM_SYSTEM"),
+            "{name}: datum system count"
+        );
+        let targets: usize = doc.semantic.datums.iter().map(|d| d.targets.len()).sum();
+        assert_eq!(
+            targets,
+            ex.count_of_type("DATUM_TARGET") + ex.count_of_type("PLACED_DATUM_TARGET_FEATURE"),
+            "{name}: datum target count"
+        );
+        for ds in &doc.semantic.datum_systems {
+            assert!(
+                !ds.compartments.is_empty(),
+                "{name}: empty datum system {:?}",
+                ds.meta.source_refs
+            );
+            assert!(
+                !ds.text.contains('?'),
+                "{name}: unresolved datum in {}",
+                ds.text
+            );
+        }
+
+        // Nothing in a handled family may leak.
         let leaked: Vec<_> = doc
             .unknown
             .iter()
-            .filter(|u| u.reason.contains("dimension"))
+            .filter(|u| u.reason.contains("walker"))
             .map(|u| format!("{} {}", u.source_ref, u.kind))
             .collect();
         assert!(
             leaked.is_empty(),
-            "{name}: unconsumed dimension entities: {leaked:?}"
+            "{name}: unconsumed PMI entities: {leaked:?}"
         );
 
         // The corpus mixes metric and inch (ASME) models.
@@ -123,11 +217,46 @@ fn ctc01_spot_values() {
         .unwrap();
     assert_eq!(a.value.as_ref().unwrap().unit, "deg");
     assert_eq!(a.value.as_ref().unwrap().value, 60.0);
-    // Pending families are reported, not dropped.
+    // CTC 01 has datums A, B, C and datum systems A|B|C and A.
+    let mut labels: Vec<&str> = doc
+        .semantic
+        .datums
+        .iter()
+        .map(|d| d.label.as_str())
+        .collect();
+    labels.sort();
+    assert_eq!(labels, ["A", "B", "C"]);
+    let texts: Vec<&str> = doc
+        .semantic
+        .datum_systems
+        .iter()
+        .map(|d| d.text.as_str())
+        .collect();
     assert!(
-        doc.unknown
-            .iter()
-            .any(|u| u.kind.contains("GEOMETRIC_TOLERANCE"))
+        texts.contains(&"A|B|C") && texts.contains(&"A"),
+        "{texts:?}"
     );
-    assert!(doc.unknown.iter().any(|u| u.kind == "DATUM"));
+    for d in &doc.semantic.datums {
+        assert!(
+            !d.features.is_empty(),
+            "datum {} has no datum feature",
+            d.label
+        );
+    }
+    // #21 = position 0.75 to A|B|C.
+    let t = doc
+        .semantic
+        .tolerances
+        .iter()
+        .find(|t| t.meta.source_refs.contains(&"#21".to_string()))
+        .expect("#21 extracted");
+    assert_eq!(t.kind.as_str(), "position");
+    assert_eq!(t.value.as_ref().unwrap().value, 0.75);
+    let ds = doc
+        .semantic
+        .datum_systems
+        .iter()
+        .find(|d| Some(&d.meta.id) == t.datum_system.as_ref())
+        .expect("datum system resolved");
+    assert_eq!(ds.text, "A|B|C");
 }
