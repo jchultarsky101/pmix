@@ -5,8 +5,11 @@ Conformance Testing* project and are the de-facto public corpus that CAD
 vendors test PMI interoperability against. They are the ground truth for
 `pmix`'s STEP reader.
 
-- Source: <https://www.nist.gov/document/nist-pmi-step-files> (also shipped
-  with the [NIST STEP File Analyzer and Viewer](https://github.com/usnistgov/SFA)).
+- Source: `Release/NIST-PMI-STEP-Files.zip` in the
+  [NIST STEP File Analyzer and Viewer](https://github.com/usnistgov/SFA)
+  repository, February 2026 update. The older zip at
+  <https://www.nist.gov/document/nist-pmi-step-files> (June 2024) has
+  earlier editions of CTC 04, FTC 08 (tessellated), FTC 11, and STC 09.
 - Project page and test-case definitions:
   <https://www.nist.gov/ctl/smart-connected-systems-division/smart-connected-manufacturing-systems-group/mbe-pmi-0>
 - Expected PMI per test case (CSV): <https://github.com/usnistgov/CAD-PMI-Testing>

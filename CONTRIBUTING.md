@@ -47,8 +47,12 @@ cargo doc --no-deps --document-private-items
    review than a grab bag.
 4. Add or update tests for any behaviour you change. Integration tests for the
    CLI live in `tests/`; unit tests live next to the code they cover.
-5. Add an entry under `## [Unreleased]` in `CHANGELOG.md` for user-visible
-   changes.
+5. Keep the documentation in step with the code, in the same pull request.
+   Update `README.md` for any change to usage, flags, or output; add an
+   entry under `## [Unreleased]` in `CHANGELOG.md` for user-visible changes;
+   keep rustdoc on public items current; and record design decisions as
+   architecture decision records under `docs/adr/`. A change is not complete
+   until its documentation is.
 6. Make sure the checks above pass locally.
 7. Open the pull request and fill in the template.
 
