@@ -1,0 +1,3 @@
+# Keep STEP fixtures byte-exact: no line-ending normalisation, no diffs in PRs.
+tests/fixtures/** -text linguist-vendored
+*.stp -diff
