@@ -18,18 +18,44 @@ pub(crate) fn feature_for(ctx: &mut Ctx<'_>, sa: Id) -> Option<String> {
         ctx.warn(format!("feature reference #{sa} is undefined"), Some(sa));
         return None;
     };
-    // Anything referenced as a feature is a shape_aspect by schema (AP242
-    // has dozens of subtypes: datums, machining feature occurrences, ...),
-    // so no type gate: the record's kind comes from its geometry.
-    if inst
+    // A tolerance may target the product_definition_shape itself: "all
+    // over". Model that as a feature of the whole part.
+    if inst.has_type("PRODUCT_DEFINITION_SHAPE") {
+        let id = ctx.ids.make("feat", &["all_over"]);
+        ctx.features.push(Feature {
+            meta: Meta {
+                id: id.clone(),
+                source_refs: vec![source_ref(sa)],
+                ..Default::default()
+            },
+            kind: FeatureKind::AllOver,
+            name: None,
+            geometry: Vec::new(),
+            members: Vec::new(),
+            count: None,
+        });
+        ctx.feature_ids.insert(sa, Some(id.clone()));
+        return Some(id);
+    }
+
+    // Anything else referenced as a feature is a shape_aspect by schema
+    // (AP242 has dozens of subtypes: datums, machining feature occurrences,
+    // ...), so no type gate beyond rejecting obvious non-features: the
+    // record's kind comes from its geometry.
+    let not_a_feature = inst.type_names().any(|t| {
+        matches!(
+            t,
+            "PRODUCT_DEFINITION" | "PRODUCT" | "SHAPE_REPRESENTATION" | "REPRESENTATION"
+        )
+    }) || (inst
         .type_names()
         .any(|t| t.starts_with("DIMENSIONAL_") || t.starts_with("GEOMETRIC_TOLERANCE"))
         && !inst.has_type("DATUM_FEATURE")
-        && !inst.type_names().any(|t| t.ends_with("WITH_DATUM_FEATURE"))
-    {
+        && !inst.type_names().any(|t| t.ends_with("WITH_DATUM_FEATURE")));
+    if not_a_feature {
         ctx.warn(
             format!(
-                "#{sa} ({}) is used as a feature but is a dimension or tolerance",
+                "#{sa} ({}) is used as a feature but is not a shape aspect",
                 inst.type_key()
             ),
             Some(sa),
@@ -74,9 +100,12 @@ pub(crate) fn feature_for(ctx: &mut Ctx<'_>, sa: Id) -> Option<String> {
     }
 
     let kind = feature_kind(inst, &geometry, &members);
-    if matches!(kind, FeatureKind::Other(_)) {
+    if geometry.is_empty() && members.is_empty() {
         ctx.warn(
-            format!("feature #{sa} has no geometry and no members; kind unresolved"),
+            format!(
+                "feature #{sa} ({}) has no geometry and no members",
+                inst.type_key()
+            ),
             Some(sa),
         );
     }

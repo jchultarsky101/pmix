@@ -12,7 +12,7 @@ mod measure;
 mod semantic;
 
 pub use id::ContentId;
-pub use measure::{Direction, Measure};
+pub use measure::{Direction, Measure, Placement};
 pub use semantic::*;
 
 use serde::{Deserialize, Serialize};

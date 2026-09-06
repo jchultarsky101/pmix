@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::measure::{Direction, Measure};
+use super::measure::{Direction, Measure, Placement};
 
 /// Defines an enumeration that serialises as a string, with known values
 /// mapped to canonical `snake_case` names and unrecognised source values
@@ -126,6 +126,7 @@ string_enum! {
         Composite => "composite",
         CompositeGroup => "composite_group",
         DatumTargetArea => "datum_target_area",
+        AllOver => "all_over",
         ParallelOffset => "parallel_offset",
         GeometricAlignment => "geometric_alignment",
         PerpendicularTo => "perpendicular_to",
@@ -190,10 +191,18 @@ pub struct DatumTarget {
     /// E.g. `"A1"`.
     pub label: String,
     pub kind: DatumTargetKind,
-    /// Target dimensions (diameter, or width and length).
-    pub size: Vec<Measure>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diameter: Option<Measure>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub length: Option<Measure>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<Measure>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placement: Option<Placement>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub feature: Option<String>,
+    /// Attributes recognised but not interpreted.
+    pub unmapped: Vec<Unmapped>,
 }
 
 string_enum! {
@@ -203,6 +212,7 @@ string_enum! {
         Line => "line",
         Rectangle => "rectangle",
         Circle => "circle",
+        CircularLine => "circular_line",
         Area => "area",
     }
 }
@@ -481,6 +491,8 @@ pub struct GeometricTolerance {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub composite_of: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decimal_places: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
 }
 
@@ -517,17 +529,16 @@ pub struct Zone {
 }
 
 string_enum! {
-    /// AP242 `tolerance_zone_form` names, normalised.
+    /// AP242 `tolerance_zone_form` names (rec. practice table 13), normalised.
     ZoneForm {
-        WithinCylinder => "within_cylinder",
-        WithinSphere => "within_sphere",
-        WithinCircle => "within_circle",
-        WithinTwoParallelPlanes => "within_two_parallel_planes",
-        WithinTwoParallelLines => "within_two_parallel_lines",
-        WithinTwoConcentricCircles => "within_two_concentric_circles",
-        WithinTwoCoaxialCylinders => "within_two_coaxial_cylinders",
         CylindricalOrCircular => "cylindrical_or_circular",
         Spherical => "spherical",
+        WithinCircle => "within_circle",
+        BetweenTwoConcentricCircles => "between_two_concentric_circles",
+        BetweenTwoEquidistantCurves => "between_two_equidistant_curves",
+        WithinCylinder => "within_cylinder",
+        BetweenTwoCoaxialCylinders => "between_two_coaxial_cylinders",
+        BetweenTwoEquidistantSurfaces => "between_two_equidistant_surfaces",
         NonUniform => "non_uniform",
     }
 }
@@ -538,6 +549,9 @@ pub struct UnitBasis {
     pub length: Measure,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<Measure>,
+    /// Shape of the unit area: `circular`, `rectangular`, `square`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub area_type: Option<String>,
 }
 
 string_enum! {
