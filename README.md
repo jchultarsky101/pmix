@@ -127,11 +127,20 @@ the crate is published.
 ## Roadmap
 
 - [x] Project scaffolding, CLI skeleton, versioned JSON model
+- [x] Test corpus: NIST MBE PMI AP242 models ([tests/fixtures/nist](tests/fixtures/nist))
+- [ ] STEP Part 21 parser and `pmix inspect` for exploring entity graphs
 - [ ] STEP AP242 reader: semantic PMI (dimensions, tolerances, datums)
-- [ ] STEP AP242 reader: presentation PMI (graphical annotations)
-- [ ] JT reader: PMI segment
-- [ ] `pmix diff` command to compare two or more extractions
+- [ ] STEP AP242 reader: presentation PMI (graphical annotations, saved views)
+- [ ] Stable identity across exports and `pmix diff`
+- [ ] JT reader: PMI Manager segment
 - [ ] Publish to crates.io
+
+## Design
+
+The reader is a targeted, pure-Rust implementation rather than a binding to
+OpenCascade or a full EXPRESS schema. The reasoning and the resulting design
+rules are recorded in
+[ADR 0001](docs/adr/0001-step-parsing-strategy.md).
 
 ## Contributing
 
