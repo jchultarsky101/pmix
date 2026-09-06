@@ -41,6 +41,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub fn extract(path: &Path) -> Result<PmiDocument> {
     let format =
         Format::from_path(path).ok_or_else(|| Error::UnknownFormat(path.display().to_string()))?;
+    tracing::debug!(path = %path.display(), %format, "detected input format");
 
     // Fail early on unreadable input so callers get an I/O error rather than
     // an "unsupported" error for a file that does not exist.
