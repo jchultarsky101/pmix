@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- STEP Part 21 parser (`pmix::step::p21`): header, simple and complex
+  instances, typed values, all string escapes, edition-3 section skipping,
+  and error recovery with line-numbered diagnostics. Parses the entire NIST
+  AP242 corpus without diagnostics.
+- `pmix inspect` command to explore a STEP file's entity graph: type counts,
+  complex-instance combinations, per-type listing, entity dumps with
+  reference depth, diagnostics, and JSON output.
+- `CLAUDE.md` with project rules, including keeping documentation in step
+  with code changes.
 - ADR 0001 recording the STEP parsing strategy, and the NIST MBE PMI AP242
   test corpus under `tests/fixtures/nist`.
 - Project scaffolding: library and CLI crate layout, CI workflow, issue and
