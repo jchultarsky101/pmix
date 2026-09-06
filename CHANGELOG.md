@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `docs/test-data.md`: test-data strategy and a licence-checked survey of
+  public STEP and JT sources.
 - STEP Part 21 parser (`pmix::step::p21`): header, simple and complex
   instances, typed values, all string escapes, edition-3 section skipping,
   and error recovery with line-numbered diagnostics. Parses the entire NIST
