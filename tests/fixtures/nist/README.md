@@ -14,6 +14,9 @@ vendors test PMI interoperability against. They are the ground truth for
   <https://www.nist.gov/ctl/smart-connected-systems-division/smart-connected-manufacturing-systems-group/mbe-pmi-0>
 - Expected PMI per test case (CSV): <https://github.com/usnistgov/CAD-PMI-Testing>
 
+See [docs/test-data.md](../../../docs/test-data.md) for how this corpus fits
+into the overall test strategy and for other data sources.
+
 ## Terms of use
 
 NIST states that "the test cases, CAD models, and STEP files can be used
