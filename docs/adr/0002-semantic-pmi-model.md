@@ -1,6 +1,6 @@
 # ADR 0002: Semantic layer of the PMI data model
 
-- **Status:** Proposed, 2026-09-06
+- **Status:** Accepted, 2026-09-06
 - **Deciders:** Julian Chultarsky
 - **Depends on:** [ADR 0001](0001-step-parsing-strategy.md)
 

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- ADR 0002 (proposed): semantic layer of the PMI data model.
+- ADR 0002: semantic layer of the PMI data model.
 - `docs/test-data.md`: test-data strategy and a licence-checked survey of
   public STEP and JT sources.
 - STEP Part 21 parser (`pmix::step::p21`): header, simple and complex
