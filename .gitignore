@@ -1,0 +1,14 @@
+# Rust build output
+/target
+
+# Cargo.lock is committed for binaries, so it is intentionally NOT ignored.
+
+# Editor and OS noise
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Local scratch
+*.log

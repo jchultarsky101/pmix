@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an improvement or new capability.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation, not just the solution you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like pmix to behave? Example commands or JSON output are welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

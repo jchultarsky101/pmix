@@ -1,0 +1,37 @@
+name: Bug report
+description: Something does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the problem, including the exact command you ran and the full error output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: pmix version
+      description: Output of `pmix --version`, or the commit hash if built from source.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Operating system and Rust version
+      placeholder: macOS 15.1, rustc 1.85.0
+  - type: textarea
+    id: file
+    attributes:
+      label: Input file
+      description: >
+        Which CAD system exported the file and in what format/version (e.g. "NX 2312, JT 10.5" or
+        "SolidWorks 2024, STEP AP242"). If you can attach or link a file that reproduces the problem
+        and is safe to share publicly, please do; it makes fixing the bug far easier.
