@@ -16,10 +16,11 @@ you can answer questions like "did the tolerances change between revision B
 and revision C?" without opening a CAD package.
 
 > **Status: early development.** `pmix extract` reads STEP AP242 files and
-> emits units, features, and dimensions with their tolerances. Geometric
-> tolerances, datums, and graphical PMI are listed under `unknown` in the
-> output until their readers land. JT is not supported yet. Nothing is
-> published to crates.io yet. See the [roadmap](#roadmap).
+> emits the full semantic PMI layer: units, features, dimensions with
+> tolerances, geometric tolerances with zones, modifiers and composites,
+> datums with targets, and datum reference frames. It extracts every such
+> entity in the NIST test corpus. Graphical PMI and JT are not supported
+> yet. Nothing is published to crates.io yet. See the [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -120,13 +121,32 @@ breaking changes. Abridged:
         "modifiers": [], "features": ["feat:…"], "decimal_places": 2,
         "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#42", "#46", "#45", "#50", "#49"] }
     ],
-    "datums": [], "datum_systems": [], "tolerances": [], "notes": [], "other": []
+    "datums": [
+      { "id": "datum:…", "label": "A", "features": ["feat:…"],
+        "targets": [{ "label": "A1", "kind": "point", "diameter": { "value": 2.0, "unit": "mm" },
+                      "placement": { "origin": [10.0, 10.0, 0.0], "axis": { "x": 0.0, "y": 0.0, "z": 1.0 } }, "feature": "feat:…", "unmapped": [] }],
+        "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#42", "#43", "#45"] }
+    ],
+    "datum_systems": [
+      { "id": "dsys:…", "text": "A|B(M)|C",
+        "compartments": [
+          { "datums": [{ "datum": "datum:…", "modifiers": [], "modifier_values": [] }], "common": false },
+          { "datums": [{ "datum": "datum:…", "modifiers": ["maximum_material"], "modifier_values": [] }], "common": false },
+          { "datums": [{ "datum": "datum:…", "modifiers": [], "modifier_values": [] }], "common": false }
+        ],
+        "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#73", "#70", "#71", "#72"] }
+    ],
+    "tolerances": [
+      { "id": "tol:…", "kind": "position", "text": "⌖ ⌀0.1 Ⓟ10 Ⓜ | A | B Ⓜ | C",
+        "value": { "value": 0.1, "unit": "mm" },
+        "zone": { "form": "cylindrical_or_circular", "projected": { "value": 10.0, "unit": "mm" } },
+        "modifiers": ["maximum_material"], "datum_system": "dsys:…", "features": ["feat:…"], "decimal_places": 2,
+        "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#84", "#82", "#86", "#87"] }
+    ],
+    "notes": [], "other": []
   },
   "presentation": { "annotations": [] },
-  "unknown": [
-    { "layer": "semantic", "kind": "DATUM", "reason": "geometric tolerances and datums are not supported yet",
-      "source_ref": "#300", "raw": "#300=DATUM('','',#16,.F.,'A');" }
-  ],
+  "unknown": [],
   "diagnostics": []
 }
 ```
@@ -162,7 +182,7 @@ the crate is published.
 - [x] STEP Part 21 parser and `pmix inspect` for exploring entity graphs
 - [x] Semantic data model (ADR 0002)
 - [x] STEP AP242 reader: units, features, dimensions with tolerances
-- [ ] STEP AP242 reader: geometric tolerances, datums, datum systems
+- [x] STEP AP242 reader: geometric tolerances, datums, datum targets, datum systems
 - [ ] STEP AP242 reader: presentation PMI (graphical annotations, saved views)
 - [ ] Stable identity across exports and `pmix diff`
 - [ ] JT reader: PMI Manager segment

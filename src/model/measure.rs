@@ -34,3 +34,13 @@ pub struct Direction {
     pub y: f64,
     pub z: f64,
 }
+
+/// A position and orientation in model space (AP242 `axis2_placement_3d`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Placement {
+    pub origin: [f64; 3],
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub axis: Option<Direction>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ref_direction: Option<Direction>,
+}
