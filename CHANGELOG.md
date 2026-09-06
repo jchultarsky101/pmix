@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project scaffolding: library and CLI crate layout, CI workflow, issue and
   pull request templates, contribution guidelines, and code of conduct.
 - `pmix extract` command with `--output` and `--compact` options.
+- `--verbose` flag and `RUST_LOG` support for diagnostic logging via `tracing`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 

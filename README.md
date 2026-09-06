@@ -63,6 +63,14 @@ Write the output to a file, compact instead of pretty-printed:
 pmix extract part.jt --output part.pmi.json --compact
 ```
 
+Turn on diagnostic logging with `-v` (debug) or `-vv` (trace), or set
+`RUST_LOG` for fine-grained control. Logs go to stderr, so JSON on stdout
+stays clean:
+
+```bash
+pmix -v extract part.stp > part.pmi.json
+```
+
 Run `pmix --help` or `pmix extract --help` for the full option list.
 
 ## Output format
