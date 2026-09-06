@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "source": {
+    "file_name": "dimension_basics.stp",
+    "format": "STEP",
+    "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF",
+    "writer": "pmix synthetic",
+    "time_stamp": "2026-09-06T00:00:00"
+  },
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "semantic": {
+    "features": [
+      {
+        "id": "feat:1a1625fc17b4fc49",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#40",
+          "#41"
+        ],
+        "kind": "face",
+        "name": "hole",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "cylinder",
+            "source_ref": "#25"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:80625b919b82cea8",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#71",
+          "#72"
+        ],
+        "kind": "face",
+        "name": "hole 1",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "cylinder",
+            "source_ref": "#25"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:a758074951cfbc7b",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#62",
+          "#63"
+        ],
+        "kind": "face",
+        "name": "right",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#31"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:e8ab37e5fa48d88e",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#60",
+          "#61"
+        ],
+        "kind": "face",
+        "name": "left",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#27"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:faede4f21ad47156",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#70",
+          "#73"
+        ],
+        "kind": "composite",
+        "name": "pattern",
+        "geometry": [],
+        "members": [
+          "feat:80625b919b82cea8"
+        ]
+      }
+    ],
+    "datums": [],
+    "datum_systems": [],
+    "dimensions": [
+      {
+        "id": "dim:78aad44e861f0446",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#42",
+          "#46",
+          "#45",
+          "#50",
+          "#49"
+        ],
+        "kind": "size",
+        "subtype": "diameter",
+        "value": {
+          "value": 12.5,
+          "unit": "mm"
+        },
+        "tolerance": {
+          "type": "plus_minus",
+          "lower": {
+            "value": -0.05,
+            "unit": "mm"
+          },
+          "upper": {
+            "value": 0.05,
+            "unit": "mm"
+          }
+        },
+        "modifiers": [],
+        "features": [
+          "feat:1a1625fc17b4fc49"
+        ],
+        "decimal_places": 2
+      },
+      {
+        "id": "dim:ae1786b93f6643fc",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#90",
+          "#95",
+          "#94",
+          "#97",
+          "#96"
+        ],
+        "kind": "size",
+        "subtype": "diameter",
+        "value": {
+          "value": 12.5,
+          "unit": "mm"
+        },
+        "tolerance": {
+          "type": "limits_and_fits",
+          "form": "H",
+          "zone": "",
+          "grade": "7"
+        },
+        "modifiers": [
+          "statistical"
+        ],
+        "features": [
+          "feat:1a1625fc17b4fc49"
+        ]
+      },
+      {
+        "id": "dim:cafcfa2cb749e9d2",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#74",
+          "#78",
+          "#77"
+        ],
+        "kind": "size",
+        "subtype": "radius",
+        "limits": {
+          "lower": {
+            "value": 6.2,
+            "unit": "mm"
+          },
+          "upper": {
+            "value": 6.3,
+            "unit": "mm"
+          }
+        },
+        "modifiers": [],
+        "features": [
+          "feat:faede4f21ad47156"
+        ]
+      },
+      {
+        "id": "dim:e7a91961fc450e52",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#80",
+          "#83",
+          "#82"
+        ],
+        "kind": "angular_size",
+        "subtype": "angle",
+        "value": {
+          "value": 30.0,
+          "unit": "deg"
+        },
+        "modifiers": [],
+        "features": [
+          "feat:e8ab37e5fa48d88e"
+        ]
+      },
+      {
+        "id": "dim:fef5cd5086dada30",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#64",
+          "#68",
+          "#67"
+        ],
+        "kind": "location",
+        "subtype": "linear",
+        "value": {
+          "value": 40.0,
+          "unit": "mm"
+        },
+        "qualifier": "basic",
+        "modifiers": [],
+        "features": [
+          "feat:e8ab37e5fa48d88e",
+          "feat:a758074951cfbc7b"
+        ]
+      }
+    ],
+    "tolerances": [],
+    "notes": [],
+    "other": []
+  },
+  "presentation": {
+    "annotations": []
+  },
+  "unknown": [],
+  "diagnostics": []
+}

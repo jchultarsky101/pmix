@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Semantic data model (`pmix::model`) implementing ADR 0002: features,
+  datums, datum systems, dimensions, geometric tolerances, notes, and an
+  `unknown` list for content that is recognised but not mapped.
+- STEP AP242 reader (`pmix::step::pmi`) with walkers for units, features
+  (shape aspects resolved to B-rep faces), and dimensions with values,
+  limits, plus-minus and limits-and-fits tolerances, qualifiers, and
+  modifiers. `pmix extract` now produces output for STEP files.
+- Synthetic fixtures under `tests/fixtures/synthetic` with expected JSON.
 - ADR 0002: semantic layer of the PMI data model.
 - `docs/test-data.md`: test-data strategy and a licence-checked survey of
   public STEP and JT sources.
