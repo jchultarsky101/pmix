@@ -15,11 +15,11 @@ The end goal is to run `pmix` on two or more models and diff the results, so
 you can answer questions like "did the tolerances change between revision B
 and revision C?" without opening a CAD package.
 
-> **Status: early development.** The STEP Part 21 parser and the
-> `pmix inspect` explorer work on the full NIST AP242 PMI corpus. PMI
-> interpretation is not implemented yet, so `pmix extract` currently reports
-> the format as unsupported. Nothing is published to crates.io yet. See the
-> [roadmap](#roadmap).
+> **Status: early development.** `pmix extract` reads STEP AP242 files and
+> emits units, features, and dimensions with their tolerances. Geometric
+> tolerances, datums, and graphical PMI are listed under `unknown` in the
+> output until their readers land. JT is not supported yet. Nothing is
+> published to crates.io yet. See the [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -97,34 +97,45 @@ Run `pmix --help` or `pmix extract --help` for the full option list.
 
 ## Output format
 
-The output is a single JSON document. The shape is versioned through a
-`schema_version` field so that downstream tooling can detect breaking changes.
+The output is a single JSON document defined in
+[ADR 0002](docs/adr/0002-semantic-pmi-model.md). The shape is versioned
+through a `schema_version` field so that downstream tooling can detect
+breaking changes. Abridged:
 
 ```json
 {
   "schema_version": 1,
-  "source": {
-    "file_name": "part.stp",
-    "format": "STEP"
+  "source": { "file_name": "part.stp", "format": "STEP", "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF" },
+  "units": { "length": "mm", "angle": "deg" },
+  "semantic": {
+    "features": [
+      { "id": "feat:…", "kind": "face", "name": "hole",
+        "geometry": [{ "kind": "face", "surface": "cylinder", "source_ref": "#25" }],
+        "members": [], "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#40", "#41"] }
+    ],
+    "dimensions": [
+      { "id": "dim:…", "kind": "size", "subtype": "diameter",
+        "value": { "value": 12.5, "unit": "mm" },
+        "tolerance": { "type": "plus_minus", "lower": { "value": -0.05, "unit": "mm" }, "upper": { "value": 0.05, "unit": "mm" } },
+        "modifiers": [], "features": ["feat:…"], "decimal_places": 2,
+        "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#42", "#46", "#45", "#50", "#49"] }
+    ],
+    "datums": [], "datum_systems": [], "tolerances": [], "notes": [], "other": []
   },
-  "annotations": [
-    {
-      "kind": "dimension",
-      "text": "⌀12.5 ±0.05"
-    },
-    {
-      "kind": "geometric_tolerance",
-      "text": "⌖ ⌀0.1 Ⓜ A B C"
-    }
-  ]
+  "presentation": { "annotations": [] },
+  "unknown": [
+    { "layer": "semantic", "kind": "DATUM", "reason": "geometric tolerances and datums are not supported yet",
+      "source_ref": "#300", "raw": "#300=DATUM('','',#16,.F.,'A');" }
+  ],
+  "diagnostics": []
 }
 ```
 
-Collections are sorted deterministically and identifiers are derived from
-content rather than from the source file's internal entity numbering, so two
-extractions of semantically identical PMI produce byte-identical output. The
-model will grow considerably as the readers are implemented; the current
-definition lives in [`src/model.rs`](src/model.rs).
+Every array is sorted by id, ids are derived from content rather than from
+the source file's entity numbering, and measures are kept in the unit the
+file declares. Anything the reader recognises but cannot map is reported
+under `unknown` rather than dropped. The model lives in
+[`src/model/`](src/model/).
 
 ## Library use
 
@@ -149,7 +160,9 @@ the crate is published.
 - [x] Project scaffolding, CLI skeleton, versioned JSON model
 - [x] Test corpus: NIST MBE PMI AP242 models ([tests/fixtures/nist](tests/fixtures/nist))
 - [x] STEP Part 21 parser and `pmix inspect` for exploring entity graphs
-- [ ] STEP AP242 reader: semantic PMI (dimensions, tolerances, datums)
+- [x] Semantic data model (ADR 0002)
+- [x] STEP AP242 reader: units, features, dimensions with tolerances
+- [ ] STEP AP242 reader: geometric tolerances, datums, datum systems
 - [ ] STEP AP242 reader: presentation PMI (graphical annotations, saved views)
 - [ ] Stable identity across exports and `pmix diff`
 - [ ] JT reader: PMI Manager segment
