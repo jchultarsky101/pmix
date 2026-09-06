@@ -171,6 +171,8 @@ pull request. This project follows the
 
 Sample STEP and JT files that contain PMI are especially valuable for testing.
 If you can share one under a permissive licence, please open an issue.
+[docs/test-data.md](docs/test-data.md) lists what the project already uses,
+what else is available, and which sources must be avoided for licence reasons.
 
 ## License
 
