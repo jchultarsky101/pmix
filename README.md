@@ -1,8 +1,10 @@
 # pmix
 
 [![CI](https://github.com/jchultarsky101/pmix/actions/workflows/ci.yml/badge.svg)](https://github.com/jchultarsky101/pmix/actions/workflows/ci.yml)
+<!-- Restore when the crate is published:
 [![crates.io](https://img.shields.io/crates/v/pmix.svg)](https://crates.io/crates/pmix)
 [![docs.rs](https://img.shields.io/docsrs/pmix)](https://docs.rs/pmix)
+-->
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
 **pmix** is a command-line tool that reads a 3D model file (STEP or JT),
