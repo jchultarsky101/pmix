@@ -15,10 +15,11 @@ The end goal is to run `pmix` on two or more models and diff the results, so
 you can answer questions like "did the tolerances change between revision B
 and revision C?" without opening a CAD package.
 
-> **Status: early development.** The CLI, JSON data model, and format
-> detection exist. The STEP and JT readers are not implemented yet, so
-> `pmix extract` currently reports the format as unsupported. Nothing is
-> published to crates.io yet. See the [roadmap](#roadmap).
+> **Status: early development.** The STEP Part 21 parser and the
+> `pmix inspect` explorer work on the full NIST AP242 PMI corpus. PMI
+> interpretation is not implemented yet, so `pmix extract` currently reports
+> the format as unsupported. Nothing is published to crates.io yet. See the
+> [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -64,6 +65,25 @@ Write the output to a file, compact instead of pretty-printed:
 ```bash
 pmix extract part.jt --output part.pmi.json --compact
 ```
+
+### Exploring a STEP file
+
+`pmix inspect` shows the raw entity graph of a STEP file, which is useful
+when investigating what a CAD system actually exported:
+
+```bash
+pmix inspect part.stp                     # header, summary, count of every entity type
+pmix inspect part.stp --complex           # only the complex-instance combinations
+pmix inspect part.stp --type datum        # every instance with a DATUM segment
+pmix inspect part.stp -e 1752 -d 2        # instance #1752 and what it references, 2 levels deep
+pmix inspect part.stp --diagnostics       # show parser warnings and recovered errors
+pmix inspect part.stp -e 1752 --json      # machine-readable output
+```
+
+The parser is tolerant: malformed records are reported and skipped, and
+the rest of the file is still read.
+
+### Logging
 
 Turn on diagnostic logging with `-v` (debug) or `-vv` (trace), or set
 `RUST_LOG` for fine-grained control. Logs go to stderr, so JSON on stdout
@@ -128,7 +148,7 @@ the crate is published.
 
 - [x] Project scaffolding, CLI skeleton, versioned JSON model
 - [x] Test corpus: NIST MBE PMI AP242 models ([tests/fixtures/nist](tests/fixtures/nist))
-- [ ] STEP Part 21 parser and `pmix inspect` for exploring entity graphs
+- [x] STEP Part 21 parser and `pmix inspect` for exploring entity graphs
 - [ ] STEP AP242 reader: semantic PMI (dimensions, tolerances, datums)
 - [ ] STEP AP242 reader: presentation PMI (graphical annotations, saved views)
 - [ ] Stable identity across exports and `pmix diff`

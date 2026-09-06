@@ -12,6 +12,7 @@
 
 pub mod format;
 pub mod model;
+pub mod step;
 
 pub use format::Format;
 pub use model::PmiDocument;
