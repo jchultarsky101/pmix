@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-07
+
+First release with prebuilt binaries.
+
+### Added
+
+- Prebuilt binaries, installer scripts, and the `pmix-update` updater for
+  macOS (Apple Silicon and Intel) and Windows (x86-64 and ARM64), built by
+  cargo-dist on every release tag (ADR 0006). crates.io publishing is
+  postponed until the base functionality is complete.
+
 ## [0.1.0] - 2026-09-07
 
 First release: STEP AP242 extraction of both PMI layers, identity across
@@ -82,5 +93,6 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/jchultarsky101/pmix/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jchultarsky101/pmix/releases/tag/v0.1.0

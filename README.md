@@ -41,13 +41,28 @@ data lives inside the 3D file rather than on a 2D drawing.
 
 ## Installation
 
-From crates.io (requires Rust 1.85 or newer):
+Prebuilt binaries and installers for macOS and Windows are attached to
+every [GitHub release](https://github.com/jchultarsky101/pmix/releases).
+
+macOS (Apple Silicon and Intel):
 
 ```bash
-cargo install pmix
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jchultarsky101/pmix/releases/latest/download/pmix-installer.sh | sh
 ```
 
-Or from source:
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/jchultarsky101/pmix/releases/latest/download/pmix-installer.ps1 | iex"
+```
+
+The installer also puts `pmix-update` next to `pmix`; run it to upgrade to
+the latest release in place. Archives for manual installation are on the
+same release page.
+
+Publishing to crates.io is postponed until the base functionality is
+complete ([ADR 0006](docs/adr/0006-distribution.md)). Until then, building
+from source needs Rust 1.85 or newer:
 
 ```bash
 git clone https://github.com/jchultarsky101/pmix.git
@@ -229,7 +244,8 @@ fn main() -> Result<(), pmix::Error> {
 }
 ```
 
-API documentation is on [docs.rs](https://docs.rs/pmix).
+API documentation will be on [docs.rs](https://docs.rs/pmix) once the crate
+is published; until then, `cargo doc --open` builds it locally.
 
 ## Roadmap
 
@@ -244,7 +260,8 @@ API documentation is on [docs.rs](https://docs.rs/pmix).
 - [x] Stable identity across exports (ADR 0004)
 - [x] `pmix diff` (ADR 0005)
 - [ ] JT reader: PMI Manager segment
-- [x] Publish to crates.io (0.1.0)
+- [x] Binaries and installers for macOS and Windows from GitHub releases (ADR 0006)
+- [ ] Publish to crates.io, once the base functionality is complete
 
 ## Design
 
