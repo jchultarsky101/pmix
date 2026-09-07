@@ -12,3 +12,6 @@
 
 # Local scratch
 *.log
+
+# Local test data (large model files that must not be committed)
+/data/
