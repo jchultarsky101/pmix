@@ -11,10 +11,10 @@
 //!
 //! # Status
 //!
-//! The STEP reader extracts units, features, and dimensions with their
-//! tolerances. Geometric tolerances, datums, presentation, and JT are not
-//! implemented yet; their entities are reported in the document's
-//! `unknown` list rather than dropped.
+//! The STEP reader extracts the semantic layer (units, features,
+//! dimensions, geometric tolerances, datums, datum systems) and the
+//! presentation layer (annotations and saved views). JT is not implemented
+//! yet.
 
 pub mod format;
 pub mod model;
@@ -23,7 +23,7 @@ pub mod step;
 
 pub use format::Format;
 pub use model::PmiDocument;
-pub use reader::{Reader, read_path};
+pub use reader::{ExtractOptions, Reader, read_path, read_path_with};
 
 use std::path::Path;
 
@@ -53,4 +53,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Read the file at `path`, detect its format, and extract the PMI it contains.
 pub fn extract(path: &Path) -> Result<PmiDocument> {
     read_path(path)
+}
+
+/// [`extract`] with options.
+pub fn extract_with(path: &Path, options: &ExtractOptions) -> Result<PmiDocument> {
+    read_path_with(path, options)
 }

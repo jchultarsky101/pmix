@@ -9,10 +9,12 @@
 
 mod id;
 mod measure;
+mod presentation;
 mod semantic;
 
-pub use id::ContentId;
+pub use id::{ContentId, content_hash};
 pub use measure::{Direction, Measure, Placement};
+pub use presentation::*;
 pub use semantic::*;
 
 use serde::{Deserialize, Serialize};
@@ -33,7 +35,7 @@ pub struct PmiDocument {
     pub units: Units,
     /// Machine-readable PMI.
     pub semantic: Semantic,
-    /// Human-visible PMI. Defined by a later ADR; empty until then.
+    /// Human-visible PMI (ADR 0003).
     pub presentation: Presentation,
     /// Recognised but unmapped content. Never silently dropped.
     pub unknown: Vec<Unknown>,
@@ -93,22 +95,6 @@ impl Semantic {
         self.notes.sort_by(|a, b| a.meta.id.cmp(&b.meta.id));
         self.other.sort_by(|a, b| a.meta.id.cmp(&b.meta.id));
     }
-}
-
-/// The presentation layer. Placeholder until its ADR; kept in the skeleton
-/// so the document shape does not change when it lands.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
-pub struct Presentation {
-    pub annotations: Vec<Annotation>,
-}
-
-/// A visible annotation. Minimal placeholder; see the presentation ADR.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Annotation {
-    pub id: String,
-    pub kind: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub text: Option<String>,
 }
 
 /// Content the reader recognised as PMI-related but could not map.

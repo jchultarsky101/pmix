@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Presentation layer (ADR 0003) in the model and the STEP reader:
+  annotations from draughting callouts and standalone occurrences with
+  kind, label, text (explicit from the PMI validation property or rendered
+  from the linked semantic record), plane, placeholder box and leader
+  lines, style, geometry summary with bounding box and content hash, parts,
+  and links to semantic records and features; saved views from cameras with
+  projection, clipping planes, and the annotations they show. Semantic
+  records now carry their `presentation` links.
+- `pmix extract --presentation-geometry` to include full annotation
+  coordinates and triangles.
+- Dimensions now carry a rendered `text` such as `⌀35 -0.2/+0` or `[40]`.
+- Synthetic fixture `presentation_basics` with expected JSON.
 - ADR 0003: presentation layer of the PMI data model.
 - STEP AP242 walkers for geometric tolerances (all fifteen types in simple
   and complex instance form, magnitude with decimal places, modifiers,

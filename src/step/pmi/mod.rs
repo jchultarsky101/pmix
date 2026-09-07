@@ -10,24 +10,27 @@ pub(crate) mod datums;
 pub(crate) mod dimensions;
 pub(crate) mod features;
 pub(crate) mod measures;
+pub(crate) mod presentation;
 pub(crate) mod tolerances;
 pub(crate) mod units;
 
 use std::collections::{HashMap, HashSet};
 
+use crate::ExtractOptions;
 use crate::model::{
-    ContentId, Datum, DatumSystem, Diagnostic, Dimension, Feature, GeometricTolerance, Layer,
-    PmiDocument, Presentation, SCHEMA_VERSION, Semantic, Source, Unknown,
+    Annotation, ContentId, Datum, DatumSystem, Diagnostic, Dimension, Feature, GeometricTolerance,
+    Layer, PmiDocument, Presentation, SCHEMA_VERSION, SavedView, Semantic, Source, Unknown,
 };
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
 /// Extract everything the walkers understand from `ex`.
-pub fn extract(ex: &Exchange, file_name: &str) -> PmiDocument {
+pub fn extract(ex: &Exchange, file_name: &str, options: &ExtractOptions) -> PmiDocument {
     let mut ctx = Ctx::new(ex);
     let units = units::document_units(&mut ctx);
     datums::walk(&mut ctx);
     dimensions::walk(&mut ctx);
     tolerances::walk(&mut ctx);
+    presentation::walk(&mut ctx, options);
     let unknown = ctx.collect_unknown();
 
     let mut diagnostics: Vec<Diagnostic> = ex
@@ -49,6 +52,11 @@ pub fn extract(ex: &Exchange, file_name: &str) -> PmiDocument {
         ..Default::default()
     };
     semantic.sort();
+    let mut presentation = Presentation {
+        annotations: ctx.annotations,
+        views: ctx.views,
+    };
+    presentation.sort();
 
     let header = &ex.header;
     PmiDocument {
@@ -68,7 +76,7 @@ pub fn extract(ex: &Exchange, file_name: &str) -> PmiDocument {
         },
         units,
         semantic,
-        presentation: Presentation::default(),
+        presentation,
         unknown,
         diagnostics,
     }
@@ -78,7 +86,7 @@ pub fn extract(ex: &Exchange, file_name: &str) -> PmiDocument {
 /// unconsumed indicate a gap in a walker. Leaf values such as
 /// `TOLERANCE_VALUE` are not listed: they are only meaningful through their
 /// parent, which is what gets reported.
-const HANDLED_FAMILY: &[(&[&str], &str)] = &[
+const HANDLED_FAMILY: &[(&[&str], &str, Layer)] = &[
     (
         &[
             "DIMENSIONAL_SIZE",
@@ -95,6 +103,7 @@ const HANDLED_FAMILY: &[(&[&str], &str)] = &[
             "PLUS_MINUS_TOLERANCE",
         ],
         "recognised as a dimension entity but not consumed by the dimension walker",
+        Layer::Semantic,
     ),
     (
         &[
@@ -122,6 +131,7 @@ const HANDLED_FAMILY: &[(&[&str], &str)] = &[
             "GEOMETRIC_TOLERANCE_RELATIONSHIP",
         ],
         "recognised as a geometric tolerance entity but not consumed by the tolerance walker",
+        Layer::Semantic,
     ),
     (
         &[
@@ -138,20 +148,46 @@ const HANDLED_FAMILY: &[(&[&str], &str)] = &[
             "DATUM_REFERENCE_MODIFIER_WITH_VALUE",
         ],
         "recognised as a datum entity but not consumed by the datum walker",
+        Layer::Semantic,
+    ),
+    (
+        &[
+            "DRAUGHTING_CALLOUT",
+            "DRAUGHTING_CALLOUT_RELATIONSHIP",
+            "ANNOTATION_OCCURRENCE",
+            "TESSELLATED_ANNOTATION_OCCURRENCE",
+            "ANNOTATION_CURVE_OCCURRENCE",
+            "ANNOTATION_FILL_AREA_OCCURRENCE",
+            "ANNOTATION_PLACEHOLDER_OCCURRENCE",
+            "ANNOTATION_PLACEHOLDER_OCCURRENCE_WITH_LEADER_LINE",
+            "ANNOTATION_TEXT_OCCURRENCE",
+            "ANNOTATION_PLANE",
+            "DRAUGHTING_MODEL_ITEM_ASSOCIATION",
+            "DRAUGHTING_MODEL_ITEM_ASSOCIATION_WITH_PLACEHOLDER",
+            "CAMERA_MODEL_D3",
+            "CAMERA_MODEL_D3_MULTI_CLIPPING",
+            "MODEL_GEOMETRIC_VIEW",
+            "DEFAULT_MODEL_GEOMETRIC_VIEW",
+        ],
+        "recognised as a presentation entity but not consumed by the presentation walker",
+        Layer::Presentation,
     ),
 ];
 
-/// Reason for an unconsumed instance, if it belongs to a PMI family.
-fn unknown_reason(inst: &Instance) -> Option<&'static str> {
-    for (keywords, reason) in HANDLED_FAMILY {
+/// Reason and layer for an unconsumed instance, if it belongs to a PMI family.
+fn unknown_reason(inst: &Instance) -> Option<(&'static str, Layer)> {
+    for (keywords, reason, layer) in HANDLED_FAMILY {
         if inst.type_names().any(|t| keywords.contains(&t)) {
-            return Some(reason);
+            return Some((reason, *layer));
         }
     }
     // AP242 machining feature definitions (basic_round_hole, counterbore
     // hole, ...) carry hole callouts with their own tolerance values.
     if inst.type_names().any(|t| t.contains("_HOLE")) {
-        return Some("hole feature definitions are not supported yet");
+        return Some((
+            "hole feature definitions are not supported yet",
+            Layer::Semantic,
+        ));
     }
     None
 }
@@ -170,6 +206,10 @@ pub(crate) struct Ctx<'a> {
     pub datums: Vec<Datum>,
     pub datum_systems: Vec<DatumSystem>,
     pub tolerances: Vec<GeometricTolerance>,
+    pub annotations: Vec<Annotation>,
+    pub views: Vec<SavedView>,
+    /// Dimension instance id to record id.
+    pub dimension_ids: HashMap<Id, String>,
     /// Datum instance id to record id.
     pub datum_ids: HashMap<Id, Option<String>>,
     /// Datum record id to its label, for rendering.
@@ -220,6 +260,9 @@ impl<'a> Ctx<'a> {
             datums: Vec::new(),
             datum_systems: Vec::new(),
             tolerances: Vec::new(),
+            annotations: Vec::new(),
+            views: Vec::new(),
+            dimension_ids: HashMap::new(),
             datum_ids: HashMap::new(),
             datum_labels: HashMap::new(),
             datum_system_ids: HashMap::new(),
@@ -371,6 +414,23 @@ impl<'a> Ctx<'a> {
         self.consumed.insert(id);
     }
 
+    /// Record that annotation `aid` displays semantic record `sid`.
+    pub fn link_presentation(&mut self, sid: &str, aid: &str) {
+        let meta = self
+            .dimensions
+            .iter_mut()
+            .map(|d| &mut d.meta)
+            .chain(self.tolerances.iter_mut().map(|t| &mut t.meta))
+            .chain(self.datums.iter_mut().map(|d| &mut d.meta))
+            .chain(self.datum_systems.iter_mut().map(|d| &mut d.meta))
+            .find(|m| m.id == sid);
+        if let Some(m) = meta {
+            if !m.presentation.iter().any(|a| a == aid) {
+                m.presentation.push(aid.to_owned());
+            }
+        }
+    }
+
     pub fn warn(&mut self, message: impl Into<String>, source: Option<Id>) {
         let message = message.into();
         tracing::debug!(source = ?source, "{message}");
@@ -399,11 +459,11 @@ impl<'a> Ctx<'a> {
             if self.consumed.contains(&inst.id) {
                 continue;
             }
-            let Some(reason) = unknown_reason(inst) else {
+            let Some((reason, layer)) = unknown_reason(inst) else {
                 continue;
             };
             out.push(Unknown {
-                layer: Layer::Semantic,
+                layer,
                 kind: inst.type_key(),
                 reason: reason.to_owned(),
                 source_ref: source_ref(inst.id),

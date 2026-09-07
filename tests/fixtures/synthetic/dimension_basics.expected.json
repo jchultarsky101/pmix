@@ -146,7 +146,8 @@
         "features": [
           "feat:1a1625fc17b4fc49"
         ],
-        "decimal_places": 2
+        "decimal_places": 2,
+        "text": "⌀12.50 ±0.05"
       },
       {
         "id": "dim:ae1786b93f6643fc",
@@ -177,7 +178,8 @@
         ],
         "features": [
           "feat:1a1625fc17b4fc49"
-        ]
+        ],
+        "text": "⌀12.5 H7"
       },
       {
         "id": "dim:cafcfa2cb749e9d2",
@@ -204,7 +206,8 @@
         "modifiers": [],
         "features": [
           "feat:faede4f21ad47156"
-        ]
+        ],
+        "text": "R6.2–6.3"
       },
       {
         "id": "dim:e7a91961fc450e52",
@@ -225,7 +228,8 @@
         "modifiers": [],
         "features": [
           "feat:e8ab37e5fa48d88e"
-        ]
+        ],
+        "text": "30°"
       },
       {
         "id": "dim:fef5cd5086dada30",
@@ -248,7 +252,8 @@
         "features": [
           "feat:e8ab37e5fa48d88e",
           "feat:a758074951cfbc7b"
-        ]
+        ],
+        "text": "[40]"
       }
     ],
     "tolerances": [],
@@ -256,7 +261,8 @@
     "other": []
   },
   "presentation": {
-    "annotations": []
+    "annotations": [],
+    "views": []
   },
   "unknown": [],
   "diagnostics": []
