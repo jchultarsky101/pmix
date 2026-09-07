@@ -118,3 +118,40 @@ fn extract_presentation_geometry_flag() {
         .success()
         .stdout(predicate::str::contains("\"vertices\""));
 }
+
+#[test]
+fn diff_exit_codes_and_output() {
+    let base = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/synthetic/tolerance_datum_basics.stp"
+    );
+    // Identical: exit 0.
+    pmix()
+        .args(["diff", base, base])
+        .assert()
+        .code(0)
+        .stdout(predicate::str::contains("summary:"));
+    // Different: exit 1, the changed field is named.
+    let text = std::fs::read_to_string(base).unwrap();
+    let changed = text.replace(
+        "LENGTH_MEASURE(0.1),#1) QUALIFIED",
+        "LENGTH_MEASURE(0.2),#1) QUALIFIED",
+    );
+    let tmp = std::env::temp_dir().join("pmix-cli-diff-changed.stp");
+    std::fs::write(&tmp, changed).unwrap();
+    pmix()
+        .args(["diff", base, tmp.to_str().unwrap()])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("value.value: 0.1 → 0.2"));
+    pmix()
+        .args(["diff", base, tmp.to_str().unwrap(), "--json"])
+        .assert()
+        .code(1)
+        .stdout(predicate::str::contains("\"kind\": \"changed\""));
+    // Error: exit 2.
+    pmix()
+        .args(["diff", base, "does-not-exist.stp"])
+        .assert()
+        .code(2);
+}

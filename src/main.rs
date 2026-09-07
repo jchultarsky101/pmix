@@ -42,6 +42,22 @@ enum Command {
         presentation_geometry: bool,
     },
 
+    /// Compare the PMI of two or more models.
+    ///
+    /// Inputs are model files (extracted on the fly) or JSON documents
+    /// written by `pmix extract`. Every input after the first is compared
+    /// against the first. Exit status is 0 when nothing differs, 1 when
+    /// something does, 2 on error.
+    Diff {
+        /// Two or more inputs; the first is the baseline.
+        #[arg(num_args = 2.., required = true)]
+        inputs: Vec<PathBuf>,
+
+        /// Emit JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Explore the raw entity graph of a STEP file.
     ///
     /// With no options, prints the header, a summary, and a count of every
@@ -90,10 +106,10 @@ fn main() -> ExitCode {
     init_tracing(cli.verbose);
 
     match run(cli) {
-        Ok(()) => ExitCode::SUCCESS,
+        Ok(code) => code,
         Err(err) => {
             eprintln!("error: {err:#}");
-            ExitCode::FAILURE
+            ExitCode::from(2)
         }
     }
 }
@@ -114,7 +130,7 @@ fn init_tracing(verbosity: u8) {
         .init();
 }
 
-fn run(cli: Cli) -> Result<()> {
+fn run(cli: Cli) -> Result<ExitCode> {
     match cli.command {
         Command::Extract {
             input,
@@ -128,7 +144,9 @@ fn run(cli: Cli) -> Result<()> {
             pmix::ExtractOptions {
                 presentation_geometry,
             },
-        ),
+        )
+        .map(|()| ExitCode::SUCCESS),
+        Command::Diff { inputs, json } => diff(inputs, json),
         Command::Inspect {
             input,
             entities,
@@ -147,8 +165,46 @@ fn run(cli: Cli) -> Result<()> {
                 diagnostics,
                 json,
             },
-        ),
+        )
+        .map(|()| ExitCode::SUCCESS),
     }
+}
+
+fn diff(inputs: Vec<PathBuf>, json: bool) -> Result<ExitCode> {
+    let baseline = pmix::load(&inputs[0])
+        .with_context(|| format!("failed to load `{}`", inputs[0].display()))?;
+    let mut reports = Vec::new();
+    for path in &inputs[1..] {
+        let doc =
+            pmix::load(path).with_context(|| format!("failed to load `{}`", path.display()))?;
+        reports.push(pmix::diff::diff(&baseline, &doc));
+    }
+    let differs = reports.iter().any(|r| !r.is_empty());
+    let stdout = std::io::stdout();
+    let mut out = std::io::BufWriter::new(stdout.lock());
+    if json {
+        if reports.len() == 1 {
+            serde_json::to_writer_pretty(&mut out, &reports[0])?;
+        } else {
+            serde_json::to_writer_pretty(&mut out, &reports)?;
+        }
+        writeln!(out)?;
+    } else {
+        for (i, r) in reports.iter().enumerate() {
+            if i > 0 {
+                writeln!(out)?;
+                writeln!(out, "{}", "=".repeat(60))?;
+                writeln!(out)?;
+            }
+            write!(out, "{r}")?;
+        }
+    }
+    out.flush()?;
+    Ok(if differs {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    })
 }
 
 fn extract(

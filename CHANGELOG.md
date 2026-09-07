@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `pmix diff` (ADR 0005): compares two or more models or extracted JSON
+  documents by identity, reports added, removed, and changed records with
+  the fields that changed, excludes extraction-only fields, prints text or
+  `--json`, and exits 0/1/2 for same/different/error.
+- `pmix::load` reads either a model file or a JSON document.
 - Identity keys (ADR 0004): ids now name the design element rather than
   hashing content. Features are anchored on a B-rep geometry fingerprint
   (surface kind and placement plus a split-invariant span) and shape aspects on
