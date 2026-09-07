@@ -1,6 +1,6 @@
 # ADR 0004: Identity of records across exports
 
-- **Status:** Proposed, 2026-09-07
+- **Status:** Accepted, 2026-09-07
 - **Deciders:** Julian Chultarsky
 - **Depends on:** [ADR 0002](0002-semantic-pmi-model.md), [ADR 0003](0003-presentation-pmi-model.md)
 
@@ -98,11 +98,12 @@ by its FNV-1a hash otherwise:
 ### Collisions
 
 Two records with the same identity key (two identical frames on one
-feature, two saved views with one name) get the suffixes `-1`, `-2`, ...
-in ascending order of their content hash, never in entity order. The diff
-therefore matches duplicates consistently as long as their content is
-unchanged, and reports duplicates whose content both changed as a removal
-and an addition.
+feature, two saved views with one name) are ordered by their content hash,
+never by entity order; the first keeps the plain id and the rest get the
+suffixes `-2`, `-3`, .... The diff therefore matches duplicates
+consistently as long as their content is unchanged, a newly added duplicate
+does not disturb the existing one, and duplicates whose content all changed
+are reported as removals and additions.
 
 ### Assignment
 
