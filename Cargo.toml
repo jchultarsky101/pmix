@@ -12,7 +12,7 @@ homepage = "https://github.com/jchultarsky101/pmix"
 documentation = "https://docs.rs/pmix"
 keywords = ["step", "jt", "pmi", "cad", "gdt"]
 categories = ["command-line-utilities", "parser-implementations", "science"]
-exclude = [".github/", "tests/fixtures/"]
+exclude = [".github/", "tests/", "CLAUDE.md", ".editorconfig", ".gitattributes", "rustfmt.toml"]
 
 [lib]
 name = "pmix"

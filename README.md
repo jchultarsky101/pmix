@@ -15,15 +15,14 @@ Run it on two or more models and `pmix diff` answers questions like "did
 the tolerances change between revision B and revision C?" without opening a
 CAD package.
 
-> **Status: early development.** `pmix extract` reads STEP AP242 files and
-> emits both layers of the model: the semantic layer (units, features,
-> dimensions with tolerances, geometric tolerances with zones, modifiers and
-> composites, datums with targets, datum reference frames) and the
-> presentation layer (annotations with text, plane, leaders, style, geometry
-> summary and links to the semantic records; saved views). It extracts every
-> such entity in the NIST test corpus, and `pmix diff` compares two or more
-> models by identity. JT is not supported yet. Nothing is published to
-> crates.io yet. See the [roadmap](#roadmap).
+> **Status: 0.1.0.** `pmix extract` reads STEP AP242 files and emits both
+> layers of the model: the semantic layer (units, features, dimensions with
+> tolerances, geometric tolerances with zones, modifiers and composites,
+> datums with targets, datum reference frames) and the presentation layer
+> (annotations with text, plane, leaders, style, geometry summary and links
+> to the semantic records; saved views). It extracts every such entity in
+> the NIST test corpus, and `pmix diff` compares two or more models by
+> identity. JT input is not supported yet. See the [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -42,13 +41,13 @@ data lives inside the 3D file rather than on a 2D drawing.
 
 ## Installation
 
-Once published, `pmix` will be installable from crates.io:
+From crates.io (requires Rust 1.85 or newer):
 
 ```bash
 cargo install pmix
 ```
 
-Until then, build from source (requires Rust 1.85 or newer):
+Or from source:
 
 ```bash
 git clone https://github.com/jchultarsky101/pmix.git
@@ -230,8 +229,7 @@ fn main() -> Result<(), pmix::Error> {
 }
 ```
 
-API documentation will be available on [docs.rs](https://docs.rs/pmix) once
-the crate is published.
+API documentation is on [docs.rs](https://docs.rs/pmix).
 
 ## Roadmap
 
@@ -246,7 +244,7 @@ the crate is published.
 - [x] Stable identity across exports (ADR 0004)
 - [x] `pmix diff` (ADR 0005)
 - [ ] JT reader: PMI Manager segment
-- [ ] Publish to crates.io
+- [x] Publish to crates.io (0.1.0)
 
 ## Design
 
