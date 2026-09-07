@@ -274,6 +274,8 @@ Result<PmiDocument> }`. The existing placeholder `model.rs` is replaced;
   NIST corpus and its oracles (see `docs/test-data.md`).
 - The identity ADR must be settled before `pmix diff`; until then ids are
   content hashes, stable for identical content and not otherwise.
+  *(Settled by [ADR 0004](0004-identity.md) on 2026-09-07; `pmix diff`
+  followed in [ADR 0005](0005-diff.md).)*
 - The presentation ADR defines annotations, planes, and saved views, and the
   exact form of the `presentation` cross-link ids.
 - JT work can begin against the same structs with no model changes, adding
