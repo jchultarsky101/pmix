@@ -19,7 +19,9 @@ to install the tool on Windows, macOS, and Linux without a Rust toolchain.
 - **Binaries and installers come from GitHub releases**, built by
   [cargo-dist](https://opensource.axo.dev/cargo-dist/) in CI on every
   `v*` tag: archives for macOS (Apple Silicon and Intel), Linux (x86-64
-  and ARM64), and Windows (x86-64 and ARM64), a shell installer script for
+  and ARM64), and Windows (x86-64; Windows on ARM runs it under
+  emulation, because cargo-dist ships no updater for that target), a shell
+  installer script for
   macOS and Linux, a PowerShell installer script for Windows, and the
   `pmix-update` updater binary that upgrades an installation in place from
   the latest release.
