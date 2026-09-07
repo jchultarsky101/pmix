@@ -11,9 +11,9 @@
 extracts the Product Manufacturing Information (PMI) embedded in it, and
 writes that information to a JSON file in a stable, comparable form.
 
-The end goal is to run `pmix` on two or more models and diff the results, so
-you can answer questions like "did the tolerances change between revision B
-and revision C?" without opening a CAD package.
+Run it on two or more models and `pmix diff` answers questions like "did
+the tolerances change between revision B and revision C?" without opening a
+CAD package.
 
 > **Status: early development.** `pmix extract` reads STEP AP242 files and
 > emits both layers of the model: the semantic layer (units, features,
@@ -21,9 +21,9 @@ and revision C?" without opening a CAD package.
 > composites, datums with targets, datum reference frames) and the
 > presentation layer (annotations with text, plane, leaders, style, geometry
 > summary and links to the semantic records; saved views). It extracts every
-> such entity in the NIST test corpus. Identity across exports, `pmix diff`,
-> and JT are not there yet. Nothing is published to crates.io yet. See the
-> [roadmap](#roadmap).
+> such entity in the NIST test corpus, and `pmix diff` compares two or more
+> models by identity. JT is not supported yet. Nothing is published to
+> crates.io yet. See the [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -77,6 +77,32 @@ Include the full coordinates and triangles when you need them:
 ```bash
 pmix extract part.stp --presentation-geometry
 ```
+
+### Comparing models
+
+Diff the PMI of two models, or of JSON documents written by `pmix extract`:
+
+```bash
+pmix diff bracket_revB.stp bracket_revC.stp
+pmix diff baseline.pmi.json bracket_revC.stp --json
+```
+
+Records match by identity, so a changed tolerance value reads as a change
+on the same record rather than a removal and an addition:
+
+```text
+semantic
+  ~ tol:3f9a1c0b7d2e6a48  ⌖ ⌀0.1 Ⓜ | A | B | C
+      value.value: 0.1 → 0.2
+      text: ⌖ ⌀0.1 Ⓜ | A | B | C → ⌖ ⌀0.2 Ⓜ | A | B | C
+
+summary: 41 unchanged, 1 changed, 0 removed, 0 added
+```
+
+The exit status is 0 when nothing differs, 1 when something does, and 2
+on error, so the command works as a check in scripts. What is compared
+and what is deliberately ignored is recorded in
+[ADR 0005](docs/adr/0005-diff.md).
 
 ### Exploring a STEP file
 
@@ -218,7 +244,7 @@ the crate is published.
 - [x] Presentation data model (ADR 0003)
 - [x] STEP AP242 reader: annotations (tessellated, polyline, placeholder, text), styles, links, saved views
 - [x] Stable identity across exports (ADR 0004)
-- [ ] `pmix diff`
+- [x] `pmix diff` (ADR 0005)
 - [ ] JT reader: PMI Manager segment
 - [ ] Publish to crates.io
 
