@@ -167,6 +167,78 @@ fn every_dimension_entity_becomes_a_record() {
             );
         }
 
+        // Presentation: one annotation per top-level callout plus one per
+        // occurrence outside any callout; one view per camera; every
+        // association consumed.
+        let related: std::collections::HashSet<u64> = ex
+            .of_type("DRAUGHTING_CALLOUT_RELATIONSHIP")
+            .filter_map(|r| r.parameters().get(3).and_then(|p| p.as_ref()))
+            .collect();
+        let top_callouts = ex
+            .of_type("DRAUGHTING_CALLOUT")
+            .filter(|c| !related.contains(&c.id))
+            .count();
+        let in_callout: std::collections::HashSet<u64> = ex
+            .of_type("DRAUGHTING_CALLOUT")
+            .flat_map(|c| {
+                let mut v = Vec::new();
+                if let Some(p) = c.parameters().get(1) {
+                    p.collect_refs(&mut v);
+                }
+                v
+            })
+            .collect();
+        let standalone = ex
+            .instances()
+            .filter(|i| {
+                i.type_names()
+                    .any(|t| t.ends_with("_OCCURRENCE") && t.contains("ANNOTATION"))
+                    && !in_callout.contains(&i.id)
+            })
+            .count();
+        assert_eq!(
+            doc.presentation.annotations.len(),
+            top_callouts + standalone,
+            "{name}: annotation count"
+        );
+        let cameras = ex.count_of_type("CAMERA_MODEL_D3")
+            + ex.count_of_type("CAMERA_MODEL_D3_MULTI_CLIPPING");
+        assert_eq!(doc.presentation.views.len(), cameras, "{name}: view count");
+        for a in &doc.presentation.annotations {
+            assert!(
+                a.plane.is_some(),
+                "{name}: annotation {:?} has no plane",
+                a.source_refs
+            );
+            assert!(
+                !a.parts.is_empty(),
+                "{name}: annotation {:?} has no parts",
+                a.source_refs
+            );
+        }
+        let linked_semantic = doc
+            .semantic
+            .tolerances
+            .iter()
+            .map(|t| &t.meta)
+            .chain(doc.semantic.dimensions.iter().map(|d| &d.meta))
+            .chain(doc.semantic.datums.iter().map(|d| &d.meta))
+            .filter(|m| !m.presentation.is_empty())
+            .count();
+        let with_semantic = doc
+            .presentation
+            .annotations
+            .iter()
+            .filter(|a| !a.semantic.is_empty())
+            .count();
+        let has_semantic_records = !doc.semantic.tolerances.is_empty()
+            || !doc.semantic.dimensions.is_empty()
+            || !doc.semantic.datums.is_empty();
+        assert!(
+            !has_semantic_records || (linked_semantic > 0 && with_semantic > 0),
+            "{name}: no semantic/presentation links resolved"
+        );
+
         // Nothing in a handled family may leak.
         let leaked: Vec<_> = doc
             .unknown

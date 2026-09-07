@@ -99,3 +99,22 @@ fn inspect_rejects_non_step_input() {
         .failure()
         .stderr(predicate::str::contains("not a STEP Part 21 file"));
 }
+
+#[test]
+fn extract_presentation_geometry_flag() {
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/synthetic/presentation_basics.stp"
+    );
+    pmix()
+        .args(["extract", fixture])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"polylines\": 1"))
+        .stdout(predicate::str::contains("\"vertices\"").not());
+    pmix()
+        .args(["extract", fixture, "--presentation-geometry"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"vertices\""));
+}

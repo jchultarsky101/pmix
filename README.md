@@ -16,11 +16,14 @@ you can answer questions like "did the tolerances change between revision B
 and revision C?" without opening a CAD package.
 
 > **Status: early development.** `pmix extract` reads STEP AP242 files and
-> emits the full semantic PMI layer: units, features, dimensions with
-> tolerances, geometric tolerances with zones, modifiers and composites,
-> datums with targets, and datum reference frames. It extracts every such
-> entity in the NIST test corpus. Graphical PMI and JT are not supported
-> yet. Nothing is published to crates.io yet. See the [roadmap](#roadmap).
+> emits both layers of the model: the semantic layer (units, features,
+> dimensions with tolerances, geometric tolerances with zones, modifiers and
+> composites, datums with targets, datum reference frames) and the
+> presentation layer (annotations with text, plane, leaders, style, geometry
+> summary and links to the semantic records; saved views). It extracts every
+> such entity in the NIST test corpus. Identity across exports, `pmix diff`,
+> and JT are not there yet. Nothing is published to crates.io yet. See the
+> [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -64,7 +67,15 @@ pmix extract part.stp
 Write the output to a file, compact instead of pretty-printed:
 
 ```bash
-pmix extract part.jt --output part.pmi.json --compact
+pmix extract part.stp --output part.pmi.json --compact
+```
+
+Annotation geometry is summarised by default (counts, bounding box, and a
+content hash, see [ADR 0003](docs/adr/0003-presentation-pmi-model.md)).
+Include the full coordinates and triangles when you need them:
+
+```bash
+pmix extract part.stp --presentation-geometry
 ```
 
 ### Exploring a STEP file
@@ -145,7 +156,24 @@ breaking changes. Abridged:
     ],
     "notes": [], "other": []
   },
-  "presentation": { "annotations": [] },
+  "presentation": {
+    "annotations": [
+      { "id": "ann:…", "kind": "position", "label": "Position.1",
+        "text": "⌖ ⌀0.1 Ⓟ10 Ⓜ | A | B Ⓜ | C", "text_origin": "semantic",
+        "plane": { "origin": [20.0, 20.0, 0.0], "axis": { "x": 0.0, "y": 0.0, "z": 1.0 } },
+        "leaders": [],
+        "geometry": { "polylines": 1, "triangles": 1, "points": 8, "bbox": { "min": [20.0, 20.0, 0.0], "max": [24.0, 22.0, 0.0] }, "hash": "…" },
+        "parts": [{ "form": "tessellated", "kind": "position", "geometry": { "…": "…" }, "source_ref": "#97" }],
+        "style": { "colour": "#ff0000", "line_font": "continuous", "layer": "PMI layer" },
+        "semantic": ["tol:…"], "features": ["feat:…"], "views": ["view:…"],
+        "attributes": {}, "unmapped": [], "source_refs": ["#98", "#97", "#99", "#100"] }
+    ],
+    "views": [
+      { "id": "view:…", "name": "MBD_A",
+        "camera": { "placement": { "origin": [0.0, 0.0, 100.0] }, "projection": "parallel", "view_plane_distance": 100.0, "view_window": [200.0, 150.0] },
+        "clipping_planes": [], "annotations": ["ann:…"], "unmapped": [], "source_refs": ["#215", "#214", "#217"] }
+    ]
+  },
   "unknown": [],
   "diagnostics": []
 }
@@ -183,7 +211,8 @@ the crate is published.
 - [x] Semantic data model (ADR 0002)
 - [x] STEP AP242 reader: units, features, dimensions with tolerances
 - [x] STEP AP242 reader: geometric tolerances, datums, datum targets, datum systems
-- [ ] STEP AP242 reader: presentation PMI (graphical annotations, saved views)
+- [x] Presentation data model (ADR 0003)
+- [x] STEP AP242 reader: annotations (tessellated, polyline, placeholder, text), styles, links, saved views
 - [ ] Stable identity across exports and `pmix diff`
 - [ ] JT reader: PMI Manager segment
 - [ ] Publish to crates.io

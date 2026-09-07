@@ -10,20 +10,20 @@ pub mod p21;
 pub mod pmi;
 
 use crate::model::PmiDocument;
-use crate::{Reader, Result};
+use crate::{ExtractOptions, Reader, Result};
 
 /// Reader for STEP AP242 files.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct StepReader;
 
 impl Reader for StepReader {
-    fn read(&self, input: &[u8], file_name: &str) -> Result<PmiDocument> {
+    fn read(&self, input: &[u8], file_name: &str, options: &ExtractOptions) -> Result<PmiDocument> {
         let exchange = p21::parse_bytes(input)?;
         tracing::debug!(
             instances = exchange.len(),
             diagnostics = exchange.diagnostics.len(),
             "parsed Part 21"
         );
-        Ok(pmi::extract(&exchange, file_name))
+        Ok(pmi::extract(&exchange, file_name, options))
     }
 }

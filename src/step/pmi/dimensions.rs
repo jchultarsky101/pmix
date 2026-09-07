@@ -523,7 +523,17 @@ fn build(ctx: &mut Ctx<'_>, id: Id) -> Option<Dimension> {
         ],
     );
 
+    let text = render(
+        kind,
+        &subtype,
+        value.as_ref(),
+        limits.as_ref(),
+        tolerance.as_ref(),
+        qualifier.as_ref(),
+        decimal_places,
+    );
     ctx.consume(id);
+    ctx.dimension_ids.insert(id, id_str.clone());
     Some(Dimension {
         meta: Meta {
             id: id_str,
@@ -543,8 +553,81 @@ fn build(ctx: &mut Ctx<'_>, id: Id) -> Option<Dimension> {
         orientation: None,
         path,
         decimal_places,
-        text: None,
+        text: Some(text),
     })
+}
+
+/// Human-readable dimension, e.g. `⌀35 -0.2/+0`, `[40]`, `R6.2–6.3`.
+fn render(
+    kind: DimensionKind,
+    subtype: &DimensionSubtype,
+    value: Option<&Measure>,
+    limits: Option<&Limits>,
+    tolerance: Option<&DimensionTolerance>,
+    qualifier: Option<&DimensionQualifier>,
+    decimal_places: Option<u8>,
+) -> String {
+    let num = |v: f64| match decimal_places {
+        Some(d) => format!("{v:.*}", d as usize),
+        None => format!("{v}"),
+    };
+    let prefix = match subtype {
+        DimensionSubtype::Diameter => "⌀",
+        DimensionSubtype::Radius => "R",
+        DimensionSubtype::SphericalDiameter => "S⌀",
+        DimensionSubtype::SphericalRadius => "SR",
+        DimensionSubtype::Thickness => "T",
+        _ => "",
+    };
+    let mut s = String::from(prefix);
+    match (value, limits) {
+        (Some(v), _) => s.push_str(&num(v.value)),
+        (None, Some(l)) => s.push_str(&format!("{}–{}", num(l.lower.value), num(l.upper.value))),
+        (None, None) => {}
+    }
+    if value.is_some() {
+        if let Some(l) = limits {
+            s.push_str(&format!(" ({}–{})", num(l.lower.value), num(l.upper.value)));
+        }
+    }
+    if matches!(
+        kind,
+        DimensionKind::AngularSize | DimensionKind::AngularLocation
+    ) {
+        s.push('°');
+    }
+    match tolerance {
+        Some(DimensionTolerance::PlusMinus { lower, upper }) => {
+            if (lower.value + upper.value).abs() < 1e-9 && upper.value != 0.0 {
+                s.push_str(&format!(" ±{}", num(upper.value)));
+            } else {
+                s.push_str(&format!(
+                    " {}/+{}",
+                    signed(lower.value, &num),
+                    num(upper.value)
+                ));
+            }
+        }
+        Some(DimensionTolerance::LimitsAndFits { form, zone, grade }) => {
+            s.push_str(&format!(" {form}{zone}{grade}"));
+        }
+        None => {}
+    }
+    match qualifier {
+        Some(DimensionQualifier::Basic) => format!("[{s}]"),
+        Some(DimensionQualifier::Reference) => format!("({s})"),
+        Some(DimensionQualifier::Maximum) => format!("{s} MAX"),
+        Some(DimensionQualifier::Minimum) => format!("{s} MIN"),
+        _ => s,
+    }
+}
+
+fn signed(v: f64, num: &dyn Fn(f64) -> String) -> String {
+    if v < 0.0 {
+        num(v)
+    } else {
+        format!("+{}", num(v))
+    }
 }
 
 /// Map an AP242 dimension modifier description (rec. practice tables 7
