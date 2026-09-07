@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Identity keys (ADR 0004): ids now name the design element rather than
+  hashing content. Features are anchored on a B-rep geometry fingerprint
+  (surface kind and placement plus a split-invariant span) and shape aspects on
+  the same geometry merge into one feature; datums, datum systems, and
+  saved views get readable ids (`datum:A`, `dsys:A|B|C`, `view:MBD_A`);
+  dimensions, tolerances, and annotations key on kind and the features or
+  records they apply to; collisions are ordered by content, never by entity
+  numbering. Ids are assigned in a finalisation pass after all walkers.
+- Earlier NIST builds of four models under `tests/fixtures/nist/previous`
+  and a test that ids survive re-export.
 - ADR 0004: identity of records across exports.
 - Presentation layer (ADR 0003) in the model and the STEP reader:
   annotations from draughting callouts and standalone occurrences with

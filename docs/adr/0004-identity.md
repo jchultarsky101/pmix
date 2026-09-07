@@ -76,10 +76,31 @@ rounded to the *identity quantum* `q`:
 - **Curve set or other supplemental geometry:** bounding box.
 
 Directions are sign-normalised so that a flipped face normal does not
-change the key. The identity quantum is `max(file uncertainty, 1e-3 model
-units)`; the coarse quantum used for unlinked annotations is `100 × q`.
+change the key.
 
-Why not the face's full boundary? Vertex bounding boxes distinguish every
+**Span.** The per-face extent is chosen so that a face split by a
+re-export keeps its key: the axial extent of the vertices for cylinders,
+cones, and tori (a cylinder cut at a new seam gains vertices, but at the
+same axial positions), nothing for spheres, and the vertex bounding box
+for planes and free-form surfaces (a split line lies inside the box).
+Faces that resolve to the same surface key and span are deduplicated, so a
+hole that one export writes as one face and another as two halves gives
+the same feature key.
+
+**Quantum.** A fixed `1e-3` model units, deliberately not derived from the
+file's uncertainty, which differs between exports of the same design (the
+STC 09 pair declares `1e-6` and `0.005`). Values are first snapped to a
+`1e-5` grid because re-exports print the same coordinate with different
+precision (`-2.0315` against `-2.03149999`), and engineering values in
+round fractions of an inch sit exactly on rounding boundaries. The coarse
+quantum used for unlinked annotations is `100 × q`.
+
+**Merging.** Shape aspects on the same geometry are the same design
+feature: records with an identical feature key are merged into one, with
+the union of their source references. Items that carry no geometry (a
+`mapped_item`, a bare representation) are left out of the key.
+
+Why not the face's full boundary? Surface plus span distinguishes every
 face in the corpus that shares a surface with another, at a fraction of
 the cost, and the diff has a fallback (below) for the rare miss.
 
@@ -153,9 +174,13 @@ collisions, rewrites cross references, and sorts every array by id.
 - `pmix diff` can rely on id equality as its primary match and treat the
   rest as content comparison. Its own ADR covers fallback matching, unit
   normalisation, and output.
-- A new corpus test extracts each re-export pair and requires every
-  semantic id from one edition to be present in the other, with the STC 09
-  pair recorded as the baseline for how far a real re-export drifts.
+- A corpus test extracts each re-export pair and requires every semantic
+  id from one edition to be present in the other for the three edition
+  re-labellings. For the STC 09 pair, a genuine re-export from a newer CAD
+  version that split faces and added hole features, the recorded baseline
+  is 53 of 63 semantic ids and 27 of 58 annotation ids shared
+  (2026-09-07); the remainder are features whose geometry the newer export
+  changed and annotations whose tessellation changed.
 - Users can read datum, datum system, and view ids directly in the JSON;
   the hashed ids remain opaque, and the `source_refs` field remains the
   way back to the file.
