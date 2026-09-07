@@ -15,7 +15,7 @@ First release with prebuilt binaries.
 
 - Prebuilt binaries, installer scripts, and the `pmix-update` updater for
   macOS (Apple Silicon and Intel), Linux (x86-64 and ARM64), and Windows
-  (x86-64 and ARM64), built by cargo-dist on every release tag (ADR 0006). crates.io publishing is
+  (x86-64; Windows on ARM runs it under emulation), built by cargo-dist on every release tag (ADR 0006). crates.io publishing is
   postponed until the base functionality is complete.
 
 ## [0.1.0] - 2026-09-07
