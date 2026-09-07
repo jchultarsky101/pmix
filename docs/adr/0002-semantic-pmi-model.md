@@ -62,11 +62,10 @@ excluded from comparison by default.
 ### Rules that apply to every semantic record
 
 1. **`id`**: an opaque string, unique within the document, derived from the
-   record's content rather than from source entity numbers. Cross references
-   between records use ids. The derivation recipe, including how feature
-   identity survives re-export, is deferred to the identity ADR. Until then,
-   readers use a content hash of the record with `id`, `source_refs`, and
-   `presentation` fields excluded, with an ordinal suffix on collision.
+   record's identity rather than from source entity numbers. Cross references
+   between records use ids. The derivation recipe is
+   [ADR 0004](0004-identity.md), which superseded the interim content-hash
+   scheme this record originally specified.
 2. **`source_refs`**: the source entities the record came from, as strings
    such as `"#1752"` for STEP or a segment/element path for JT. Present for
    debugging and traceability, excluded from comparison.

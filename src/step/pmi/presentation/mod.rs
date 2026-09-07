@@ -4,6 +4,8 @@ mod annotations;
 mod geometry;
 mod views;
 
+pub(crate) use geometry::sample_curve;
+
 use std::collections::HashMap;
 
 use super::Ctx;

@@ -77,11 +77,16 @@ pub(crate) fn feature_for(ctx: &mut Ctx<'_>, sa: Id) -> Option<String> {
     // Geometry through geometric_item_specific_usage and
     // item_identified_representation_usage.
     let mut geometry = Vec::new();
+    let mut fingerprints = Vec::new();
+    let q = super::fingerprint::identity_quantum(ex);
     for (usage_id, item_id) in ctx.geometry_usage.get(&sa).cloned().unwrap_or_default() {
         ctx.consume(usage_id);
         source_refs.push(source_ref(usage_id));
         match ex.get(item_id) {
-            Some(item) => geometry.push(geometry_ref(ex, item)),
+            Some(item) => {
+                geometry.push(geometry_ref(ex, item));
+                fingerprints.push(super::fingerprint::of_item(ex, item, q));
+            }
             None => ctx.warn(
                 format!("#{usage_id} identifies undefined geometry #{item_id}"),
                 Some(usage_id),
@@ -131,6 +136,7 @@ pub(crate) fn feature_for(ctx: &mut Ctx<'_>, sa: Id) -> Option<String> {
     );
 
     ctx.consume(sa);
+    ctx.feature_fingerprints.insert(id.clone(), fingerprints);
     ctx.features.push(Feature {
         meta: Meta {
             id: id.clone(),

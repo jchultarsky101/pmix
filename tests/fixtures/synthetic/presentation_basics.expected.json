@@ -14,7 +14,7 @@
   "semantic": {
     "features": [
       {
-        "id": "feat:1a1625fc17b4fc49",
+        "id": "feat:53de788ee7fdc6de",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -34,7 +34,7 @@
         "members": []
       },
       {
-        "id": "feat:9b52997e63fdfd73",
+        "id": "feat:c1f8c505df305f4a",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -56,10 +56,10 @@
     ],
     "datums": [
       {
-        "id": "datum:b4094a2420a70fc7",
+        "id": "datum:A",
         "origin": "semantic",
         "presentation": [
-          "ann:c9db4d210586bf75"
+          "ann:7d95a4ae818a1812"
         ],
         "unmapped": [],
         "source_refs": [
@@ -68,14 +68,14 @@
         ],
         "label": "A",
         "features": [
-          "feat:9b52997e63fdfd73"
+          "feat:c1f8c505df305f4a"
         ],
         "targets": []
       }
     ],
     "datum_systems": [
       {
-        "id": "dsys:f7e52b82c91798b0",
+        "id": "dsys:A",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -87,7 +87,7 @@
           {
             "datums": [
               {
-                "datum": "datum:b4094a2420a70fc7",
+                "datum": "datum:A",
                 "modifiers": [],
                 "modifier_values": []
               }
@@ -100,10 +100,10 @@
     ],
     "dimensions": [
       {
-        "id": "dim:565fe2d9e646abcf",
+        "id": "dim:9e49ed233f1fa152",
         "origin": "semantic",
         "presentation": [
-          "ann:06e57c39d9717a18"
+          "ann:d23e9fac0bd3f91b"
         ],
         "unmapped": [],
         "source_refs": [
@@ -132,17 +132,17 @@
         },
         "modifiers": [],
         "features": [
-          "feat:1a1625fc17b4fc49"
+          "feat:53de788ee7fdc6de"
         ],
         "text": "⌀10 ±0.05"
       }
     ],
     "tolerances": [
       {
-        "id": "tol:9b4718f9f5257082",
+        "id": "tol:c559bccfd1025641",
         "origin": "semantic",
         "presentation": [
-          "ann:17b56d113f9c04b7"
+          "ann:5f94555adb4b289e"
         ],
         "unmapped": [],
         "source_refs": [
@@ -159,9 +159,9 @@
           "form": "cylindrical_or_circular"
         },
         "modifiers": [],
-        "datum_system": "dsys:f7e52b82c91798b0",
+        "datum_system": "dsys:A",
         "features": [
-          "feat:1a1625fc17b4fc49"
+          "feat:53de788ee7fdc6de"
         ],
         "text": "⌖ ⌀0.1 | A"
       }
@@ -172,98 +172,7 @@
   "presentation": {
     "annotations": [
       {
-        "id": "ann:06e57c39d9717a18",
-        "kind": "diameter_dimension",
-        "label": "Diameter.1",
-        "text": "⌀10 ±0.05",
-        "text_origin": "explicit",
-        "plane": {
-          "origin": [
-            0.0,
-            30.0,
-            0.0
-          ],
-          "axis": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 1.0
-          },
-          "ref_direction": {
-            "x": 1.0,
-            "y": 0.0,
-            "z": 0.0
-          }
-        },
-        "leaders": [],
-        "geometry": {
-          "polylines": 1,
-          "triangles": 0,
-          "points": 2,
-          "bbox": {
-            "min": [
-              0.0,
-              30.0,
-              0.0
-            ],
-            "max": [
-              10.0,
-              30.0,
-              0.0
-            ]
-          },
-          "hash": "677b938aa7583a74"
-        },
-        "parts": [
-          {
-            "form": "tessellated",
-            "kind": "diameter_dimension",
-            "geometry": {
-              "polylines": 1,
-              "triangles": 0,
-              "points": 2,
-              "bbox": {
-                "min": [
-                  0.0,
-                  30.0,
-                  0.0
-                ],
-                "max": [
-                  10.0,
-                  30.0,
-                  0.0
-                ]
-              },
-              "hash": "677b938aa7583a74"
-            },
-            "source_ref": "#135"
-          }
-        ],
-        "style": {
-          "colour": "#ff0000",
-          "line_font": "continuous",
-          "line_width": {
-            "value": 0.2,
-            "unit": "mm"
-          }
-        },
-        "semantic": [
-          "dim:565fe2d9e646abcf"
-        ],
-        "features": [],
-        "views": [
-          "view:da24dcf335e3a5e7"
-        ],
-        "attributes": {},
-        "unmapped": [],
-        "source_refs": [
-          "#136",
-          "#135",
-          "#137",
-          "#138"
-        ]
-      },
-      {
-        "id": "ann:17b56d113f9c04b7",
+        "id": "ann:5f94555adb4b289e",
         "kind": "position",
         "label": "Position.1",
         "text": "⌖ ⌀0.1 | A",
@@ -339,14 +248,14 @@
           "layer": "PMI layer"
         },
         "semantic": [
-          "tol:9b4718f9f5257082"
+          "tol:c559bccfd1025641"
         ],
         "features": [
-          "feat:1a1625fc17b4fc49"
+          "feat:53de788ee7fdc6de"
         ],
         "views": [
-          "view:e30bd59f194c782c",
-          "view:da24dcf335e3a5e7"
+          "view:Isometric",
+          "view:MBD_A"
         ],
         "attributes": {},
         "unmapped": [],
@@ -359,74 +268,7 @@
         ]
       },
       {
-        "id": "ann:7c6b485a4e09fe0b",
-        "kind": "Axis",
-        "label": "Axis",
-        "leaders": [],
-        "geometry": {
-          "polylines": 1,
-          "triangles": 0,
-          "points": 2,
-          "bbox": {
-            "min": [
-              0.0,
-              0.0,
-              -20.0
-            ],
-            "max": [
-              0.0,
-              0.0,
-              20.0
-            ]
-          },
-          "hash": "a94c89d84401b6a8"
-        },
-        "parts": [
-          {
-            "form": "polyline",
-            "kind": "Axis",
-            "geometry": {
-              "polylines": 1,
-              "triangles": 0,
-              "points": 2,
-              "bbox": {
-                "min": [
-                  0.0,
-                  0.0,
-                  -20.0
-                ],
-                "max": [
-                  0.0,
-                  0.0,
-                  20.0
-                ]
-              },
-              "hash": "a94c89d84401b6a8"
-            },
-            "source_ref": "#144"
-          }
-        ],
-        "style": {
-          "colour": "#ff0000",
-          "line_font": "continuous",
-          "line_width": {
-            "value": 0.2,
-            "unit": "mm"
-          }
-        },
-        "semantic": [],
-        "features": [],
-        "views": [
-          "view:da24dcf335e3a5e7"
-        ],
-        "attributes": {},
-        "unmapped": [],
-        "source_refs": [
-          "#144"
-        ]
-      },
-      {
-        "id": "ann:c9db4d210586bf75",
+        "id": "ann:7d95a4ae818a1812",
         "kind": "datum",
         "label": "Datum A",
         "text": "A",
@@ -556,12 +398,12 @@
           }
         },
         "semantic": [
-          "datum:b4094a2420a70fc7"
+          "datum:A"
         ],
         "features": [],
         "views": [
-          "view:e30bd59f194c782c",
-          "view:da24dcf335e3a5e7"
+          "view:Isometric",
+          "view:MBD_A"
         ],
         "attributes": {},
         "unmapped": [],
@@ -574,11 +416,169 @@
           "#126",
           "#127"
         ]
+      },
+      {
+        "id": "ann:88d1daef1411ebb6",
+        "kind": "Axis",
+        "label": "Axis",
+        "leaders": [],
+        "geometry": {
+          "polylines": 1,
+          "triangles": 0,
+          "points": 2,
+          "bbox": {
+            "min": [
+              0.0,
+              0.0,
+              -20.0
+            ],
+            "max": [
+              0.0,
+              0.0,
+              20.0
+            ]
+          },
+          "hash": "a94c89d84401b6a8"
+        },
+        "parts": [
+          {
+            "form": "polyline",
+            "kind": "Axis",
+            "geometry": {
+              "polylines": 1,
+              "triangles": 0,
+              "points": 2,
+              "bbox": {
+                "min": [
+                  0.0,
+                  0.0,
+                  -20.0
+                ],
+                "max": [
+                  0.0,
+                  0.0,
+                  20.0
+                ]
+              },
+              "hash": "a94c89d84401b6a8"
+            },
+            "source_ref": "#144"
+          }
+        ],
+        "style": {
+          "colour": "#ff0000",
+          "line_font": "continuous",
+          "line_width": {
+            "value": 0.2,
+            "unit": "mm"
+          }
+        },
+        "semantic": [],
+        "features": [],
+        "views": [
+          "view:Isometric"
+        ],
+        "attributes": {},
+        "unmapped": [],
+        "source_refs": [
+          "#144"
+        ]
+      },
+      {
+        "id": "ann:d23e9fac0bd3f91b",
+        "kind": "diameter_dimension",
+        "label": "Diameter.1",
+        "text": "⌀10 ±0.05",
+        "text_origin": "explicit",
+        "plane": {
+          "origin": [
+            0.0,
+            30.0,
+            0.0
+          ],
+          "axis": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          },
+          "ref_direction": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "leaders": [],
+        "geometry": {
+          "polylines": 1,
+          "triangles": 0,
+          "points": 2,
+          "bbox": {
+            "min": [
+              0.0,
+              30.0,
+              0.0
+            ],
+            "max": [
+              10.0,
+              30.0,
+              0.0
+            ]
+          },
+          "hash": "677b938aa7583a74"
+        },
+        "parts": [
+          {
+            "form": "tessellated",
+            "kind": "diameter_dimension",
+            "geometry": {
+              "polylines": 1,
+              "triangles": 0,
+              "points": 2,
+              "bbox": {
+                "min": [
+                  0.0,
+                  30.0,
+                  0.0
+                ],
+                "max": [
+                  10.0,
+                  30.0,
+                  0.0
+                ]
+              },
+              "hash": "677b938aa7583a74"
+            },
+            "source_ref": "#135"
+          }
+        ],
+        "style": {
+          "colour": "#ff0000",
+          "line_font": "continuous",
+          "line_width": {
+            "value": 0.2,
+            "unit": "mm"
+          }
+        },
+        "semantic": [
+          "dim:9e49ed233f1fa152"
+        ],
+        "features": [],
+        "views": [
+          "view:Isometric"
+        ],
+        "attributes": {},
+        "unmapped": [],
+        "source_refs": [
+          "#136",
+          "#135",
+          "#137",
+          "#138"
+        ]
       }
     ],
     "views": [
       {
-        "id": "view:da24dcf335e3a5e7",
+        "id": "view:Isometric",
         "name": "Isometric",
         "camera": {
           "placement": {
@@ -607,10 +607,10 @@
         },
         "clipping_planes": [],
         "annotations": [
-          "ann:06e57c39d9717a18",
-          "ann:17b56d113f9c04b7",
-          "ann:7c6b485a4e09fe0b",
-          "ann:c9db4d210586bf75"
+          "ann:5f94555adb4b289e",
+          "ann:7d95a4ae818a1812",
+          "ann:88d1daef1411ebb6",
+          "ann:d23e9fac0bd3f91b"
         ],
         "default": true,
         "unmapped": [],
@@ -621,7 +621,7 @@
         ]
       },
       {
-        "id": "view:e30bd59f194c782c",
+        "id": "view:MBD_A",
         "name": "MBD_A",
         "camera": {
           "placement": {
@@ -650,8 +650,8 @@
         },
         "clipping_planes": [],
         "annotations": [
-          "ann:17b56d113f9c04b7",
-          "ann:c9db4d210586bf75"
+          "ann:5f94555adb4b289e",
+          "ann:7d95a4ae818a1812"
         ],
         "unmapped": [],
         "source_refs": [
