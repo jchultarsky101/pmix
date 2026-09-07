@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ADR 0004: identity of records across exports.
 - Presentation layer (ADR 0003) in the model and the STEP reader:
   annotations from draughting callouts and standalone occurrences with
   kind, label, text (explicit from the PMI validation property or rendered
