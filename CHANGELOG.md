@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   validation ones, which are derived from the PMI they describe.
 - Derived units (`derived_unit`), so areas and volumes resolve as `mm2`
   and `mm3` instead of being reported as unrecognised.
+- Descriptive property values that are exactly a number's own rendering
+  are read as integers or numbers, so counts and prices written as strings
+  become comparable (ADR 0008). Values whose formatting carries meaning,
+  such as `007`, `2.50`, and `1e5`, stay text.
 
 ## [0.1.1] - 2026-09-07
 

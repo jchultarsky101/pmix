@@ -71,10 +71,16 @@ their original provenance is unstated. Use for local experiments only.
 
 ## Local data
 
-The `data/` directory is ignored by git. Put model files there that are too
-large, too numerous, or too uncertain in provenance to commit. Nothing in
-the test suite depends on it; it is for exploring the readers by hand, for
-example with `pmix inspect`.
+The `data/` directory is ignored by git and **may hold proprietary customer
+models**. Never commit anything from it, never attach one of its files to
+an issue or pull request, and never quote a part name, part number, or any
+other value out of one. Nothing in the test suite depends on it; it is for
+exploring the readers by hand, for example with `pmix inspect`, and for
+checking a change against real parts before release.
+
+Everything under `tests/fixtures/` is different: it is public-domain NIST
+data and synthetic fixtures written for this project, and it is committed
+deliberately.
 
 ## Do not use
 
