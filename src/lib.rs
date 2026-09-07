@@ -14,8 +14,9 @@
 //!
 //! The STEP reader extracts the semantic layer (units, features,
 //! dimensions, geometric tolerances, datums, datum systems) and the
-//! presentation layer (annotations and saved views). JT is not implemented
-//! yet.
+//! presentation layer (annotations and saved views), with ids that survive
+//! re-export (ADR 0004), and [`diff`] compares documents. JT is not
+//! implemented yet.
 
 pub mod diff;
 pub mod format;

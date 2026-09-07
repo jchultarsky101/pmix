@@ -20,6 +20,12 @@ carry the explicit statement that they "can be used without any
 restrictions". They contain both semantic and graphical PMI from several CAD
 systems and deliberately include syntax errors.
 
+`tests/fixtures/nist/previous/` holds the June 2024 builds of four of these
+models. Each is the same design as its current counterpart, re-exported in
+another AP242 edition, and one (STC 09) is a genuine re-export from a newer
+CAD version. They are the test set for identity across exports
+([ADR 0004](adr/0004-identity.md)).
+
 Three independent oracles exist for what these files should yield:
 
 | Oracle | Where | Notes |
