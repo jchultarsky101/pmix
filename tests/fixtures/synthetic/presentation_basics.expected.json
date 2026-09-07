@@ -11,6 +11,26 @@
     "length": "mm",
     "angle": "deg"
   },
+  "properties": [
+    {
+      "id": "prop:9b6639a8b9382f8f",
+      "name": "equivalent unicode string",
+      "category": "pmi validation property",
+      "kind": "validation",
+      "value": {
+        "type": "text",
+        "value": "DIM\\w⌀10 ±0.05"
+      },
+      "applies_to": "dim:9e49ed233f1fa152",
+      "unmapped": [],
+      "source_refs": [
+        "#70",
+        "#73",
+        "#72",
+        "#71"
+      ]
+    }
+  ],
   "semantic": {
     "features": [
       {

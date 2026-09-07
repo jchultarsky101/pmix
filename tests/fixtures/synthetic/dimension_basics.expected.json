@@ -11,6 +11,7 @@
     "length": "mm",
     "angle": "deg"
   },
+  "properties": [],
   "semantic": {
     "features": [
       {

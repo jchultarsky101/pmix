@@ -22,7 +22,9 @@ CAD package.
 > (annotations with text, plane, leaders, style, geometry summary and links
 > to the semantic records; saved views). It extracts every such entity in
 > the NIST test corpus, and `pmix diff` compares two or more models by
-> identity. JT input is not supported yet. See the [roadmap](#roadmap).
+> identity. Named property values such as part numbers and revisions are
+> extracted too. JT input is not supported yet. See the
+> [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -159,6 +161,14 @@ breaking changes. Abridged:
   "schema_version": 1,
   "source": { "file_name": "part.stp", "format": "STEP", "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF" },
   "units": { "length": "mm", "angle": "deg" },
+  "properties": [
+    { "id": "prop:Part_Number", "name": "Part_Number", "category": "PLM__Part_Number",
+      "kind": "user", "value": { "type": "text", "value": "SYN-004-REV-A" },
+      "unmapped": [], "source_refs": ["#40", "#43", "#42", "#41"] },
+    { "id": "prop:…", "name": "affected area", "category": "pmi validation property",
+      "kind": "validation", "value": { "type": "measure", "value": 120.5, "unit": "mm2" },
+      "applies_to": "tol:…", "unmapped": [], "source_refs": ["#70", "#74", "#73", "#72"] }
+  ],
   "semantic": {
     "features": [
       { "id": "feat:…", "kind": "face", "name": "hole",
@@ -219,6 +229,12 @@ breaking changes. Abridged:
 }
 ```
 
+The `properties` array holds named values that are neither PMI nor
+geometry: part numbers, revisions, suppliers, prices, and the CAx-IF
+validation properties a file writes so a consuming system can check how it
+read the PMI. A property attaches to the whole part, or to one PMI record
+through `applies_to`. See [ADR 0007](docs/adr/0007-properties.md).
+
 Every array is sorted by id. Ids are *identity keys*
 ([ADR 0004](docs/adr/0004-identity.md)): they name which design element a
 record is, so the same tolerance keeps its id across re-exports even when
@@ -259,6 +275,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] STEP AP242 reader: annotations (tessellated, polyline, placeholder, text), styles, links, saved views
 - [x] Stable identity across exports (ADR 0004)
 - [x] `pmix diff` (ADR 0005)
+- [x] Product and record properties (ADR 0007)
 - [ ] JT reader: PMI Manager segment
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 - [ ] Publish to crates.io, once the base functionality is complete
