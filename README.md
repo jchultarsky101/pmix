@@ -23,8 +23,10 @@ CAD package.
 > to the semantic records; saved views). It extracts every such entity in
 > the NIST test corpus, and `pmix diff` compares two or more models by
 > identity. Named property values such as part numbers and revisions are
-> extracted too. For JT, `pmix inspect` reads the file structure and
-> `pmix extract` does not support it yet. See the [roadmap](#roadmap).
+> extracted too. For JT it extracts the semantic layer, so dimensions,
+> geometric tolerances, datums, and datum reference frames come out of both
+> formats in the same shape; the presentation layer is next. See the
+> [roadmap](#roadmap).
 
 ## What is PMI?
 
@@ -39,7 +41,7 @@ data lives inside the 3D file rather than on a 2D drawing.
 | Format | Standard | Extensions | Status |
 | ------ | -------- | ---------- | ------ |
 | STEP | ISO 10303 (AP242) | `.stp`, `.step`, `.p21` | Extraction and comparison |
-| JT | ISO 14306 | `.jt` | File structure readable with `pmix inspect`; PMI extraction in progress |
+| JT | ISO 14306 | `.jt` | Semantic PMI extraction and comparison; presentation layer in progress |
 
 ## Installation
 
@@ -137,10 +139,12 @@ pmix inspect part.stp -e 1752 --json      # machine-readable output
 The parser is tolerant: malformed records are reported and skipped, and
 the rest of the file is still read.
 
-`pmix inspect` also reads JT files, reporting the header, the segment
-inventory, and the elements of the segments that carry PMI:
+`pmix extract` and `pmix diff` accept JT files as they do STEP files, and
+produce the same document. `pmix inspect` reports a JT file's header, its
+segment inventory, and the elements of the segments that carry PMI:
 
 ```bash
+pmix extract assembly.jt --output pmi.json
 pmix inspect assembly.jt
 pmix inspect assembly.jt --type "PMI data" --json
 ```
@@ -295,7 +299,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] `pmix diff` (ADR 0005)
 - [x] Product and record properties (ADR 0007)
 - [x] JT reader: file structure, segments, and decompression (ADR 0009)
-- [ ] JT reader: PMI Manager element and the mapping onto the model
+- [x] JT reader: PMI Manager element, model units, and the semantic layer
+- [ ] JT reader: the presentation layer, so annotations and saved views
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 - [ ] Publish to crates.io, once the base functionality is complete
 
