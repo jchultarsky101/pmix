@@ -92,8 +92,8 @@ on the same record rather than a removal and an addition:
 ```text
 semantic
   ~ tol:3f9a1c0b7d2e6a48  ⌖ ⌀0.1 Ⓜ | A | B | C
-      value.value: 0.1 → 0.2
       text: ⌖ ⌀0.1 Ⓜ | A | B | C → ⌖ ⌀0.2 Ⓜ | A | B | C
+      value.value: 0.1 → 0.2
 
 summary: 41 unchanged, 1 changed, 0 removed, 0 added
 ```
