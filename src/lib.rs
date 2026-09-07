@@ -5,9 +5,10 @@
 //! front end (`src/main.rs`). The library is the intended integration point
 //! for anyone who wants to embed PMI extraction in their own tooling.
 //!
-//! - [`model`] is the JSON data model (ADR 0002).
+//! - [`model`] is the JSON data model (ADR 0002, 0003, 0004).
 //! - [`step`] reads STEP AP242 files: a Part 21 parser plus PMI walkers.
 //! - [`reader`] is the format-independent entry point.
+//! - [`diff`] compares two documents (ADR 0005).
 //!
 //! # Status
 //!
@@ -16,6 +17,7 @@
 //! presentation layer (annotations and saved views). JT is not implemented
 //! yet.
 
+pub mod diff;
 pub mod format;
 pub mod model;
 pub mod reader;
@@ -42,6 +44,10 @@ pub enum Error {
     #[error("STEP parse error: {0}")]
     StepParse(#[from] step::p21::ParseError),
 
+    /// A JSON document written by `pmix extract` could not be read.
+    #[error("invalid pmix JSON document: {0}")]
+    Json(#[from] serde_json::Error),
+
     /// An I/O failure while reading the input.
     #[error(transparent)]
     Io(#[from] std::io::Error),
@@ -58,4 +64,17 @@ pub fn extract(path: &Path) -> Result<PmiDocument> {
 /// [`extract`] with options.
 pub fn extract_with(path: &Path, options: &ExtractOptions) -> Result<PmiDocument> {
     read_path_with(path, options)
+}
+
+/// Load a document: a `.json` file written by `pmix extract`, or a model
+/// file, which is extracted.
+pub fn load(path: &Path) -> Result<PmiDocument> {
+    if path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("json"))
+    {
+        let text = std::fs::read_to_string(path)?;
+        return Ok(serde_json::from_str(&text)?);
+    }
+    extract(path)
 }

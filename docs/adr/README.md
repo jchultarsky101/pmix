@@ -10,3 +10,4 @@ never rewritten; a superseding decision gets a new record that links back.
 | [0002](0002-semantic-pmi-model.md) | Semantic layer of the PMI data model | Accepted |
 | [0003](0003-presentation-pmi-model.md) | Presentation layer of the PMI data model | Accepted |
 | [0004](0004-identity.md) | Identity of records across exports | Accepted |
+| [0005](0005-diff.md) | Comparing documents with `pmix diff` | Accepted |
