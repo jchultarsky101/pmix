@@ -41,10 +41,10 @@ data lives inside the 3D file rather than on a 2D drawing.
 
 ## Installation
 
-Prebuilt binaries and installers for macOS and Windows are attached to
-every [GitHub release](https://github.com/jchultarsky101/pmix/releases).
+Prebuilt binaries and installers for macOS, Linux, and Windows are attached
+to every [GitHub release](https://github.com/jchultarsky101/pmix/releases).
 
-macOS (Apple Silicon and Intel):
+macOS (Apple Silicon and Intel) and Linux (x86-64 and ARM64):
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/jchultarsky101/pmix/releases/latest/download/pmix-installer.sh | sh
@@ -260,7 +260,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Stable identity across exports (ADR 0004)
 - [x] `pmix diff` (ADR 0005)
 - [ ] JT reader: PMI Manager segment
-- [x] Binaries and installers for macOS and Windows from GitHub releases (ADR 0006)
+- [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 - [ ] Publish to crates.io, once the base functionality is complete
 
 ## Design
