@@ -40,6 +40,6 @@ pub fn read_path_with(path: &Path, options: &ExtractOptions) -> Result<PmiDocume
         .unwrap_or_default();
     match format {
         Format::Step => crate::step::StepReader.read(&bytes, &file_name, options),
-        Format::Jt => Err(Error::Unsupported(format)),
+        Format::Jt => crate::jt::JtReader.read(&bytes, &file_name, options),
     }
 }

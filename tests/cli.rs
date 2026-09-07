@@ -180,10 +180,12 @@ fn inspect_reads_a_jt_file() {
         .failure()
         .stderr(predicate::str::contains("STEP files only"));
 
-    // Extraction is not supported for JT yet, and says so.
+    // Extraction produces a document in the same shape as for STEP.
     pmix()
         .args(["extract", fixture])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("JT"));
+        .success()
+        .stdout(predicate::str::contains("\"format\": \"JT\""))
+        .stdout(predicate::str::contains("\"length\": \"mm\""))
+        .stdout(predicate::str::contains("\"kind\": \"position\""));
 }

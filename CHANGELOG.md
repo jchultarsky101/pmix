@@ -9,12 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- JT PMI extraction (ADR 0009). `pmix extract` and `pmix diff` now accept
+  `.jt` files and produce the same document as for STEP: dimensions with
+  their values, plus and minus deviations and ISO fits, geometric
+  tolerances with material conditions and datum reference frames, and
+  datums. A callout that nests several measurements, such as a hole and
+  thread note, becomes one record per measurement.
+- JT model units, read from the scene graph's `JT_PROP_MEASUREMENT_UNITS`
+  property, so every JT measure states the unit the file declares. The
+  scene graph's other properties, such as part names, become the
+  document's `properties`.
 - JT file structure reader (`pmix::jt`, ADR 0009): header, table of
   contents, segments, and XZ decompression of the segments that carry PMI,
   plus a walker over their element streams. `pmix inspect` now reads JT
   files and reports the header, the segment inventory, and those elements.
   Geometry segments are listed but never decoded. `pmix extract` still
-  refuses JT until the PMI walker lands.
 - The NIST MTC assembly as the JT fixture, public domain, which settles
   that it carries PMI.
 

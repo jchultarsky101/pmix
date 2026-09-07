@@ -7,7 +7,8 @@
 //!
 //! - [`model`] is the JSON data model (ADR 0002, 0003, 0004).
 //! - [`step`] reads STEP AP242 files: a Part 21 parser plus PMI walkers.
-//! - [`jt`] reads the structure of JT files (ADR 0009).
+//! - [`jt`] reads JT files: the file structure, the PMI Manager element,
+//!   and the scene graph properties that declare the model units (ADR 0009).
 //! - [`reader`] is the format-independent entry point.
 //! - [`diff`] compares two documents (ADR 0005).
 //!
@@ -16,8 +17,9 @@
 //! The STEP reader extracts the semantic layer (units, features,
 //! dimensions, geometric tolerances, datums, datum systems) and the
 //! presentation layer (annotations and saved views), with ids that survive
-//! re-export (ADR 0004), and [`diff`] compares documents. For JT the file
-//! structure is readable and PMI extraction is not implemented yet.
+//! re-export (ADR 0004), and [`diff`] compares documents. The JT reader
+//! extracts the semantic layer and the model's properties; its
+//! presentation layer is not implemented yet.
 
 pub mod diff;
 pub mod format;
@@ -38,10 +40,6 @@ pub enum Error {
     /// The input file's format could not be determined from its extension.
     #[error("unrecognised file format for `{0}`; expected a .stp/.step or .jt file")]
     UnknownFormat(String),
-
-    /// The format is recognised but the reader for it is not available yet.
-    #[error("{0} support is not implemented yet")]
-    Unsupported(Format),
 
     /// The input is not a STEP Part 21 file at all.
     #[error("STEP parse error: {0}")]
