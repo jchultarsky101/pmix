@@ -320,3 +320,90 @@ fn presentation_basics_semantics() {
         &vec![[0u32, 1, 2]]
     );
 }
+
+#[test]
+fn property_basics() {
+    check("property_basics");
+}
+
+#[test]
+fn property_basics_semantics() {
+    use pmix::model::{PropertyKind, PropertyValue};
+    let doc = pmix::extract(&synthetic_dir().join("property_basics.stp")).unwrap();
+    assert!(doc.unknown.is_empty(), "{:?}", doc.unknown);
+    assert!(doc.diagnostics.is_empty(), "{:?}", doc.diagnostics);
+    // Four user properties, plus three validation values across two
+    // validation representations.
+    assert_eq!(doc.properties.len(), 7);
+
+    let by_id = |id: &str| {
+        doc.properties
+            .iter()
+            .find(|p| p.id == id)
+            .unwrap_or_else(|| panic!("no property {id}"))
+    };
+
+    // Product-level user properties get readable ids, one per value type.
+    let part = by_id("prop:Part_Number");
+    assert_eq!(part.kind, PropertyKind::User);
+    assert_eq!(part.category.as_deref(), Some("PLM__Part_Number"));
+    assert!(part.applies_to.is_none());
+    assert_eq!(
+        part.value,
+        PropertyValue::Text {
+            value: "SYN-004-REV-A".into()
+        }
+    );
+    assert_eq!(
+        by_id("prop:Batch_Size").value,
+        PropertyValue::Integer { value: 250 }
+    );
+    assert_eq!(
+        by_id("prop:Unit_Price").value,
+        PropertyValue::Number { value: 18.75 }
+    );
+    assert_eq!(
+        by_id("prop:Release_Approved").value,
+        PropertyValue::Boolean { value: true }
+    );
+
+    // A validation property attached to the tolerance, with a derived unit.
+    let tolerance = &doc.semantic.tolerances[0].meta.id;
+    let area = doc
+        .properties
+        .iter()
+        .find(|p| p.name == "affected area")
+        .expect("affected area");
+    assert_eq!(area.kind, PropertyKind::Validation);
+    assert_eq!(area.applies_to.as_deref(), Some(tolerance.as_str()));
+    assert_eq!(
+        area.value,
+        PropertyValue::Measure {
+            value: 120.5,
+            unit: "mm2".into()
+        }
+    );
+    // The other item of the same representation is its own property.
+    let count = doc
+        .properties
+        .iter()
+        .find(|p| p.name == "number of PMI presentation elements")
+        .expect("element count");
+    assert_eq!(count.category, area.category);
+    assert_eq!(count.applies_to, area.applies_to);
+
+    // Cubic millimetres resolve through the derived unit.
+    let volume = doc
+        .properties
+        .iter()
+        .find(|p| p.name == "volume measure")
+        .expect("volume");
+    assert_eq!(
+        volume.value,
+        PropertyValue::Measure {
+            value: 1234.5,
+            unit: "mm3".into()
+        }
+    );
+    assert_eq!(volume.kind, PropertyKind::Validation);
+}

@@ -13,6 +13,7 @@ pub(crate) mod fingerprint;
 pub(crate) mod identity;
 pub(crate) mod measures;
 pub(crate) mod presentation;
+pub(crate) mod properties;
 pub(crate) mod tolerances;
 pub(crate) mod units;
 
@@ -21,7 +22,8 @@ use std::collections::{HashMap, HashSet};
 use crate::ExtractOptions;
 use crate::model::{
     Annotation, ContentId, Datum, DatumSystem, Diagnostic, Dimension, Feature, GeometricTolerance,
-    Layer, PmiDocument, Presentation, SCHEMA_VERSION, SavedView, Semantic, Source, Unknown,
+    Layer, PmiDocument, Presentation, Property, SCHEMA_VERSION, SavedView, Semantic, Source,
+    Unknown,
 };
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
@@ -33,6 +35,7 @@ pub fn extract(ex: &Exchange, file_name: &str, options: &ExtractOptions) -> PmiD
     dimensions::walk(&mut ctx);
     tolerances::walk(&mut ctx);
     presentation::walk(&mut ctx, options);
+    properties::walk(&mut ctx);
     identity::finalise(&mut ctx);
     let unknown = ctx.collect_unknown();
 
@@ -55,6 +58,8 @@ pub fn extract(ex: &Exchange, file_name: &str, options: &ExtractOptions) -> PmiD
         ..Default::default()
     };
     semantic.sort();
+    let mut properties = ctx.properties;
+    properties.sort_by(|a, b| a.id.cmp(&b.id));
     let mut presentation = Presentation {
         annotations: ctx.annotations,
         views: ctx.views,
@@ -78,6 +83,7 @@ pub fn extract(ex: &Exchange, file_name: &str, options: &ExtractOptions) -> PmiD
                 .map(str::to_owned),
         },
         units,
+        properties,
         semantic,
         presentation,
         unknown,
@@ -195,6 +201,10 @@ fn unknown_reason(inst: &Instance) -> Option<(&'static str, Layer)> {
     None
 }
 
+/// A property definition and the representation carrying its values:
+/// `(property_definition, definition_representation, representation)`.
+pub(crate) type PropertyRepr = (Id, Id, Id);
+
 /// Shared state for the walkers.
 pub(crate) struct Ctx<'a> {
     pub ex: &'a Exchange,
@@ -211,6 +221,7 @@ pub(crate) struct Ctx<'a> {
     pub tolerances: Vec<GeometricTolerance>,
     pub annotations: Vec<Annotation>,
     pub views: Vec<SavedView>,
+    pub properties: Vec<Property>,
     /// Dimension instance id to record id.
     pub dimension_ids: HashMap<Id, String>,
     /// Feature (temporary) record id to the fingerprints of its geometry.
@@ -231,9 +242,8 @@ pub(crate) struct Ctx<'a> {
     /// Datum target id to `(relationship id, feature)` from
     /// `FEATURE_FOR_DATUM_TARGET_RELATIONSHIP`.
     pub target_features: HashMap<Id, Vec<(Id, Id)>>,
-    /// Definition id to `(property_definition, definition_representation,
-    /// representation)` triples.
-    pub property_reprs: HashMap<Id, Vec<(Id, Id, Id)>>,
+    /// Definition id to the property representations describing it.
+    pub property_reprs: HashMap<Id, Vec<PropertyRepr>>,
     /// Tolerance id to the `TOLERANCE_ZONE`s defining it.
     pub zones: HashMap<Id, Vec<Id>>,
     /// Zone id to its `*_ZONE_DEFINITION`s.
@@ -267,6 +277,7 @@ impl<'a> Ctx<'a> {
             tolerances: Vec::new(),
             annotations: Vec::new(),
             views: Vec::new(),
+            properties: Vec::new(),
             dimension_ids: HashMap::new(),
             feature_fingerprints: HashMap::new(),
             datum_ids: HashMap::new(),

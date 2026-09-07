@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A `properties` section (ADR 0007): named values that are neither PMI nor
+  geometry, such as part numbers, revisions, suppliers, prices, and the
+  CAx-IF validation properties. Values are typed (text, integer, number,
+  measure with unit, boolean), a property attaches to the whole part or to
+  one PMI record, and product-level properties get readable ids such as
+  `prop:Part_Number`. `pmix diff` compares user properties and ignores
+  validation ones, which are derived from the PMI they describe.
+- Derived units (`derived_unit`), so areas and volumes resolve as `mm2`
+  and `mm3` instead of being reported as unrecognised.
+
 ## [0.1.1] - 2026-09-07
 
 First release with prebuilt binaries.

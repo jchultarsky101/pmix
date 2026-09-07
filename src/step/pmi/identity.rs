@@ -320,7 +320,47 @@ pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
         ctx.views[i].id = id;
     }
 
-    // 8. Remaining cross references: annotation -> views, semantic -> presentation.
+    // 8. Properties, after everything they can point at.
+    let mut product_level = Vec::new();
+    let mut attached = Vec::new();
+    for (i, prop) in ctx.properties.iter_mut().enumerate() {
+        if let Some(a) = &mut prop.applies_to {
+            remap(a, &map);
+        }
+        let key = [
+            prop.category.as_deref().unwrap_or(""),
+            prop.name.as_str(),
+            prop.applies_to.as_deref().unwrap_or(""),
+        ]
+        .join("|");
+        let content = hash_content(&prop, &["id", "source_refs"]);
+        if prop.applies_to.is_none() {
+            // Readable as `prop:Part_Number` when the name allows it.
+            product_level.push((i, prop.name.clone(), content, key));
+        } else {
+            attached.push((i, key, content));
+        }
+    }
+    // Product-level properties key on all three parts but are named by the
+    // property alone, so a name shared by two categories collides and takes
+    // the usual content-ordered suffix.
+    let readable: Vec<(usize, String, String)> = product_level
+        .into_iter()
+        .map(|(i, name, content, key)| {
+            let base = if is_readable(&name) { name } else { key };
+            (i, base, content)
+        })
+        .collect();
+    for (i, id) in assign(readable, "prop", true) {
+        map.insert(ctx.properties[i].id.clone(), id.clone());
+        ctx.properties[i].id = id;
+    }
+    for (i, id) in assign(attached, "prop", false) {
+        map.insert(ctx.properties[i].id.clone(), id.clone());
+        ctx.properties[i].id = id;
+    }
+
+    // 9. Remaining cross references: annotation -> views, semantic -> presentation.
     for a in &mut ctx.annotations {
         remap_all(&mut a.views, &map);
     }

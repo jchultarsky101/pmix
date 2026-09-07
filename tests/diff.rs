@@ -129,3 +129,47 @@ fn json_round_trip_and_reexport_pair() {
     let back: pmix::diff::DiffReport = serde_json::from_str(&json).unwrap();
     assert_eq!(back, report);
 }
+
+#[test]
+fn user_properties_are_compared_and_validation_ones_are_not() {
+    use pmix::model::PropertyKind;
+    let a = pmix::extract(&synthetic("property_basics.stp")).unwrap();
+
+    // A revision change is one changed property on a stable id.
+    let b = pmix::extract(&edited(
+        "property_basics.stp",
+        "'Part_Number','SYN-004-REV-A'",
+        "'Part_Number','SYN-004-REV-B'",
+    ))
+    .unwrap();
+    let report = diff(&a, &b);
+    assert_eq!(report.changes.len(), 1, "{}", report.render_text());
+    let change = &report.changes[0];
+    assert_eq!(change.kind, ChangeKind::Changed);
+    assert_eq!(change.collection, "properties");
+    assert_eq!(change.id, "prop:Part_Number");
+    assert_eq!(change.label, "Part_Number");
+    let paths: Vec<&str> = change.fields.iter().map(|f| f.path.as_str()).collect();
+    assert_eq!(paths, ["value.value"]);
+    assert!(
+        report.render_text().contains("properties"),
+        "{}",
+        report.render_text()
+    );
+
+    // A validation property that changed is not reported: it is derived
+    // from the PMI it describes (ADR 0007).
+    let c = pmix::extract(&edited(
+        "property_basics.stp",
+        "AREA_MEASURE(120.5)",
+        "AREA_MEASURE(999.5)",
+    ))
+    .unwrap();
+    assert!(
+        c.properties
+            .iter()
+            .any(|p| p.kind == PropertyKind::Validation && p.value.canonical().contains("999.5")),
+        "the edit should have changed a validation property"
+    );
+    assert!(diff(&a, &c).is_empty(), "{}", diff(&a, &c).render_text());
+}

@@ -12,3 +12,4 @@ never rewritten; a superseding decision gets a new record that links back.
 | [0004](0004-identity.md) | Identity of records across exports | Accepted |
 | [0005](0005-diff.md) | Comparing documents with `pmix diff` | Accepted |
 | [0006](0006-distribution.md) | Distribution through GitHub releases | Accepted |
+| [0007](0007-properties.md) | Product and record properties | Accepted |

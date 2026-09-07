@@ -84,9 +84,10 @@ impl DiffReport {
     }
 }
 
-/// The collections compared, with their layer and the key that labels a
-/// record for humans.
+/// The collections compared: `(section, collection, layer, label keys)`.
+/// An empty section means the collection is at the top level.
 const COLLECTIONS: &[(&str, &str, Layer, &[&str])] = &[
+    ("", "properties", Layer::Properties, &["name"]),
     ("semantic", "features", Layer::Semantic, &["name", "kind"]),
     ("semantic", "datums", Layer::Semantic, &["label"]),
     ("semantic", "datum_systems", Layer::Semantic, &["text"]),
@@ -169,8 +170,32 @@ pub fn diff(left: &PmiDocument, right: &PmiDocument) -> DiffReport {
     }
 
     for (section, collection, layer, label_keys) in COLLECTIONS {
-        let lm = by_id(&l[section][collection]);
-        let rm = by_id(&r[section][collection]);
+        let pick = |doc: &Value| -> Value {
+            let v = if section.is_empty() {
+                &doc[collection]
+            } else {
+                &doc[section][collection]
+            };
+            // Validation properties are derived from the PMI they describe,
+            // so comparing them would restate every PMI change (ADR 0007).
+            if *collection == "properties" {
+                let kept: Vec<Value> = v
+                    .as_array()
+                    .map(|a| {
+                        a.iter()
+                            .filter(|p| p.get("kind").and_then(Value::as_str) != Some("validation"))
+                            .cloned()
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                Value::Array(kept)
+            } else {
+                v.clone()
+            }
+        };
+        let (lv, rv) = (pick(&l), pick(&r));
+        let lm = by_id(&lv);
+        let rm = by_id(&rv);
         let ids: BTreeSet<&String> = lm.keys().chain(rm.keys()).collect();
         for id in ids {
             match (lm.get(id), rm.get(id)) {
@@ -363,7 +388,7 @@ impl fmt::Display for DiffReport {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "left:  {}", self.left)?;
         writeln!(f, "right: {}", self.right)?;
-        for layer in [Layer::Semantic, Layer::Presentation] {
+        for layer in [Layer::Properties, Layer::Semantic, Layer::Presentation] {
             let changes: Vec<&Change> = self.changes.iter().filter(|c| c.layer == layer).collect();
             if changes.is_empty() {
                 continue;
@@ -373,6 +398,7 @@ impl fmt::Display for DiffReport {
                 f,
                 "{}",
                 match layer {
+                    Layer::Properties => "properties",
                     Layer::Semantic => "semantic",
                     Layer::Presentation => "presentation",
                 }
