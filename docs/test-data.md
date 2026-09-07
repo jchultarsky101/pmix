@@ -69,6 +69,13 @@ sample), PyOpenJt's example files (JT 8.0 to 10.3, copied from a repository
 with no licence), and assimp's `conrod.jt` all sit in open-source repos but
 their original provenance is unstated. Use for local experiments only.
 
+## Local data
+
+The `data/` directory is ignored by git. Put model files there that are too
+large, too numerous, or too uncertain in provenance to commit. Nothing in
+the test suite depends on it; it is for exploring the readers by hand, for
+example with `pmix inspect`.
+
 ## Do not use
 
 - **Fusion 360 Gallery, SolidLetters, and other Autodesk research datasets:**

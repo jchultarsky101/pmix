@@ -10,11 +10,13 @@
 mod id;
 mod measure;
 mod presentation;
+mod properties;
 mod semantic;
 
 pub use id::{ContentId, content_hash};
 pub use measure::{Direction, Measure, Placement};
 pub use presentation::*;
+pub use properties::*;
 pub use semantic::*;
 
 use serde::{Deserialize, Serialize};
@@ -33,6 +35,8 @@ pub struct PmiDocument {
     pub source: Source,
     /// Units declared by the file for lengths and angles.
     pub units: Units,
+    /// Named values that are neither PMI nor geometry (ADR 0007).
+    pub properties: Vec<Property>,
     /// Machine-readable PMI.
     pub semantic: Semantic,
     /// Human-visible PMI (ADR 0003).
@@ -118,6 +122,7 @@ pub struct Unknown {
 pub enum Layer {
     Semantic,
     Presentation,
+    Properties,
 }
 
 /// A reader warning.

@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "source": {
+    "file_name": "property_basics.stp",
+    "format": "STEP",
+    "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF",
+    "writer": "pmix synthetic",
+    "time_stamp": "2026-09-07T00:00:00"
+  },
+  "units": {
+    "length": "mm",
+    "angle": "rad"
+  },
+  "properties": [
+    {
+      "id": "prop:607b46832bf01548",
+      "name": "volume measure",
+      "category": "geometric validation property",
+      "kind": "validation",
+      "value": {
+        "type": "measure",
+        "value": 1234.5,
+        "unit": "mm3"
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#60",
+        "#63",
+        "#62",
+        "#61"
+      ]
+    },
+    {
+      "id": "prop:6b928780103e53c7",
+      "name": "number of PMI presentation elements",
+      "category": "pmi validation property",
+      "kind": "validation",
+      "value": {
+        "type": "integer",
+        "value": 1
+      },
+      "applies_to": "tol:36e281c3ba9d4c19",
+      "unmapped": [],
+      "source_refs": [
+        "#70",
+        "#74",
+        "#73",
+        "#71"
+      ]
+    },
+    {
+      "id": "prop:Batch_Size",
+      "name": "Batch_Size",
+      "category": "PLM__Batch_Size",
+      "kind": "user",
+      "value": {
+        "type": "integer",
+        "value": 250
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#44",
+        "#47",
+        "#46",
+        "#45"
+      ]
+    },
+    {
+      "id": "prop:Part_Number",
+      "name": "Part_Number",
+      "category": "PLM__Part_Number",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "SYN-004-REV-A"
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#40",
+        "#43",
+        "#42",
+        "#41"
+      ]
+    },
+    {
+      "id": "prop:Release_Approved",
+      "name": "Release_Approved",
+      "category": "PLM__Release_Approved",
+      "kind": "user",
+      "value": {
+        "type": "boolean",
+        "value": true
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#52",
+        "#55",
+        "#54",
+        "#53"
+      ]
+    },
+    {
+      "id": "prop:Unit_Price",
+      "name": "Unit_Price",
+      "category": "PLM__Unit_Price",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 18.75
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#48",
+        "#51",
+        "#50",
+        "#49"
+      ]
+    },
+    {
+      "id": "prop:b0091180e33b61db",
+      "name": "affected area",
+      "category": "pmi validation property",
+      "kind": "validation",
+      "value": {
+        "type": "measure",
+        "value": 120.5,
+        "unit": "mm2"
+      },
+      "applies_to": "tol:36e281c3ba9d4c19",
+      "unmapped": [],
+      "source_refs": [
+        "#70",
+        "#74",
+        "#73",
+        "#72"
+      ]
+    }
+  ],
+  "semantic": {
+    "features": [
+      {
+        "id": "feat:c1f8c505df305f4a",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#30",
+          "#31"
+        ],
+        "kind": "face",
+        "name": "base",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#25"
+          }
+        ],
+        "members": []
+      }
+    ],
+    "datums": [],
+    "datum_systems": [],
+    "dimensions": [],
+    "tolerances": [
+      {
+        "id": "tol:36e281c3ba9d4c19",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#33",
+          "#32"
+        ],
+        "kind": "flatness",
+        "value": {
+          "value": 0.05,
+          "unit": "mm"
+        },
+        "modifiers": [],
+        "features": [
+          "feat:c1f8c505df305f4a"
+        ],
+        "text": "⏥ 0.05"
+      }
+    ],
+    "notes": [],
+    "other": []
+  },
+  "presentation": {
+    "annotations": [],
+    "views": []
+  },
+  "unknown": [],
+  "diagnostics": []
+}

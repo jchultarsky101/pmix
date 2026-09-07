@@ -40,9 +40,11 @@ pub(crate) fn unit_name(ctx: &mut Ctx<'_>, id: Id) -> Option<String> {
     if let Some(cached) = ctx.unit_names.get(&id) {
         return cached.clone();
     }
+    // Guard against a derived unit that reaches itself.
+    ctx.unit_names.insert(id, None);
     let name = match ctx.ex.get(id) {
         Some(inst) => {
-            let n = resolve(inst);
+            let n = resolve(inst).or_else(|| derived(ctx, inst));
             if n.is_none() {
                 ctx.warn(
                     format!("unrecognised unit #{id} ({})", inst.type_key()),
@@ -58,6 +60,35 @@ pub(crate) fn unit_name(ctx: &mut Ctx<'_>, id: Id) -> Option<String> {
     };
     ctx.unit_names.insert(id, name.clone());
     name
+}
+
+/// A `derived_unit` such as mm² or kg/m³: each element's unit name
+/// followed by its exponent when that is not 1, joined with `.`.
+/// Millimetres squared becomes `mm2`, kilograms per cubic metre `kg.m-3`.
+fn derived(ctx: &mut Ctx<'_>, inst: &Instance) -> Option<String> {
+    let seg = inst.segment("DERIVED_UNIT")?;
+    let ex = ctx.ex;
+    let mut elements = Vec::new();
+    seg.parameters.first()?.collect_refs(&mut elements);
+    if elements.is_empty() {
+        return None;
+    }
+    let mut parts = Vec::new();
+    for e in elements {
+        let element = ex.get(e)?;
+        let p = element.parameters();
+        let base = p.first().and_then(Parameter::as_ref)?;
+        let name = unit_name(ctx, base)?;
+        let exponent = p.get(1).and_then(Parameter::as_f64).unwrap_or(1.0);
+        if (exponent - 1.0).abs() < 1e-9 {
+            parts.push(name);
+        } else if exponent.fract().abs() < 1e-9 {
+            parts.push(format!("{name}{}", exponent as i64));
+        } else {
+            parts.push(format!("{name}{exponent}"));
+        }
+    }
+    Some(parts.join("."))
 }
 
 fn resolve(inst: &Instance) -> Option<String> {
