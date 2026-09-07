@@ -14,33 +14,15 @@
   "semantic": {
     "features": [
       {
-        "id": "feat:1a1625fc17b4fc49",
-        "origin": "semantic",
-        "presentation": [],
-        "unmapped": [],
-        "source_refs": [
-          "#40",
-          "#41"
-        ],
-        "kind": "face",
-        "name": "hole",
-        "geometry": [
-          {
-            "kind": "face",
-            "surface": "cylinder",
-            "source_ref": "#25"
-          }
-        ],
-        "members": []
-      },
-      {
-        "id": "feat:80625b919b82cea8",
+        "id": "feat:c077b47e9f30aa18",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
         "source_refs": [
           "#71",
-          "#72"
+          "#72",
+          "#40",
+          "#41"
         ],
         "kind": "face",
         "name": "hole 1",
@@ -54,47 +36,7 @@
         "members": []
       },
       {
-        "id": "feat:a758074951cfbc7b",
-        "origin": "semantic",
-        "presentation": [],
-        "unmapped": [],
-        "source_refs": [
-          "#62",
-          "#63"
-        ],
-        "kind": "face",
-        "name": "right",
-        "geometry": [
-          {
-            "kind": "face",
-            "surface": "plane",
-            "source_ref": "#31"
-          }
-        ],
-        "members": []
-      },
-      {
-        "id": "feat:e8ab37e5fa48d88e",
-        "origin": "semantic",
-        "presentation": [],
-        "unmapped": [],
-        "source_refs": [
-          "#60",
-          "#61"
-        ],
-        "kind": "face",
-        "name": "left",
-        "geometry": [
-          {
-            "kind": "face",
-            "surface": "plane",
-            "source_ref": "#27"
-          }
-        ],
-        "members": []
-      },
-      {
-        "id": "feat:faede4f21ad47156",
+        "id": "feat:c077b47e9f30aa18",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -106,15 +48,37 @@
         "name": "pattern",
         "geometry": [],
         "members": [
-          "feat:80625b919b82cea8"
+          "feat:c077b47e9f30aa18"
         ]
+      },
+      {
+        "id": "feat:c1f8c505df305f4a",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#62",
+          "#63",
+          "#60",
+          "#61"
+        ],
+        "kind": "face",
+        "name": "right",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#31"
+          }
+        ],
+        "members": []
       }
     ],
     "datums": [],
     "datum_systems": [],
     "dimensions": [
       {
-        "id": "dim:78aad44e861f0446",
+        "id": "dim:062b89c0e80c5305",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -144,13 +108,13 @@
         },
         "modifiers": [],
         "features": [
-          "feat:1a1625fc17b4fc49"
+          "feat:c077b47e9f30aa18"
         ],
         "decimal_places": 2,
         "text": "⌀12.50 ±0.05"
       },
       {
-        "id": "dim:ae1786b93f6643fc",
+        "id": "dim:062b89c0e80c5305-2",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -177,12 +141,12 @@
           "statistical"
         ],
         "features": [
-          "feat:1a1625fc17b4fc49"
+          "feat:c077b47e9f30aa18"
         ],
         "text": "⌀12.5 H7"
       },
       {
-        "id": "dim:cafcfa2cb749e9d2",
+        "id": "dim:2224b5296a52f808",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -205,34 +169,12 @@
         },
         "modifiers": [],
         "features": [
-          "feat:faede4f21ad47156"
+          "feat:c077b47e9f30aa18"
         ],
         "text": "R6.2–6.3"
       },
       {
-        "id": "dim:e7a91961fc450e52",
-        "origin": "semantic",
-        "presentation": [],
-        "unmapped": [],
-        "source_refs": [
-          "#80",
-          "#83",
-          "#82"
-        ],
-        "kind": "angular_size",
-        "subtype": "angle",
-        "value": {
-          "value": 30.0,
-          "unit": "deg"
-        },
-        "modifiers": [],
-        "features": [
-          "feat:e8ab37e5fa48d88e"
-        ],
-        "text": "30°"
-      },
-      {
-        "id": "dim:fef5cd5086dada30",
+        "id": "dim:6e378aab78453e7b",
         "origin": "semantic",
         "presentation": [],
         "unmapped": [],
@@ -250,10 +192,32 @@
         "qualifier": "basic",
         "modifiers": [],
         "features": [
-          "feat:e8ab37e5fa48d88e",
-          "feat:a758074951cfbc7b"
+          "feat:c1f8c505df305f4a",
+          "feat:c1f8c505df305f4a"
         ],
         "text": "[40]"
+      },
+      {
+        "id": "dim:c9a81a4d47cb85fa",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#80",
+          "#83",
+          "#82"
+        ],
+        "kind": "angular_size",
+        "subtype": "angle",
+        "value": {
+          "value": 30.0,
+          "unit": "deg"
+        },
+        "modifiers": [],
+        "features": [
+          "feat:c1f8c505df305f4a"
+        ],
+        "text": "30°"
       }
     ],
     "tolerances": [],

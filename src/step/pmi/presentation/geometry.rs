@@ -346,9 +346,39 @@ fn point(inst: &Instance) -> Option<[f64; 3]> {
 
 const CIRCLE_SEGMENTS: usize = 32;
 
+/// Sample a curve as a polyline without reporting problems. Angles are
+/// taken as radians unless the file declares degrees.
+pub(crate) fn sample_curve(ex: &Exchange, e: &Instance) -> Option<Vec<[f64; 3]>> {
+    let deg = ex
+        .of_type("GLOBAL_UNIT_ASSIGNED_CONTEXT")
+        .flat_map(|c| {
+            c.attr("GLOBAL_UNIT_ASSIGNED_CONTEXT", 0)
+                .and_then(Parameter::as_list)
+                .into_iter()
+                .flatten()
+        })
+        .filter_map(|p| p.as_ref().and_then(|id| ex.get(id)))
+        .any(|u| {
+            u.has_type("PLANE_ANGLE_UNIT")
+                && u.attr("CONVERSION_BASED_UNIT", 0)
+                    .and_then(Parameter::as_str)
+                    .is_some_and(|n| n.eq_ignore_ascii_case("degree"))
+        });
+    curve_inner(ex, None, e, deg)
+}
+
 /// Sample a curve as a polyline.
 fn curve(ctx: &mut Ctx<'_>, e: &Instance, deg: bool) -> Option<Vec<[f64; 3]>> {
     let ex = ctx.ex;
+    curve_inner(ex, Some(ctx), e, deg)
+}
+
+fn curve_inner(
+    ex: &Exchange,
+    mut ctx: Option<&mut Ctx<'_>>,
+    e: &Instance,
+    deg: bool,
+) -> Option<Vec<[f64; 3]>> {
     if e.has_type("POLYLINE") {
         let mut ids = Vec::new();
         e.parameters().get(1)?.collect_refs(&mut ids);
@@ -429,14 +459,16 @@ fn curve(ctx: &mut Ctx<'_>, e: &Instance, deg: bool) -> Option<Vec<[f64; 3]>> {
             let b = t2.1.or_else(|| t2.0.map(at))?;
             return Some(vec![a, b]);
         }
-        ctx.warn(
-            format!(
-                "trimmed curve #{} on unsupported basis {}",
-                e.id,
-                basis.type_key()
-            ),
-            Some(e.id),
-        );
+        if let Some(c) = ctx.as_deref_mut() {
+            c.warn(
+                format!(
+                    "trimmed curve #{} on unsupported basis {}",
+                    e.id,
+                    basis.type_key()
+                ),
+                Some(e.id),
+            );
+        }
         return None;
     }
     if e.has_type("COMPOSITE_CURVE") {
@@ -454,7 +486,7 @@ fn curve(ctx: &mut Ctx<'_>, e: &Instance, deg: bool) -> Option<Vec<[f64; 3]>> {
             else {
                 continue;
             };
-            if let Some(pl) = curve(ctx, parent, deg) {
+            if let Some(pl) = curve_inner(ex, ctx.as_deref_mut(), parent, deg) {
                 out.extend(pl);
             }
         }

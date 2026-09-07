@@ -133,13 +133,13 @@ breaking changes. Abridged:
         "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#42", "#46", "#45", "#50", "#49"] }
     ],
     "datums": [
-      { "id": "datum:…", "label": "A", "features": ["feat:…"],
+      { "id": "datum:A", "label": "A", "features": ["feat:…"],
         "targets": [{ "label": "A1", "kind": "point", "diameter": { "value": 2.0, "unit": "mm" },
                       "placement": { "origin": [10.0, 10.0, 0.0], "axis": { "x": 0.0, "y": 0.0, "z": 1.0 } }, "feature": "feat:…", "unmapped": [] }],
         "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#42", "#43", "#45"] }
     ],
     "datum_systems": [
-      { "id": "dsys:…", "text": "A|B(M)|C",
+      { "id": "dsys:A|B|C", "text": "A|B(M)|C",
         "compartments": [
           { "datums": [{ "datum": "datum:…", "modifiers": [], "modifier_values": [] }], "common": false },
           { "datums": [{ "datum": "datum:…", "modifiers": ["maximum_material"], "modifier_values": [] }], "common": false },
@@ -151,7 +151,7 @@ breaking changes. Abridged:
       { "id": "tol:…", "kind": "position", "text": "⌖ ⌀0.1 Ⓟ10 Ⓜ | A | B Ⓜ | C",
         "value": { "value": 0.1, "unit": "mm" },
         "zone": { "form": "cylindrical_or_circular", "projected": { "value": 10.0, "unit": "mm" } },
-        "modifiers": ["maximum_material"], "datum_system": "dsys:…", "features": ["feat:…"], "decimal_places": 2,
+        "modifiers": ["maximum_material"], "datum_system": "dsys:A|B|C", "features": ["feat:…"], "decimal_places": 2,
         "origin": "semantic", "presentation": [], "unmapped": [], "source_refs": ["#84", "#82", "#86", "#87"] }
     ],
     "notes": [], "other": []
@@ -165,11 +165,11 @@ breaking changes. Abridged:
         "geometry": { "polylines": 1, "triangles": 1, "points": 8, "bbox": { "min": [20.0, 20.0, 0.0], "max": [24.0, 22.0, 0.0] }, "hash": "…" },
         "parts": [{ "form": "tessellated", "kind": "position", "geometry": { "…": "…" }, "source_ref": "#97" }],
         "style": { "colour": "#ff0000", "line_font": "continuous", "layer": "PMI layer" },
-        "semantic": ["tol:…"], "features": ["feat:…"], "views": ["view:…"],
+        "semantic": ["tol:…"], "features": ["feat:…"], "views": ["view:MBD_A"],
         "attributes": {}, "unmapped": [], "source_refs": ["#98", "#97", "#99", "#100"] }
     ],
     "views": [
-      { "id": "view:…", "name": "MBD_A",
+      { "id": "view:MBD_A", "name": "MBD_A",
         "camera": { "placement": { "origin": [0.0, 0.0, 100.0] }, "projection": "parallel", "view_plane_distance": 100.0, "view_window": [200.0, 150.0] },
         "clipping_planes": [], "annotations": ["ann:…"], "unmapped": [], "source_refs": ["#215", "#214", "#217"] }
     ]
@@ -179,11 +179,15 @@ breaking changes. Abridged:
 }
 ```
 
-Every array is sorted by id, ids are derived from content rather than from
-the source file's entity numbering, and measures are kept in the unit the
-file declares. Anything the reader recognises but cannot map is reported
-under `unknown` rather than dropped. The model lives in
-[`src/model/`](src/model/).
+Every array is sorted by id. Ids are *identity keys*
+([ADR 0004](docs/adr/0004-identity.md)): they name which design element a
+record is, so the same tolerance keeps its id across re-exports even when
+its value changes. Datums, datum systems, and saved views get readable ids
+(`datum:A`, `dsys:A|B|C`, `view:MBD_A`); features, dimensions,
+tolerances, and annotations get hashed ids anchored on the B-rep geometry
+they apply to. Measures are kept in the unit the file declares. Anything
+the reader recognises but cannot map is reported under `unknown` rather
+than dropped. The model lives in [`src/model/`](src/model/).
 
 ## Library use
 
@@ -213,7 +217,8 @@ the crate is published.
 - [x] STEP AP242 reader: geometric tolerances, datums, datum targets, datum systems
 - [x] Presentation data model (ADR 0003)
 - [x] STEP AP242 reader: annotations (tessellated, polyline, placeholder, text), styles, links, saved views
-- [ ] Stable identity across exports and `pmix diff`
+- [x] Stable identity across exports (ADR 0004)
+- [ ] `pmix diff`
 - [ ] JT reader: PMI Manager segment
 - [ ] Publish to crates.io
 

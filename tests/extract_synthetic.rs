@@ -42,7 +42,9 @@ fn dimension_basics_semantics() {
     assert!(doc.unknown.is_empty(), "{:?}", doc.unknown);
     assert!(doc.diagnostics.is_empty(), "{:?}", doc.diagnostics);
     assert_eq!(s.dimensions.len(), 5);
-    assert_eq!(s.features.len(), 5);
+    // `hole`, `hole 1`, and the single-member `pattern` all sit on the same
+    // cylindrical face and merge into one feature (ADR 0004).
+    assert_eq!(s.features.len(), 3);
 
     let find = |f: &dyn Fn(&pmix::model::Dimension) -> bool| {
         s.dimensions
@@ -66,7 +68,12 @@ fn dimension_basics_semantics() {
         .iter()
         .find(|f| f.meta.id == dia.features[0])
         .unwrap();
-    assert_eq!(hole.name.as_deref(), Some("hole"));
+    // Merged from `hole` and `hole 1`; the survivor is chosen by content hash.
+    assert!(
+        hole.name.as_deref().is_some_and(|n| n.starts_with("hole")),
+        "{:?}",
+        hole.name
+    );
     assert_eq!(
         hole.geometry[0].surface.as_ref().map(|s| s.as_str()),
         Some("cylinder")
@@ -80,13 +87,9 @@ fn dimension_basics_semantics() {
     let radius = find(&|d| d.subtype == DimensionSubtype::Radius);
     let lim = radius.limits.as_ref().unwrap();
     assert_eq!((lim.lower.value, lim.upper.value), (6.2, 6.3));
-    let pattern = s
-        .features
-        .iter()
-        .find(|f| f.meta.id == radius.features[0])
-        .unwrap();
-    assert_eq!(pattern.kind.as_str(), "composite");
-    assert_eq!(pattern.members.len(), 1);
+    // The radius on the pattern and the diameter on the hole resolve to
+    // the same merged feature.
+    assert_eq!(radius.features[0], dia.features[0]);
 
     let angle = find(&|d| d.kind == DimensionKind::AngularSize);
     assert_eq!(angle.value.as_ref().unwrap().unit, "deg");

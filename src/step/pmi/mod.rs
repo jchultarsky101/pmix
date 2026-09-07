@@ -9,6 +9,8 @@
 pub(crate) mod datums;
 pub(crate) mod dimensions;
 pub(crate) mod features;
+pub(crate) mod fingerprint;
+pub(crate) mod identity;
 pub(crate) mod measures;
 pub(crate) mod presentation;
 pub(crate) mod tolerances;
@@ -31,6 +33,7 @@ pub fn extract(ex: &Exchange, file_name: &str, options: &ExtractOptions) -> PmiD
     dimensions::walk(&mut ctx);
     tolerances::walk(&mut ctx);
     presentation::walk(&mut ctx, options);
+    identity::finalise(&mut ctx);
     let unknown = ctx.collect_unknown();
 
     let mut diagnostics: Vec<Diagnostic> = ex
@@ -210,6 +213,8 @@ pub(crate) struct Ctx<'a> {
     pub views: Vec<SavedView>,
     /// Dimension instance id to record id.
     pub dimension_ids: HashMap<Id, String>,
+    /// Feature (temporary) record id to the fingerprints of its geometry.
+    pub feature_fingerprints: HashMap<String, Vec<fingerprint::Fingerprint>>,
     /// Datum instance id to record id.
     pub datum_ids: HashMap<Id, Option<String>>,
     /// Datum record id to its label, for rendering.
@@ -263,6 +268,7 @@ impl<'a> Ctx<'a> {
             annotations: Vec::new(),
             views: Vec::new(),
             dimension_ids: HashMap::new(),
+            feature_fingerprints: HashMap::new(),
             datum_ids: HashMap::new(),
             datum_labels: HashMap::new(),
             datum_system_ids: HashMap::new(),
