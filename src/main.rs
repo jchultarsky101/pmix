@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -240,7 +240,166 @@ struct InspectOptions {
     json: bool,
 }
 
+/// Dispatch to the reader for the file's format.
 fn inspect(input: PathBuf, opts: InspectOptions) -> Result<()> {
+    match pmix::Format::from_path(&input) {
+        Some(pmix::Format::Jt) => inspect_jt(input, opts),
+        _ => inspect_step(input, opts),
+    }
+}
+
+/// Explore a JT file's structure: header, segments, and the elements of
+/// the segments that carry PMI (ADR 0009).
+fn inspect_jt(input: PathBuf, opts: InspectOptions) -> Result<()> {
+    use pmix::jt::{Elements, Jt};
+
+    if !opts.entities.is_empty() || opts.depth > 0 || opts.complex {
+        anyhow::bail!("--entity, --depth and --complex apply to STEP files only");
+    }
+    let bytes =
+        std::fs::read(&input).with_context(|| format!("failed to read `{}`", input.display()))?;
+    tracing::info!(input = %input.display(), bytes = bytes.len(), "reading JT");
+    let jt = Jt::parse(&bytes).with_context(|| format!("failed to read `{}`", input.display()))?;
+
+    let wanted = |kind: &pmix::jt::SegmentKind| {
+        opts.types.is_empty()
+            || opts
+                .types
+                .iter()
+                .any(|t| kind.as_str().eq_ignore_ascii_case(t))
+    };
+
+    let mut counts: BTreeMap<String, usize> = BTreeMap::new();
+    for segment in jt.segments() {
+        *counts.entry(segment.kind.as_str()).or_default() += 1;
+    }
+
+    #[derive(serde::Serialize)]
+    struct SegmentReport {
+        kind: String,
+        id: String,
+        offset: u64,
+        length: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        decoded_length: Option<usize>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+        elements: Vec<ElementReport>,
+    }
+    #[derive(serde::Serialize)]
+    struct ElementReport {
+        object_type: String,
+        base_type: u8,
+        object_id: i32,
+        length: usize,
+    }
+
+    let mut reports = Vec::new();
+    for segment in jt.segments().iter().filter(|s| wanted(&s.kind)) {
+        let mut report = SegmentReport {
+            kind: segment.kind.as_str(),
+            id: segment.id.to_string(),
+            offset: segment.offset,
+            length: segment.length,
+            decoded_length: None,
+            error: None,
+            elements: Vec::new(),
+        };
+        // Only segments carrying PMI are decoded; geometry is listed only.
+        if segment.kind.carries_pmi() {
+            match jt.segment_data(segment) {
+                Ok(data) => {
+                    report.decoded_length = Some(data.len());
+                    report.elements = Elements::new(&data)
+                        .map(|e| ElementReport {
+                            object_type: e.object_type.to_string(),
+                            base_type: e.base_type,
+                            object_id: e.object_id,
+                            length: e.data.len(),
+                        })
+                        .collect();
+                }
+                Err(e) => report.error = Some(e.to_string()),
+            }
+        }
+        reports.push(report);
+    }
+
+    let stdout = std::io::stdout();
+    let mut out = std::io::BufWriter::new(stdout.lock());
+    if opts.json {
+        #[derive(serde::Serialize)]
+        struct Report<'a> {
+            header: &'a pmix::jt::Header,
+            segments: Vec<SegmentReport>,
+        }
+        serde_json::to_writer_pretty(
+            &mut out,
+            &Report {
+                header: &jt.header,
+                segments: reports,
+            },
+        )?;
+        writeln!(out)?;
+    } else {
+        let h = &jt.header;
+        writeln!(out, "version:     {}", h.version)?;
+        writeln!(out, "format:      JT {}.{}", h.major, h.minor)?;
+        writeln!(out, "byte order:  {:?}", h.byte_order)?;
+        writeln!(out, "toc offset:  {}", h.toc_offset)?;
+        writeln!(out, "lsg segment: {}", h.lsg_segment)?;
+        writeln!(out)?;
+        writeln!(out, "{} segments", jt.segments().len())?;
+        writeln!(out)?;
+        writeln!(out, "segment types:")?;
+        for (kind, count) in &counts {
+            writeln!(out, "{count:>8}  {kind}")?;
+        }
+        let decoded: Vec<_> = reports
+            .iter()
+            .filter(|r| r.decoded_length.is_some())
+            .collect();
+        if !decoded.is_empty() {
+            writeln!(out)?;
+            writeln!(out, "PMI and metadata segments:")?;
+            for r in decoded {
+                writeln!(
+                    out,
+                    "  {} at {}: {} bytes, {} decoded, {} element(s)",
+                    r.kind,
+                    r.offset,
+                    r.length,
+                    r.decoded_length.unwrap_or(0),
+                    r.elements.len()
+                )?;
+                for e in &r.elements {
+                    writeln!(
+                        out,
+                        "      {}  base {}  id {}  {} bytes",
+                        e.object_type, e.base_type, e.object_id, e.length
+                    )?;
+                }
+            }
+        }
+        let failed: Vec<_> = reports.iter().filter(|r| r.error.is_some()).collect();
+        if !failed.is_empty() && opts.diagnostics {
+            writeln!(out)?;
+            for r in failed {
+                writeln!(
+                    out,
+                    "{} at {}: {}",
+                    r.kind,
+                    r.offset,
+                    r.error.as_deref().unwrap_or("")
+                )?;
+            }
+        }
+    }
+    out.flush()?;
+    Ok(())
+}
+
+fn inspect_step(input: PathBuf, opts: InspectOptions) -> Result<()> {
     let bytes =
         std::fs::read(&input).with_context(|| format!("failed to read `{}`", input.display()))?;
     tracing::info!(input = %input.display(), bytes = bytes.len(), "parsing");

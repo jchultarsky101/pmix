@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- JT file structure reader (`pmix::jt`, ADR 0009): header, table of
+  contents, segments, and XZ decompression of the segments that carry PMI,
+  plus a walker over their element streams. `pmix inspect` now reads JT
+  files and reports the header, the segment inventory, and those elements.
+  Geometry segments are listed but never decoded. `pmix extract` still
+  refuses JT until the PMI walker lands.
+- The NIST MTC assembly as the JT fixture, public domain, which settles
+  that it carries PMI.
+
+### Added
+
 - A `properties` section (ADR 0007): named values that are neither PMI nor
   geometry, such as part numbers, revisions, suppliers, prices, and the
   CAx-IF validation properties. Values are typed (text, integer, number,
