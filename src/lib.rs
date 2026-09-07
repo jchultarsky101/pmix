@@ -7,6 +7,7 @@
 //!
 //! - [`model`] is the JSON data model (ADR 0002, 0003, 0004).
 //! - [`step`] reads STEP AP242 files: a Part 21 parser plus PMI walkers.
+//! - [`jt`] reads the structure of JT files (ADR 0009).
 //! - [`reader`] is the format-independent entry point.
 //! - [`diff`] compares two documents (ADR 0005).
 //!
@@ -15,11 +16,12 @@
 //! The STEP reader extracts the semantic layer (units, features,
 //! dimensions, geometric tolerances, datums, datum systems) and the
 //! presentation layer (annotations and saved views), with ids that survive
-//! re-export (ADR 0004), and [`diff`] compares documents. JT is not
-//! implemented yet.
+//! re-export (ADR 0004), and [`diff`] compares documents. For JT the file
+//! structure is readable and PMI extraction is not implemented yet.
 
 pub mod diff;
 pub mod format;
+pub mod jt;
 pub mod model;
 pub mod reader;
 pub mod step;
@@ -44,6 +46,10 @@ pub enum Error {
     /// The input is not a STEP Part 21 file at all.
     #[error("STEP parse error: {0}")]
     StepParse(#[from] step::p21::ParseError),
+
+    /// The input is not a readable JT file.
+    #[error("JT parse error: {0}")]
+    JtParse(#[from] jt::ParseError),
 
     /// A JSON document written by `pmix extract` could not be read.
     #[error("invalid pmix JSON document: {0}")]

@@ -155,3 +155,35 @@ fn diff_exit_codes_and_output() {
         .assert()
         .code(2);
 }
+
+#[test]
+fn inspect_reads_a_jt_file() {
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/jt/nist_mtc_assembly.jt"
+    );
+    pmix()
+        .args(["inspect", fixture])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("JT 10.5"))
+        .stdout(predicate::str::contains("107 segments"))
+        .stdout(predicate::str::contains("PMI data"))
+        .stdout(predicate::str::contains(
+            "ce357249-38fb-11d1-a506-006097bdc6e1",
+        ));
+
+    // STEP-only options are refused rather than silently ignored.
+    pmix()
+        .args(["inspect", fixture, "--entity", "12"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("STEP files only"));
+
+    // Extraction is not supported for JT yet, and says so.
+    pmix()
+        .args(["extract", fixture])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("JT"));
+}

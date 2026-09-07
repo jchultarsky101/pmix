@@ -12,6 +12,9 @@ compartments, a dimension with a plus-minus tolerance, and so on. They are
 authored by the project, so they are MIT like the code. They are the proof
 that a specific behaviour works; every extractor feature ships with one.
 
+The JT fixture is `tests/fixtures/jt/nist_mtc_assembly.jt`, public domain
+from NIST; see that directory's README.
+
 ## 2. NIST corpus: realism
 
 The 17 NIST MBE PMI AP242 models under `tests/fixtures/nist/` (see that
@@ -46,7 +49,7 @@ licence status is not lost. Sizes are approximate.
 | [NIST PMI zip, nist.gov build](https://www.nist.gov/document/nist-pmi-step-files) (14 MB) | Five AP203 files with graphical-only PMI; earlier editions of CTC 04, FTC 08 tessellated, FTC 11, STC 09 | Public domain | Verified; useful for cross-edition regression |
 | [NIST D2MI models](https://www.nist.gov/document/nist-d2mi-modelszip) (5.5 MB) | `827-9999-904 rev c.stp`, AP242 written by CoreTechnologie 3D_Evolution; four AP203 parts | Public domain (17 USC §105 stated in README) | Verified; different AP242 writer |
 | [STEP Tools samples](https://www.steptools.com/docs/stpfiles/) | Seven AP214 `boxy_with_*.stp` files (~90 KB) with semantic flatness, cylindricity, size, and limits-and-fits tolerances | None stated | Fetch-only, optional tier; do not vendor |
-| [NIST MTC assembly](https://www.nist.gov/document/nist-cad-models-mtc-assembly) (16 MB) | One JT 10.5 assembly written by NX | Public domain | Verified; the only JT file with a clean licence; PMI content unverified |
+| [NIST MTC assembly](https://www.nist.gov/document/nist-cad-models-mtc-assembly) (16 MB) | One JT 10.5 assembly written by NX | Public domain | Verified, **and it does carry PMI**: 14 PMI data and 30 meta data segments. Committed as `tests/fixtures/jt/nist_mtc_assembly.jt` |
 
 ### Geometry only, for parser robustness
 

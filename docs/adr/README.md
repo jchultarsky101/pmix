@@ -14,3 +14,4 @@ never rewritten; a superseding decision gets a new record that links back.
 | [0006](0006-distribution.md) | Distribution through GitHub releases | Accepted |
 | [0007](0007-properties.md) | Product and record properties | Accepted |
 | [0008](0008-numeric-property-values.md) | Reading numeric property values | Accepted |
+| [0009](0009-jt-reader.md) | Reading JT files | Accepted |
