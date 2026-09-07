@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- ADR 0003: presentation layer of the PMI data model.
 - STEP AP242 walkers for geometric tolerances (all fifteen types in simple
   and complex instance form, magnitude with decimal places, modifiers,
   tolerance zones with projection and runout angle, unequally disposed and
