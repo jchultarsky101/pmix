@@ -35,6 +35,11 @@ enum Command {
         /// Emit compact JSON instead of pretty-printed JSON.
         #[arg(long)]
         compact: bool,
+
+        /// Include full annotation geometry (coordinates and triangles)
+        /// instead of only the summary.
+        #[arg(long)]
+        presentation_geometry: bool,
     },
 
     /// Explore the raw entity graph of a STEP file.
@@ -115,7 +120,15 @@ fn run(cli: Cli) -> Result<()> {
             input,
             output,
             compact,
-        } => extract(input, output, compact),
+            presentation_geometry,
+        } => extract(
+            input,
+            output,
+            compact,
+            pmix::ExtractOptions {
+                presentation_geometry,
+            },
+        ),
         Command::Inspect {
             input,
             entities,
@@ -138,9 +151,14 @@ fn run(cli: Cli) -> Result<()> {
     }
 }
 
-fn extract(input: PathBuf, output: Option<PathBuf>, compact: bool) -> Result<()> {
+fn extract(
+    input: PathBuf,
+    output: Option<PathBuf>,
+    compact: bool,
+    options: pmix::ExtractOptions,
+) -> Result<()> {
     tracing::info!(input = %input.display(), "extracting PMI");
-    let document = pmix::extract(&input)
+    let document = pmix::extract_with(&input, &options)
         .with_context(|| format!("failed to extract PMI from `{}`", input.display()))?;
 
     let json = if compact {

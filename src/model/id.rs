@@ -37,6 +37,21 @@ impl ContentId {
     }
 }
 
+/// Plain FNV-1a hash of `parts` as 16 hex digits, without collision
+/// handling. Used for geometry hashes.
+pub fn content_hash(parts: impl IntoIterator<Item = impl AsRef<str>>) -> String {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for (i, p) in parts.into_iter().enumerate() {
+        if i > 0 {
+            h = fnv_step(h, 0x1f);
+        }
+        for b in p.as_ref().bytes() {
+            h = fnv_step(h, b);
+        }
+    }
+    format!("{h:016x}")
+}
+
 #[inline]
 fn fnv_step(h: u64, b: u8) -> u64 {
     (h ^ u64::from(b)).wrapping_mul(0x0000_0100_0000_01b3)

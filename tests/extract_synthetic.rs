@@ -192,3 +192,128 @@ fn tolerance_datum_basics_semantics() {
     let angle = runout.zone.as_ref().unwrap().runout_angle.as_ref().unwrap();
     assert_eq!((angle.value, angle.unit.as_str()), (30.0, "deg"));
 }
+
+#[test]
+fn presentation_basics() {
+    check("presentation_basics");
+}
+
+#[test]
+fn presentation_basics_semantics() {
+    use pmix::model::{AnnotationKind, PartForm, TextOrigin};
+    let doc = pmix::extract(&synthetic_dir().join("presentation_basics.stp")).unwrap();
+    let p = &doc.presentation;
+    assert!(doc.unknown.is_empty(), "{:?}", doc.unknown);
+    assert!(doc.diagnostics.is_empty(), "{:?}", doc.diagnostics);
+    assert_eq!(p.annotations.len(), 4);
+    assert_eq!(p.views.len(), 2);
+
+    let ann = |kind: AnnotationKind| {
+        p.annotations
+            .iter()
+            .find(|a| a.kind == kind)
+            .expect("annotation")
+    };
+
+    let pos = ann(AnnotationKind::Position);
+    assert_eq!(pos.label.as_deref(), Some("Position.1"));
+    assert_eq!(pos.text.as_deref(), Some("⌖ ⌀0.1 | A"));
+    assert_eq!(pos.text_origin, Some(TextOrigin::Semantic));
+    assert_eq!(pos.plane.as_ref().unwrap().origin, [20.0, 20.0, 0.0]);
+    assert_eq!(
+        (
+            pos.geometry.polylines,
+            pos.geometry.triangles,
+            pos.geometry.points
+        ),
+        (1, 1, 8)
+    );
+    assert_eq!(pos.geometry.bbox.as_ref().unwrap().max, [24.0, 22.0, 0.0]);
+    assert_eq!(
+        pos.style.as_ref().unwrap().colour.as_deref(),
+        Some("#ff0000")
+    );
+    assert_eq!(
+        pos.style.as_ref().unwrap().layer.as_deref(),
+        Some("PMI layer")
+    );
+    assert_eq!(pos.parts.len(), 1);
+    assert_eq!(pos.parts[0].form, PartForm::Tessellated);
+    assert!(
+        pos.parts[0].polylines.is_none(),
+        "geometry is summarised by default"
+    );
+    let tol = &doc.semantic.tolerances[0];
+    assert_eq!(pos.semantic, vec![tol.meta.id.clone()]);
+    assert_eq!(tol.meta.presentation, vec![pos.id.clone()]);
+    assert_eq!(pos.features.len(), 1);
+    assert_eq!(pos.views.len(), 2);
+
+    let dia = ann(AnnotationKind::DiameterDimension);
+    assert_eq!(dia.text.as_deref(), Some("⌀10 ±0.05"));
+    assert_eq!(dia.text_origin, Some(TextOrigin::Explicit));
+    let dim = &doc.semantic.dimensions[0];
+    assert_eq!(dim.text.as_deref(), Some("⌀10 ±0.05"));
+    assert_eq!(dia.semantic, vec![dim.meta.id.clone()]);
+
+    let datum = ann(AnnotationKind::Datum);
+    assert_eq!(datum.text.as_deref(), Some("A"));
+    let ph = datum.placeholder.as_ref().unwrap();
+    assert_eq!(ph.box_size, Some([6.0, 3.0]));
+    assert_eq!(ph.role.as_deref(), Some("gps_data"));
+    assert_eq!(ph.text_height.as_ref().unwrap().value, 3.0);
+    assert_eq!(datum.leaders.len(), 1);
+    assert_eq!(
+        datum.leaders[0].points,
+        vec![[8.0, -8.5, 0.0], [8.0, 0.0, 0.0]]
+    );
+    assert_eq!(
+        datum.leaders[0].terminator.as_deref(),
+        Some("internal_pair_forward_arrowhead")
+    );
+    // The related callout's polyline merged into the same annotation.
+    assert_eq!(datum.parts.len(), 2);
+    assert_eq!(datum.geometry.polylines, 1);
+    assert_eq!(datum.semantic, vec![doc.semantic.datums[0].meta.id.clone()]);
+
+    let axis = p
+        .annotations
+        .iter()
+        .find(|a| a.kind.as_str() == "Axis")
+        .expect("standalone occurrence");
+    assert!(axis.semantic.is_empty());
+    assert_eq!(axis.source_refs, vec!["#144".to_string()]);
+
+    let view = |name: &str| p.views.iter().find(|v| v.name == name).expect("view");
+    let mbd = view("MBD_A");
+    assert_eq!(mbd.camera.projection.as_str(), "parallel");
+    assert_eq!(mbd.camera.view_window, Some([200.0, 150.0]));
+    assert_eq!(mbd.annotations.len(), 2);
+    assert!(!mbd.default);
+    let iso = view("Isometric");
+    assert!(iso.default);
+    assert_eq!(
+        iso.annotations.len(),
+        4,
+        "mapped item resolves to the global draughting model"
+    );
+
+    let full = pmix::extract_with(
+        &synthetic_dir().join("presentation_basics.stp"),
+        &pmix::ExtractOptions {
+            presentation_geometry: true,
+        },
+    )
+    .unwrap();
+    let pos = full
+        .presentation
+        .annotations
+        .iter()
+        .find(|a| a.kind == AnnotationKind::Position)
+        .unwrap();
+    assert_eq!(pos.parts[0].polylines.as_ref().unwrap()[0].len(), 5);
+    assert_eq!(
+        pos.parts[0].triangles.as_ref().unwrap(),
+        &vec![[0u32, 1, 2]]
+    );
+}

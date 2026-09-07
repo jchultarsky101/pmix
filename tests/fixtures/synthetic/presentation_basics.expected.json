@@ -1,0 +1,667 @@
+{
+  "schema_version": 1,
+  "source": {
+    "file_name": "presentation_basics.stp",
+    "format": "STEP",
+    "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF",
+    "writer": "pmix synthetic",
+    "time_stamp": "2026-09-06T00:00:00"
+  },
+  "units": {
+    "length": "mm",
+    "angle": "deg"
+  },
+  "semantic": {
+    "features": [
+      {
+        "id": "feat:1a1625fc17b4fc49",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#50",
+          "#51"
+        ],
+        "kind": "face",
+        "name": "hole",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "cylinder",
+            "source_ref": "#27"
+          }
+        ],
+        "members": []
+      },
+      {
+        "id": "feat:9b52997e63fdfd73",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#40",
+          "#41"
+        ],
+        "kind": "face",
+        "name": "Datum Feature A",
+        "geometry": [
+          {
+            "kind": "face",
+            "surface": "plane",
+            "source_ref": "#25"
+          }
+        ],
+        "members": []
+      }
+    ],
+    "datums": [
+      {
+        "id": "datum:b4094a2420a70fc7",
+        "origin": "semantic",
+        "presentation": [
+          "ann:c9db4d210586bf75"
+        ],
+        "unmapped": [],
+        "source_refs": [
+          "#42",
+          "#43"
+        ],
+        "label": "A",
+        "features": [
+          "feat:9b52997e63fdfd73"
+        ],
+        "targets": []
+      }
+    ],
+    "datum_systems": [
+      {
+        "id": "dsys:f7e52b82c91798b0",
+        "origin": "semantic",
+        "presentation": [],
+        "unmapped": [],
+        "source_refs": [
+          "#45",
+          "#44"
+        ],
+        "compartments": [
+          {
+            "datums": [
+              {
+                "datum": "datum:b4094a2420a70fc7",
+                "modifiers": [],
+                "modifier_values": []
+              }
+            ],
+            "common": false
+          }
+        ],
+        "text": "A"
+      }
+    ],
+    "dimensions": [
+      {
+        "id": "dim:565fe2d9e646abcf",
+        "origin": "semantic",
+        "presentation": [
+          "ann:06e57c39d9717a18"
+        ],
+        "unmapped": [],
+        "source_refs": [
+          "#60",
+          "#63",
+          "#62",
+          "#67",
+          "#66"
+        ],
+        "kind": "size",
+        "subtype": "diameter",
+        "value": {
+          "value": 10.0,
+          "unit": "mm"
+        },
+        "tolerance": {
+          "type": "plus_minus",
+          "lower": {
+            "value": -0.05,
+            "unit": "mm"
+          },
+          "upper": {
+            "value": 0.05,
+            "unit": "mm"
+          }
+        },
+        "modifiers": [],
+        "features": [
+          "feat:1a1625fc17b4fc49"
+        ],
+        "text": "⌀10 ±0.05"
+      }
+    ],
+    "tolerances": [
+      {
+        "id": "tol:9b4718f9f5257082",
+        "origin": "semantic",
+        "presentation": [
+          "ann:17b56d113f9c04b7"
+        ],
+        "unmapped": [],
+        "source_refs": [
+          "#53",
+          "#52",
+          "#55"
+        ],
+        "kind": "position",
+        "value": {
+          "value": 0.1,
+          "unit": "mm"
+        },
+        "zone": {
+          "form": "cylindrical_or_circular"
+        },
+        "modifiers": [],
+        "datum_system": "dsys:f7e52b82c91798b0",
+        "features": [
+          "feat:1a1625fc17b4fc49"
+        ],
+        "text": "⌖ ⌀0.1 | A"
+      }
+    ],
+    "notes": [],
+    "other": []
+  },
+  "presentation": {
+    "annotations": [
+      {
+        "id": "ann:06e57c39d9717a18",
+        "kind": "diameter_dimension",
+        "label": "Diameter.1",
+        "text": "⌀10 ±0.05",
+        "text_origin": "explicit",
+        "plane": {
+          "origin": [
+            0.0,
+            30.0,
+            0.0
+          ],
+          "axis": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          },
+          "ref_direction": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "leaders": [],
+        "geometry": {
+          "polylines": 1,
+          "triangles": 0,
+          "points": 2,
+          "bbox": {
+            "min": [
+              0.0,
+              30.0,
+              0.0
+            ],
+            "max": [
+              10.0,
+              30.0,
+              0.0
+            ]
+          },
+          "hash": "677b938aa7583a74"
+        },
+        "parts": [
+          {
+            "form": "tessellated",
+            "kind": "diameter_dimension",
+            "geometry": {
+              "polylines": 1,
+              "triangles": 0,
+              "points": 2,
+              "bbox": {
+                "min": [
+                  0.0,
+                  30.0,
+                  0.0
+                ],
+                "max": [
+                  10.0,
+                  30.0,
+                  0.0
+                ]
+              },
+              "hash": "677b938aa7583a74"
+            },
+            "source_ref": "#135"
+          }
+        ],
+        "style": {
+          "colour": "#ff0000",
+          "line_font": "continuous",
+          "line_width": {
+            "value": 0.2,
+            "unit": "mm"
+          }
+        },
+        "semantic": [
+          "dim:565fe2d9e646abcf"
+        ],
+        "features": [],
+        "views": [
+          "view:da24dcf335e3a5e7"
+        ],
+        "attributes": {},
+        "unmapped": [],
+        "source_refs": [
+          "#136",
+          "#135",
+          "#137",
+          "#138"
+        ]
+      },
+      {
+        "id": "ann:17b56d113f9c04b7",
+        "kind": "position",
+        "label": "Position.1",
+        "text": "⌖ ⌀0.1 | A",
+        "text_origin": "semantic",
+        "plane": {
+          "origin": [
+            20.0,
+            20.0,
+            0.0
+          ],
+          "axis": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          },
+          "ref_direction": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "leaders": [],
+        "geometry": {
+          "polylines": 1,
+          "triangles": 1,
+          "points": 8,
+          "bbox": {
+            "min": [
+              20.0,
+              20.0,
+              0.0
+            ],
+            "max": [
+              24.0,
+              22.0,
+              0.0
+            ]
+          },
+          "hash": "34dc6d221c28d52b"
+        },
+        "parts": [
+          {
+            "form": "tessellated",
+            "kind": "position",
+            "geometry": {
+              "polylines": 1,
+              "triangles": 1,
+              "points": 8,
+              "bbox": {
+                "min": [
+                  20.0,
+                  20.0,
+                  0.0
+                ],
+                "max": [
+                  24.0,
+                  22.0,
+                  0.0
+                ]
+              },
+              "hash": "34dc6d221c28d52b"
+            },
+            "source_ref": "#97"
+          }
+        ],
+        "style": {
+          "colour": "#ff0000",
+          "line_font": "continuous",
+          "line_width": {
+            "value": 0.2,
+            "unit": "mm"
+          },
+          "layer": "PMI layer"
+        },
+        "semantic": [
+          "tol:9b4718f9f5257082"
+        ],
+        "features": [
+          "feat:1a1625fc17b4fc49"
+        ],
+        "views": [
+          "view:e30bd59f194c782c",
+          "view:da24dcf335e3a5e7"
+        ],
+        "attributes": {},
+        "unmapped": [],
+        "source_refs": [
+          "#98",
+          "#97",
+          "#99",
+          "#100",
+          "#101"
+        ]
+      },
+      {
+        "id": "ann:7c6b485a4e09fe0b",
+        "kind": "Axis",
+        "label": "Axis",
+        "leaders": [],
+        "geometry": {
+          "polylines": 1,
+          "triangles": 0,
+          "points": 2,
+          "bbox": {
+            "min": [
+              0.0,
+              0.0,
+              -20.0
+            ],
+            "max": [
+              0.0,
+              0.0,
+              20.0
+            ]
+          },
+          "hash": "a94c89d84401b6a8"
+        },
+        "parts": [
+          {
+            "form": "polyline",
+            "kind": "Axis",
+            "geometry": {
+              "polylines": 1,
+              "triangles": 0,
+              "points": 2,
+              "bbox": {
+                "min": [
+                  0.0,
+                  0.0,
+                  -20.0
+                ],
+                "max": [
+                  0.0,
+                  0.0,
+                  20.0
+                ]
+              },
+              "hash": "a94c89d84401b6a8"
+            },
+            "source_ref": "#144"
+          }
+        ],
+        "style": {
+          "colour": "#ff0000",
+          "line_font": "continuous",
+          "line_width": {
+            "value": 0.2,
+            "unit": "mm"
+          }
+        },
+        "semantic": [],
+        "features": [],
+        "views": [
+          "view:da24dcf335e3a5e7"
+        ],
+        "attributes": {},
+        "unmapped": [],
+        "source_refs": [
+          "#144"
+        ]
+      },
+      {
+        "id": "ann:c9db4d210586bf75",
+        "kind": "datum",
+        "label": "Datum A",
+        "text": "A",
+        "text_origin": "semantic",
+        "plane": {
+          "origin": [
+            5.0,
+            -10.0,
+            0.0
+          ],
+          "axis": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1.0
+          },
+          "ref_direction": {
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
+          }
+        },
+        "placeholder": {
+          "placement": {
+            "origin": [
+              5.0,
+              -10.0,
+              0.0
+            ],
+            "axis": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 1.0
+            },
+            "ref_direction": {
+              "x": 1.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "box_size": [
+            6.0,
+            3.0
+          ],
+          "role": "gps_data",
+          "text_height": {
+            "value": 3.0,
+            "unit": "mm"
+          }
+        },
+        "leaders": [
+          {
+            "points": [
+              [
+                8.0,
+                -8.5,
+                0.0
+              ],
+              [
+                8.0,
+                0.0,
+                0.0
+              ]
+            ],
+            "terminator": "internal_pair_forward_arrowhead"
+          }
+        ],
+        "geometry": {
+          "polylines": 1,
+          "triangles": 0,
+          "points": 2,
+          "bbox": {
+            "min": [
+              5.0,
+              -10.0,
+              0.0
+            ],
+            "max": [
+              11.0,
+              -10.0,
+              0.0
+            ]
+          },
+          "hash": "0c1028a15c0a0626"
+        },
+        "parts": [
+          {
+            "form": "placeholder",
+            "kind": "placeholder",
+            "geometry": {
+              "polylines": 0,
+              "triangles": 0,
+              "points": 0,
+              "hash": "cbf29ce484222325"
+            },
+            "source_ref": "#117"
+          },
+          {
+            "form": "polyline",
+            "kind": "datum",
+            "geometry": {
+              "polylines": 1,
+              "triangles": 0,
+              "points": 2,
+              "bbox": {
+                "min": [
+                  5.0,
+                  -10.0,
+                  0.0
+                ],
+                "max": [
+                  11.0,
+                  -10.0,
+                  0.0
+                ]
+              },
+              "hash": "0c1028a15c0a0626"
+            },
+            "source_ref": "#123"
+          }
+        ],
+        "style": {
+          "colour": "#ff0000",
+          "line_font": "continuous",
+          "line_width": {
+            "value": 0.2,
+            "unit": "mm"
+          }
+        },
+        "semantic": [
+          "datum:b4094a2420a70fc7"
+        ],
+        "features": [],
+        "views": [
+          "view:e30bd59f194c782c",
+          "view:da24dcf335e3a5e7"
+        ],
+        "attributes": {},
+        "unmapped": [],
+        "source_refs": [
+          "#118",
+          "#124",
+          "#125",
+          "#117",
+          "#123",
+          "#126",
+          "#127"
+        ]
+      }
+    ],
+    "views": [
+      {
+        "id": "view:da24dcf335e3a5e7",
+        "name": "Isometric",
+        "camera": {
+          "placement": {
+            "origin": [
+              100.0,
+              100.0,
+              100.0
+            ],
+            "axis": {
+              "x": 0.577,
+              "y": 0.577,
+              "z": 0.577
+            },
+            "ref_direction": {
+              "x": -0.707,
+              "y": 0.707,
+              "z": 0.0
+            }
+          },
+          "projection": "parallel",
+          "view_plane_distance": 173.2,
+          "view_window": [
+            200.0,
+            150.0
+          ]
+        },
+        "clipping_planes": [],
+        "annotations": [
+          "ann:06e57c39d9717a18",
+          "ann:17b56d113f9c04b7",
+          "ann:7c6b485a4e09fe0b",
+          "ann:c9db4d210586bf75"
+        ],
+        "default": true,
+        "unmapped": [],
+        "source_refs": [
+          "#225",
+          "#224",
+          "#229"
+        ]
+      },
+      {
+        "id": "view:e30bd59f194c782c",
+        "name": "MBD_A",
+        "camera": {
+          "placement": {
+            "origin": [
+              0.0,
+              0.0,
+              100.0
+            ],
+            "axis": {
+              "x": 0.0,
+              "y": 0.0,
+              "z": 1.0
+            },
+            "ref_direction": {
+              "x": 1.0,
+              "y": 0.0,
+              "z": 0.0
+            }
+          },
+          "projection": "parallel",
+          "view_plane_distance": 100.0,
+          "view_window": [
+            200.0,
+            150.0
+          ]
+        },
+        "clipping_planes": [],
+        "annotations": [
+          "ann:17b56d113f9c04b7",
+          "ann:c9db4d210586bf75"
+        ],
+        "unmapped": [],
+        "source_refs": [
+          "#215",
+          "#214",
+          "#217"
+        ]
+      }
+    ]
+  },
+  "unknown": [],
+  "diagnostics": []
+}
