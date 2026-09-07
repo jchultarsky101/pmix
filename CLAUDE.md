@@ -25,5 +25,8 @@ Read [docs/adr/](docs/adr/) before changing architecture.
 - **`main` is PR-only** with all CI checks required. Squash-merge. Run
   `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
   before pushing.
+- **`data/` may hold proprietary customer models.** It is gitignored.
+  Never commit, attach, or quote anything from it. `tests/fixtures/` is
+  public-domain NIST data and synthetic fixtures, and is committed.
 - **Test against the NIST corpus** in `tests/fixtures/nist` for every
   reader change.

@@ -66,6 +66,74 @@
       ]
     },
     {
+      "id": "prop:Bbox_X_mm",
+      "name": "Bbox_X_mm",
+      "category": "TECH__Bbox_X_mm",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 64.0
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#96",
+        "#99",
+        "#98",
+        "#97"
+      ]
+    },
+    {
+      "id": "prop:Legacy_Code",
+      "name": "Legacy_Code",
+      "category": "PLM__Legacy_Code",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "1e5"
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#92",
+        "#95",
+        "#94",
+        "#93"
+      ]
+    },
+    {
+      "id": "prop:Nominal_Mass_kg",
+      "name": "Nominal_Mass_kg",
+      "category": "TECH__Nominal_Mass_kg",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 2.5
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#84",
+        "#87",
+        "#86",
+        "#85"
+      ]
+    },
+    {
+      "id": "prop:Part_Count",
+      "name": "Part_Count",
+      "category": "TECH__Part_Count",
+      "kind": "user",
+      "value": {
+        "type": "integer",
+        "value": 12
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#80",
+        "#83",
+        "#82",
+        "#81"
+      ]
+    },
+    {
       "id": "prop:Part_Number",
       "name": "Part_Number",
       "category": "PLM__Part_Number",
@@ -97,6 +165,23 @@
         "#55",
         "#54",
         "#53"
+      ]
+    },
+    {
+      "id": "prop:Serial_Number",
+      "name": "Serial_Number",
+      "category": "PLM__Serial_Number",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "007"
+      },
+      "unmapped": [],
+      "source_refs": [
+        "#88",
+        "#91",
+        "#90",
+        "#89"
       ]
     },
     {

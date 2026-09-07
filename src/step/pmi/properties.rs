@@ -183,7 +183,7 @@ fn value_of(ctx: &mut Ctx<'_>, item: &Instance) -> Option<(String, PropertyValue
             .to_owned();
         return Some((
             named("DESCRIPTIVE_REPRESENTATION_ITEM"),
-            PropertyValue::Text { value },
+            PropertyValue::from_text(&value),
         ));
     }
     if item.has_type("INTEGER_REPRESENTATION_ITEM") {

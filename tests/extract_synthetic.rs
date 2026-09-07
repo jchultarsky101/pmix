@@ -332,9 +332,9 @@ fn property_basics_semantics() {
     let doc = pmix::extract(&synthetic_dir().join("property_basics.stp")).unwrap();
     assert!(doc.unknown.is_empty(), "{:?}", doc.unknown);
     assert!(doc.diagnostics.is_empty(), "{:?}", doc.diagnostics);
-    // Four user properties, plus three validation values across two
+    // Nine user properties, plus three validation values across two
     // validation representations.
-    assert_eq!(doc.properties.len(), 7);
+    assert_eq!(doc.properties.len(), 12);
 
     let by_id = |id: &str| {
         doc.properties
@@ -391,6 +391,35 @@ fn property_basics_semantics() {
         .expect("element count");
     assert_eq!(count.category, area.category);
     assert_eq!(count.applies_to, area.applies_to);
+
+    // Descriptive values that are exactly a number's own rendering are
+    // read as numbers; formatting that a number would drop stays text.
+    assert_eq!(
+        by_id("prop:Part_Count").value,
+        PropertyValue::Integer { value: 12 }
+    );
+    assert_eq!(
+        by_id("prop:Nominal_Mass_kg").value,
+        PropertyValue::Number { value: 2.5 }
+    );
+    assert_eq!(
+        by_id("prop:Serial_Number").value,
+        PropertyValue::Text {
+            value: "007".into()
+        },
+        "a leading zero is part of the serial, not a count"
+    );
+    assert_eq!(
+        by_id("prop:Legacy_Code").value,
+        PropertyValue::Text {
+            value: "1e5".into()
+        }
+    );
+    assert_eq!(
+        by_id("prop:Bbox_X_mm").value,
+        PropertyValue::Number { value: 64.0 },
+        "a whole measurement is still a number, so the field's type is stable"
+    );
 
     // Cubic millimetres resolve through the derived unit.
     let volume = doc

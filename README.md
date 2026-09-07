@@ -165,6 +165,9 @@ breaking changes. Abridged:
     { "id": "prop:Part_Number", "name": "Part_Number", "category": "PLM__Part_Number",
       "kind": "user", "value": { "type": "text", "value": "SYN-004-REV-A" },
       "unmapped": [], "source_refs": ["#40", "#43", "#42", "#41"] },
+    { "id": "prop:Part_Count", "name": "Part_Count", "category": "TECH__Part_Count",
+      "kind": "user", "value": { "type": "integer", "value": 12 },
+      "unmapped": [], "source_refs": ["#80", "#83", "#82", "#81"] },
     { "id": "prop:…", "name": "affected area", "category": "pmi validation property",
       "kind": "validation", "value": { "type": "measure", "value": 120.5, "unit": "mm2" },
       "applies_to": "tol:…", "unmapped": [], "source_refs": ["#70", "#74", "#73", "#72"] }
@@ -233,7 +236,11 @@ The `properties` array holds named values that are neither PMI nor
 geometry: part numbers, revisions, suppliers, prices, and the CAx-IF
 validation properties a file writes so a consuming system can check how it
 read the PMI. A property attaches to the whole part, or to one PMI record
-through `applies_to`. See [ADR 0007](docs/adr/0007-properties.md).
+through `applies_to`. Values written as strings are read as numbers when
+nothing is lost by doing so, so a count compares as a number while a
+serial such as `007` stays text. See
+[ADR 0007](docs/adr/0007-properties.md) and
+[ADR 0008](docs/adr/0008-numeric-property-values.md).
 
 Every array is sorted by id. Ids are *identity keys*
 ([ADR 0004](docs/adr/0004-identity.md)): they name which design element a

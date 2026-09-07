@@ -66,6 +66,42 @@ pub enum PropertyValue {
 }
 
 impl PropertyValue {
+    /// Read a text value, using a number when the text is written in
+    /// plain decimal notation.
+    ///
+    /// Files routinely write counts, quantities, and prices as strings.
+    /// Reading them as numbers makes them comparable, but only for text
+    /// that spells a number and nothing else: an optional minus, then
+    /// `0` or a digit string not starting with `0`, then optionally a
+    /// decimal point and more digits. Integers must fit in 64 bits.
+    ///
+    /// So `12` becomes an integer, and `64.0` and `18.75` become numbers.
+    /// A leading zero, an exponent, a separator, or stray whitespace keeps
+    /// the text, because `007` is a serial number rather than the integer
+    /// seven and `1e5` may be a part code. Trailing zeros after the point
+    /// do not: `2.50` reads as `2.5`, because rejecting it would make a
+    /// field's type depend on whether a measurement happened to be whole.
+    pub fn from_text(text: &str) -> Self {
+        let keep = || Self::Text {
+            value: text.to_owned(),
+        };
+        if !is_plain_decimal(text) {
+            return keep();
+        }
+        if !text.contains('.') {
+            // Too many digits for an integer: keep the text rather than
+            // round it away.
+            return match text.parse::<i64>() {
+                Ok(value) => Self::Integer { value },
+                Err(_) => keep(),
+            };
+        }
+        match text.parse::<f64>() {
+            Ok(value) if value.is_finite() => Self::Number { value },
+            _ => keep(),
+        }
+    }
+
     /// Canonical text, used for rendering and for content hashes.
     pub fn canonical(&self) -> String {
         match self {
@@ -78,9 +114,78 @@ impl PropertyValue {
     }
 }
 
+/// Is `text` plain decimal notation: `-?(0|[1-9][0-9]*)(\.[0-9]+)?`
+fn is_plain_decimal(text: &str) -> bool {
+    let body = text.strip_prefix('-').unwrap_or(text);
+    let (integer, fraction) = match body.split_once('.') {
+        Some((i, f)) => (i, Some(f)),
+        None => (body, None),
+    };
+    let integer_ok = integer == "0"
+        || (!integer.is_empty()
+            && !integer.starts_with('0')
+            && integer.bytes().all(|b| b.is_ascii_digit()));
+    let fraction_ok = match fraction {
+        None => true,
+        Some(f) => !f.is_empty() && f.bytes().all(|b| b.is_ascii_digit()),
+    };
+    integer_ok && fraction_ok
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plain_decimal_text_is_read_as_a_number() {
+        for (text, expected) in [
+            ("12", PropertyValue::Integer { value: 12 }),
+            ("-4", PropertyValue::Integer { value: -4 }),
+            ("0", PropertyValue::Integer { value: 0 }),
+            ("18.75", PropertyValue::Number { value: 18.75 }),
+            ("0.1", PropertyValue::Number { value: 0.1 }),
+            // A whole measurement is still a number, so a field's type
+            // does not depend on the value it happens to carry.
+            ("64.0", PropertyValue::Number { value: 64.0 }),
+            (
+                "32532.894525837815",
+                PropertyValue::Number {
+                    value: 32532.894525837815,
+                },
+            ),
+        ] {
+            assert_eq!(PropertyValue::from_text(text), expected, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn text_that_is_not_plain_decimal_stays_text() {
+        for text in [
+            "007",                 // a leading zero belongs to the serial
+            "+5",                  // leading sign
+            "1e5",                 // exponent notation
+            "3.",                  // no digits after the point
+            "-.5",                 // no digits before it
+            "1,234",               // thousands separator
+            " 12",                 // whitespace
+            "12 ",                 //
+            "inf",                 // not a number's spelling
+            "NaN",                 //
+            "",                    // empty
+            "SYN-004-REV-A",       //
+            "true",                //
+            "12mm",                //
+            "9223372036854775808", // more digits than an integer holds
+        ] {
+            assert_eq!(
+                PropertyValue::from_text(text),
+                PropertyValue::Text {
+                    value: text.to_owned()
+                },
+                "{text:?} should stay text"
+            );
+        }
+    }
 
     #[test]
     fn values_are_tagged_and_round_trip() {
