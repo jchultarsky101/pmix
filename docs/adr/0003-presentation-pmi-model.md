@@ -152,14 +152,34 @@ record only guarantees the text is captured when it exists.
 | `camera_model_d3`, `camera_model_d3_multi_clipping[_union\|_intersection]`, `view_volume`, `model_geometric_view`, `default_model_geometric_view`, `camera_usage`, the per-view `draughting_model`, `mapped_item`, `representation_map` | `SavedView` |
 | global `draughting_model`, `mechanical_design_geometric_presentation_representation` | Membership only; not a record |
 
-### JT mapping (forward-looking)
+### JT mapping
 
-A JT PMI entity is already shaped like an `Annotation`: its type code gives
-`kind`; its string table entries give `text` with `text_origin: explicit`;
-its 2D reference frame gives `plane`; its text and non-text polylines give
-`geometry`, transformed from plane coordinates to model space; its
-associations give `semantic` and `features`; model views give `views`; its
-property bag goes to `attributes`. Nothing in the record is STEP-specific.
+Built in 2026-09-07; [ADR 0009](0009-jt-reader.md) records what the format
+turned out to require. A JT PMI entity is shaped like an `Annotation`: its
+type code gives `kind`, its `Description` property gives `label`, its
+`DisplayPlane` properties give `plane`, its non-text polylines give
+`geometry`, its model view associations give `views`, and the flat drawing
+properties go to `attributes`. Nothing in the record is STEP-specific.
+
+Four of this section's original predictions were wrong, and are corrected
+here rather than left standing:
+
+- **`text` usually stays empty.** Producing systems write the glyphs of an
+  annotation's text rather than the text, so the string table holds symbol
+  indices. The callout name goes to `label` instead, and the glyph run
+  goes into the id so a change to the text still registers.
+- **The plane comes from a property, not the 2D reference frame.** Generic
+  PMI entities write a dummy frame and state the real plane as
+  `DisplayPlane.origin`, `.xaxis`, and `.zaxis`.
+- **Polylines need no transform.** A generic PMI entity's non-text
+  polylines are already in model space. Its text polylines are in the
+  dummy 2D frame, so they are left out of `geometry` rather than placed
+  wrongly.
+- **`semantic` comes from the entity itself, not from associations.** A JT
+  entity carries its own meaning in its properties, so an annotation links
+  to the semantic records built from that same entity. Associations supply
+  `views`. `features` stays empty: JT associates PMI with B-rep faces and
+  edges, which `pmix` does not model.
 
 ### Identity
 

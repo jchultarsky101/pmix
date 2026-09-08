@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The JT presentation layer (ADR 0003, ADR 0009): annotations with their
+  kind, plane, style, and a summary of the lines that draw them, and
+  saved views with their camera and the annotations each one shows.
+  `--presentation-geometry` gives the coordinates for JT as it does for
+  STEP.
+- Model views, PMI associations, and the CAD tags that resolve them are
+  now read from the PMI Manager element, which is what ties an annotation
+  to the views it appears in.
 - JT PMI extraction (ADR 0009). `pmix extract` and `pmix diff` now accept
   `.jt` files and produce the same document as for STEP: dimensions with
   their values, plus and minus deviations and ISO fits, geometric

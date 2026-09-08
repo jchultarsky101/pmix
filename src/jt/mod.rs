@@ -6,7 +6,8 @@
 //! - [`mod@pmi`] reads the PMI Manager element those segments carry.
 //! - [`mod@property`] reads the scene graph's properties, which declare the
 //!   unit that PMI measures are expressed in.
-//! - [`mod@semantic`] maps what those two produce onto the model of ADR 0002.
+//! - [`mod@semantic`] maps what those two produce onto the model of ADR 0002,
+//!   and [`mod@presentation`] onto that of ADR 0003.
 //! - [`JtReader`] ties them together behind [`crate::Reader`].
 //!
 //! The reader is scoped to PMI (ADR 0009): it parses the structure of any
@@ -16,6 +17,7 @@
 pub mod element;
 pub mod file;
 pub mod pmi;
+pub mod presentation;
 pub mod property;
 pub mod reader;
 pub mod semantic;
