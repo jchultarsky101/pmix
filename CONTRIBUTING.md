@@ -84,8 +84,9 @@ Once approved and green in CI, a maintainer will merge it.
 ## Releases
 
 Releases are cut by the maintainers. The version in `Cargo.toml` is bumped,
-`CHANGELOG.md` gets a new dated section, a `vX.Y.Z` tag is pushed, and the
-crate is published to crates.io.
+`CHANGELOG.md` gets a new dated section, and a `vX.Y.Z` tag is pushed;
+cargo-dist then builds the binaries and installers and attaches them to the
+GitHub release ([ADR 0006](docs/adr/0006-distribution.md)).
 
 ## Licence
 

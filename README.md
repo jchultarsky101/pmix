@@ -63,9 +63,9 @@ The installer also puts `pmix-update` next to `pmix`; run it to upgrade to
 the latest release in place. Archives for manual installation are on the
 same release page.
 
-Publishing to crates.io is postponed until the base functionality is
-complete ([ADR 0006](docs/adr/0006-distribution.md)). Until then, building
-from source needs Rust 1.85 or newer:
+`pmix` is distributed as prebuilt binaries from its GitHub releases rather
+than through crates.io ([ADR 0006](docs/adr/0006-distribution.md)).
+Building from source needs Rust 1.85 or newer:
 
 ```bash
 git clone https://github.com/jchultarsky101/pmix.git
@@ -307,7 +307,6 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] One identity scheme for both formats; datums, datum frames, and views share ids across them (ADR 0004)
 - [ ] Cross-format identity for dimensions and tolerances, which needs a JT B-rep reader
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
-- [ ] Publish to crates.io, once the base functionality is complete
 
 ## Design
 
