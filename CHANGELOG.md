@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Reading a model is about **1.85x faster**, and around 2.5x on the files
+  that carry the most annotation geometry. The output is unchanged: every
+  fixture produces byte-identical JSON, ids included.
+  - Summarising what an annotation draws no longer builds a string for
+    every coordinate before hashing them. It hashes as it goes, through
+    the new `pmix::model::ContentHasher`, and formats into one reused
+    buffer.
+  - Coordinates are formatted by fixed-point arithmetic rather than the
+    general float formatter, which was the reader's single largest cost.
+    The general formatter still handles anything outside the range where
+    that is exact, and a test checks the two agree over several hundred
+    thousand values.
+  - An annotation with one occurrence no longer summarises the same
+    geometry twice, once for the occurrence and once for the aggregate.
+  - The Part 21 lexer no longer allocates a string per real number to
+    normalise forms such as `1.` that Rust's float parser rejects. It
+    tries the number as written first, which is nearly always enough.
+
 ## [0.2.0] - 2026-09-07
 
 The headline is JT. `pmix extract` and `pmix diff` now accept `.jt` files

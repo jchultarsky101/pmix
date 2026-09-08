@@ -47,3 +47,10 @@ strip = true
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+# Release code with symbols, so a profiler can name what it samples. The
+# release profile strips them, which is why this profile exists.
+[profile.profiling]
+inherits = "release"
+debug = true
+strip = false
