@@ -8,7 +8,7 @@ use crate::{ExtractOptions, Reader, Result};
 
 use super::element::Elements;
 use super::file::{Jt, SegmentKind};
-use super::{pmi, presentation, property, semantic};
+use super::{identity, pmi, presentation, property, semantic};
 
 /// Reader for JT files (ADR 0009).
 #[derive(Debug, Clone, Copy, Default)]
@@ -97,8 +97,9 @@ impl Reader for JtReader {
             "read JT structure"
         );
 
-        let (semantic, links) = semantic::build(&managers, length, &mut unknown);
-        let presentation = presentation::build(&managers, length, &links, options);
+        let built = semantic::build(&managers, length, &mut unknown);
+        let presentation = presentation::build(&managers, length, &built.links, options);
+        let semantic = built.semantic;
 
         // Scene-graph properties become the document's properties.
         let mut ids = ContentId::new();
@@ -126,7 +127,7 @@ impl Reader for JtReader {
         }
         properties.sort_by(|a, b| a.id.cmp(&b.id));
 
-        Ok(PmiDocument {
+        let mut doc = PmiDocument {
             schema_version: SCHEMA_VERSION,
             source: Source {
                 file_name: file_name.to_owned(),
@@ -147,6 +148,8 @@ impl Reader for JtReader {
             presentation,
             unknown,
             diagnostics,
-        })
+        };
+        identity::finalise(&mut doc, &built.keys);
+        Ok(doc)
     }
 }

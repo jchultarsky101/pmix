@@ -8,6 +8,8 @@
 //!   unit that PMI measures are expressed in.
 //! - [`mod@semantic`] maps what those two produce onto the model of ADR 0002,
 //!   and [`mod@presentation`] onto that of ADR 0003.
+//! - [`mod@identity`] replaces the temporary ids of both with identity
+//!   keys (ADR 0004).
 //! - [`JtReader`] ties them together behind [`crate::Reader`].
 //!
 //! The reader is scoped to PMI (ADR 0009): it parses the structure of any
@@ -16,6 +18,7 @@
 
 pub mod element;
 pub mod file;
+pub mod identity;
 pub mod pmi;
 pub mod presentation;
 pub mod property;

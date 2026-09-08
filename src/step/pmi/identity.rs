@@ -4,7 +4,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::Ctx;
-use super::fingerprint::{identity_quantum, num};
+use super::fingerprint::identity_quantum;
+use crate::identity::{assign, hash_content, is_readable, num, remap, remap_all};
 use crate::model::{Meta, content_hash};
 
 /// Assign final ids to every record in `ctx`.
@@ -376,70 +377,4 @@ pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
     for m in metas {
         remap_all(&mut m.presentation, &map);
     }
-}
-
-fn remap(id: &mut String, map: &HashMap<String, String>) {
-    if let Some(n) = map.get(id.as_str()) {
-        *id = n.clone();
-    }
-}
-
-fn remap_all(ids: &mut Vec<String>, map: &HashMap<String, String>) {
-    for id in ids.iter_mut() {
-        remap(id, map);
-    }
-    ids.sort();
-    ids.dedup();
-}
-
-/// Hash of a record's JSON without the listed keys.
-fn hash_content<T: serde::Serialize>(rec: &T, skip: &[&str]) -> String {
-    let mut v = serde_json::to_value(rec).unwrap_or_default();
-    if let Some(obj) = v.as_object_mut() {
-        for k in skip {
-            obj.remove(*k);
-        }
-    }
-    content_hash([v.to_string()])
-}
-
-/// Turn `(index, identity key, content hash)` triples into `(index, id)`.
-/// Colliding keys are ordered by content hash; the first keeps the plain
-/// id, the rest get `-2`, `-3`, ...
-fn assign(
-    batch: Vec<(usize, String, String)>,
-    prefix: &str,
-    readable: bool,
-) -> Vec<(usize, String)> {
-    let mut groups: BTreeMap<String, Vec<(String, usize)>> = BTreeMap::new();
-    for (i, key, content) in batch {
-        groups.entry(key).or_default().push((content, i));
-    }
-    let mut out = Vec::new();
-    for (key, mut members) in groups {
-        members.sort();
-        let base = if readable && is_readable(&key) {
-            format!("{prefix}:{key}")
-        } else {
-            format!("{prefix}:{}", content_hash([key.as_str()]))
-        };
-        for (n, (_, i)) in members.into_iter().enumerate() {
-            let id = if n == 0 {
-                base.clone()
-            } else {
-                format!("{base}-{}", n + 1)
-            };
-            tracing::trace!(%id, %key, "identity key");
-            out.push((i, id));
-        }
-    }
-    out
-}
-
-fn is_readable(key: &str) -> bool {
-    !key.is_empty()
-        && key.len() <= 40
-        && key
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '|' | '_' | '.' | '-'))
 }

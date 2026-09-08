@@ -70,7 +70,9 @@ fn the_nist_assembly_yields_its_pmi() {
         .iter()
         .flat_map(|c| c.datums.iter().map(|d| d.datum.as_str()))
         .collect();
-    assert_eq!(order, ["A", "B", "C"]);
+    // A datum reference names the datum record, which is named for
+    // its letter.
+    assert_eq!(order, ["datum:A", "datum:B", "datum:C"]);
 
     // The model uses position, perpendicularity, and flatness, some of
     // them at maximum material condition.
