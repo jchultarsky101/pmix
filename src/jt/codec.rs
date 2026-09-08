@@ -45,7 +45,14 @@ pub enum Predictor {
 }
 
 /// Bits used for the field-width change at the head of a run.
-const BLOCK_WIDTH_BITS: u32 = 3;
+///
+/// The specification is self-contradictory here: its prose describes a
+/// three-bit field whose extremes are 3 and -4, while the code sample
+/// beside it sets four. Real files settle it. With three, the one table
+/// in the test file whose face identifiers use the adaptive path decodes
+/// to values that repeat and do not start at zero; with four they are
+/// distinct and start at zero, as identifiers must.
+const BLOCK_WIDTH_BITS: u32 = 4;
 /// Bits used for the length of a run.
 const BLOCK_LENGTH_BITS: u32 = 4;
 /// Bits per digit of the variable-length integers a packet header uses.
