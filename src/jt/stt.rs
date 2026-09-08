@@ -6,11 +6,11 @@
 //! topology, and analytic geometry. That is what `pmix` needs: the
 //! surfaces a PMI callout applies to, without a Parasolid reader.
 //!
-//! This reads the counts that head the table, the faces, and walks the
-//! rest of the vectors to show the chain is understood. The face section
-//! holds five vectors where the specification's figure shows four; three
-//! of the five are identified from what they contain, and the other two
-//! are left unnamed rather than guessed at.
+//! This reads the counts that head the table, the faces, and the counts
+//! that head the geometry after it. The face section holds five vectors
+//! where the specification's figure shows four; three of the five are
+//! identified from what they contain, and the other two are left unnamed
+//! rather than guessed at. The geometry itself is not read yet.
 
 use std::fmt;
 
@@ -94,6 +94,17 @@ pub struct Face {
     pub normal_reversed: bool,
 }
 
+/// How many of each thing the geometry holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct GeometryCounts {
+    pub surfaces: usize,
+    /// Surfaces the table actually describes; the rest are implied.
+    pub represented_surfaces: usize,
+    pub curves: usize,
+    pub represented_curves: usize,
+    pub points: usize,
+}
+
 /// What the reader can make of one part's topology table.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Topology {
@@ -101,6 +112,11 @@ pub struct Topology {
     pub counts: Counts,
     /// The faces, in the order the table stores them.
     pub faces: Vec<Face>,
+    /// How many surfaces and curves the geometry after the topology
+    /// holds. Read only when the whole topology could be.
+    pub geometry: Option<GeometryCounts>,
+    /// The checksum the file states over its topology.
+    pub hash: Option<u32>,
     /// How many compressed vectors were read before one could not be,
     /// and the number of values each held. Reading the whole chain is
     /// what shows the table is understood; the meaning of each vector is
@@ -141,21 +157,25 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
             edges: raw[6] as usize,
         },
         faces: Vec::new(),
+        geometry: None,
+        hash: None,
         vectors: Vec::new(),
         stopped: None,
     };
 
+    // The topology is a fixed chain of compressed vectors: two for the
+    // bodies, two for the regions, four for the shells, five for the
+    // faces, three for the loops, two for the coedges, and five for the
+    // edges. Every table in every file seen so far agrees.
+    const BEFORE_FACES: usize = 2 + 2 + 4;
+    const FACE_VECTORS: usize = 5;
+    const TOPOLOGY_VECTORS: usize = BEFORE_FACES + FACE_VECTORS + 3 + 2 + 5;
+
     let mut cursor = Cursor::new(&data[29..]);
-    // Two vectors for the bodies, two for the regions, and four for the
-    // shells stand between the header and the faces.
-    const BEFORE_FACES: usize = 8;
     let mut faces: Vec<Vec<i32>> = Vec::new();
-    loop {
-        if cursor.at >= data.len() - 29 {
-            break;
-        }
+    while out.vectors.len() < TOPOLOGY_VECTORS {
         let index = out.vectors.len();
-        let in_faces = (BEFORE_FACES..BEFORE_FACES + 5).contains(&index);
+        let in_faces = (BEFORE_FACES..BEFORE_FACES + FACE_VECTORS).contains(&index);
         // Read every vector as written. Which of them a predictor applies
         // to depends on what they turn out to be, so it is undone below.
         match cursor.packet(Predictor::None) {
@@ -169,6 +189,29 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
                 out.stopped = Some(e.to_string());
                 break;
             }
+        }
+    }
+
+    // A checksum over the topology, then the counts that head the
+    // geometry. Both are plain integers rather than packets.
+    if out.vectors.len() == TOPOLOGY_VECTORS {
+        let after = 29 + cursor.at;
+        let word = |k: usize| {
+            data.get(after + k * 4..after + k * 4 + 4)
+                .and_then(|b| b.try_into().ok())
+                .map(u32::from_le_bytes)
+        };
+        out.hash = word(0);
+        if let (Some(surfaces), Some(rs), Some(curves), Some(rc), Some(points)) =
+            (word(1), word(2), word(3), word(4), word(5))
+        {
+            out.geometry = Some(GeometryCounts {
+                surfaces: surfaces as usize,
+                represented_surfaces: rs as usize,
+                curves: curves as usize,
+                represented_curves: rc as usize,
+                points: points as usize,
+            });
         }
     }
 

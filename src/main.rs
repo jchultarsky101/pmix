@@ -411,17 +411,21 @@ fn inspect_jt(input: PathBuf, opts: InspectOptions) -> Result<()> {
                 };
                 writeln!(
                     out,
-                    "  at {offset}: {} {body}, {} faces, {} edges; {} vectors read{}",
-                    t.counts.bodies,
-                    t.counts.faces,
-                    t.counts.edges,
-                    t.vectors.len(),
-                    if t.stopped.is_some() {
-                        ", then one this reader cannot decode"
-                    } else {
-                        ""
-                    },
+                    "  at {offset}: {} {body}, {} faces, {} edges",
+                    t.counts.bodies, t.counts.faces, t.counts.edges,
                 )?;
+                match &t.geometry {
+                    Some(g) => writeln!(
+                        out,
+                        "      {} surfaces ({} described), {} curves, {} points",
+                        g.surfaces, g.represented_surfaces, g.curves, g.points
+                    )?,
+                    None => writeln!(
+                        out,
+                        "      stopped after {} of its vectors, so the geometry was not reached",
+                        t.vectors.len()
+                    )?,
+                }
                 if let Some(why) = &t.stopped {
                     if opts.diagnostics {
                         writeln!(out, "      stopped: {why}")?;
