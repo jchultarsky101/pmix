@@ -7,64 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-07
+
+The headline is JT. `pmix extract` and `pmix diff` now accept `.jt` files
+and produce the same document as for STEP, so a JT model can be compared
+the way a STEP model already could.
+
 ### Added
 
-- JT records now get identity keys (ADR 0004) instead of content hashes,
-  so a JT id names which callout a record is rather than what it
-  currently says. Changing a value, a tolerance, or a callout's text
-  leaves the id alone, and `pmix diff` reports such an edit as a change
-  rather than as a removal and an addition.
-- Datums, datum reference frames, and saved views now get the same id
-  from a STEP file and a JT file of one design: `datum:A`,
-  `dsys:A|B|C`, `view:Top`. Dimensions and geometric tolerances do not
-  yet, because the STEP reader anchors them on B-rep fingerprints and
-  the JT reader has no B-rep to fingerprint; ADR 0004 records what would
-  close that.
-- The machinery that turns an identity key into an id is shared by the
-  readers (`pmix::identity`), so both use one vocabulary of prefixes and
-  one collision rule. JT tolerance ids change prefix from `gtol` to
-  `tol` and annotation ids from `anno` to `ann` to match STEP.
-- The JT presentation layer (ADR 0003, ADR 0009): annotations with their
-  kind, plane, style, and a summary of the lines that draw them, and
-  saved views with their camera and the annotations each one shows.
+- **JT PMI extraction** (ADR 0009). Dimensions with their values, plus and
+  minus deviations and ISO fits; geometric tolerances with material
+  conditions and datum reference frames; datums. A callout that nests
+  several measurements, such as a hole and thread note, becomes one record
+  per measurement.
+- **The JT presentation layer** (ADR 0003): annotations with their kind,
+  plane, style, and a summary of the lines that draw them, and saved views
+  with their camera and the annotations each one shows.
   `--presentation-geometry` gives the coordinates for JT as it does for
   STEP.
-- Model views, PMI associations, and the CAD tags that resolve them are
-  now read from the PMI Manager element, which is what ties an annotation
-  to the views it appears in.
-- JT PMI extraction (ADR 0009). `pmix extract` and `pmix diff` now accept
-  `.jt` files and produce the same document as for STEP: dimensions with
-  their values, plus and minus deviations and ISO fits, geometric
-  tolerances with material conditions and datum reference frames, and
-  datums. A callout that nests several measurements, such as a hole and
-  thread note, becomes one record per measurement.
-- JT model units, read from the scene graph's `JT_PROP_MEASUREMENT_UNITS`
-  property, so every JT measure states the unit the file declares. The
-  scene graph's other properties, such as part names, become the
-  document's `properties`.
-- JT file structure reader (`pmix::jt`, ADR 0009): header, table of
-  contents, segments, and XZ decompression of the segments that carry PMI,
-  plus a walker over their element streams. `pmix inspect` now reads JT
-  files and reports the header, the segment inventory, and those elements.
-  Geometry segments are listed but never decoded. `pmix extract` still
-- The NIST MTC assembly as the JT fixture, public domain, which settles
-  that it carries PMI.
-
-### Added
-
-- A `properties` section (ADR 0007): named values that are neither PMI nor
-  geometry, such as part numbers, revisions, suppliers, prices, and the
+- **The JT file structure reader** (`pmix::jt`): header, table of contents,
+  segments, and XZ decompression of the segments that carry PMI, plus a
+  walker over their element streams. `pmix inspect` reads JT files and
+  reports the header, the segment inventory, and those elements. Geometry
+  segments are listed but never decoded.
+- **JT model units**, read from the scene graph's
+  `JT_PROP_MEASUREMENT_UNITS` property, so every JT measure states the unit
+  the file declares. The scene graph's other properties, such as part
+  names, become the document's `properties`.
+- Model views, PMI associations, and the CAD tags that resolve them, which
+  is what ties an annotation to the views it appears in.
+- **Identity keys for JT** (ADR 0004), so a JT id names which callout a
+  record is rather than what it currently says. Changing a value, a
+  tolerance, or a callout's text leaves the id alone, and `pmix diff`
+  reports such an edit as a change rather than as a removal and an
+  addition.
+- **Ids shared between the formats.** Datums, datum reference frames, and
+  saved views get the same id from a STEP file and a JT file of one
+  design: `datum:A`, `dsys:A|B|C`, `view:Top`. Dimensions and geometric
+  tolerances do not yet, because the STEP reader anchors them on B-rep
+  fingerprints and the JT reader has no B-rep to fingerprint; ADR 0004
+  records what would close that.
+- **A `properties` section** (ADR 0007): named values that are neither PMI
+  nor geometry, such as part numbers, revisions, suppliers, prices, and the
   CAx-IF validation properties. Values are typed (text, integer, number,
   measure with unit, boolean), a property attaches to the whole part or to
   one PMI record, and product-level properties get readable ids such as
   `prop:Part_Number`. `pmix diff` compares user properties and ignores
   validation ones, which are derived from the PMI they describe.
-- Derived units (`derived_unit`), so areas and volumes resolve as `mm2`
-  and `mm3` instead of being reported as unrecognised.
-- Descriptive property values that are exactly a number's own rendering
-  are read as integers or numbers, so counts and prices written as strings
+- Descriptive property values that are exactly a number's own rendering are
+  read as integers or numbers, so counts and prices written as strings
   become comparable (ADR 0008). Values whose formatting carries meaning,
   such as `007`, `2.50`, and `1e5`, stay text.
+- Derived units (`derived_unit`), so areas and volumes resolve as `mm2` and
+  `mm3` instead of being reported as unrecognised.
+- The NIST MTC assembly as the JT fixture, public domain, which settles
+  that it carries PMI.
+
+### Changed
+
+- The machinery that turns an identity key into an id is shared by the
+  readers (`pmix::identity`), so both use one vocabulary of prefixes and
+  one collision rule. JT tolerance ids change prefix from `gtol` to `tol`
+  and annotation ids from `anno` to `ann` to match STEP.
+- Summarising what an annotation draws is shared too (`pmix::geometry`), so
+  a geometry summary means the same thing whichever format produced it.
+- A document written by 0.1.1 no longer loads, because the document gained
+  a required `properties` array. Re-extract from the model file rather than
+  reusing a saved JSON. Before 1.0 the document format is not stable.
+
+### Known limits
+
+- Cross-format matching covers datums, datum reference frames, and saved
+  views, not dimensions or geometric tolerances.
+- Assemblies are not modelled, so each part of one states its own datum A
+  and the ids are told apart by a suffix (ADR 0004).
+- JT is read little-endian only, and only version 10 is tested (ADR 0009).
 
 ## [0.1.1] - 2026-09-07
 
@@ -152,6 +169,7 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/jchultarsky101/pmix/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jchultarsky101/pmix/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/jchultarsky101/pmix/releases/tag/v0.1.0
