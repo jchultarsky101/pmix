@@ -4,6 +4,7 @@
 - **Deciders:** Julian Chultarsky
 - **Depends on:** [ADR 0001](0001-step-parsing-strategy.md), [ADR 0002](0002-semantic-pmi-model.md), [ADR 0003](0003-presentation-pmi-model.md)
 - **Amended:** 2026-09-07, with what building the PMI walker established
+- **Amended:** 2026-09-07, with what the presentation layer established
 
 ## Context
 
@@ -66,11 +67,20 @@ describes.
 - **Version 10 verified.** The reader parses the header of any version and
   reports what it finds, but only 10.x is tested. Older layouts differ and
   will be added when a test file for them exists.
-- **The presentation layer comes later.** `pmix extract` fills the
-  semantic layer of ADR 0002 from JT and leaves the presentation layer of
-  ADR 0003 empty, so annotations and saved views are not compared yet.
-  The data is there: the PMI element carries model views and the 2D
-  geometry of every annotation, and the reader already walks past both.
+- **Annotation text is usually absent.** A producing system may write
+  the glyphs of an annotation's text rather than the text, in which case
+  the string table holds symbol indices and no reader can recover the
+  words. Such an annotation gets its callout name as a `label` and no
+  `text`. The glyph run still goes into the annotation's id, so a change
+  to the text changes the id even though the text cannot be read back.
+- **Text geometry is left out of the summary.** The lines that draw an
+  annotation's frame and leaders are in world coordinates, but the lines
+  that draw its text are in the entity's own 2D frame, which generic PMI
+  entities leave empty. Mixing the two would corrupt the bounding box, so
+  the summary covers the world-space lines only.
+- **Nothing is compared across the two formats.** Identity (ADR 0004) is
+  anchored on B-rep geometry fingerprints that the JT reader does not
+  compute, so ids match within a format but not between them.
 
 ## What the file format turned out to require
 
@@ -107,6 +117,43 @@ four; parsing it as four breaks the element a few hundred bytes in. And a
 scene graph holds two element streams one after another, the nodes and
 then the property atoms, rather than the single stream the figure shows.
 
+### What the presentation layer required
+
+**Associations name their ends by CAD tag, not by position.** An
+association carries a packed integer per end: the low 24 bits identify
+the thing, the next 7 say what kind it is, and the top bit says whether
+the identifier is a position or a CAD tag. Producing systems set the top
+bit, so the identifier is an index into the element's CAD tag list. That
+list is ordered by kind, model views before design groups before generic
+entities, which makes it the map from tag to thing. Reading it means
+stepping over the PMI polygon data first, so the reader parses that too;
+a file that malforms there still yields its PMI and loses only which view
+shows what.
+
+**View membership is not written with the reason code reserved for it.**
+The specification gives reason 98 for "show the PMI when this model view
+is selected". No association in the test file uses it; the writer uses
+reason 10, "included in a PMI symbol", for all 326 of them. So the reader
+identifies membership by the ends of the association, a generic entity
+pointing at a model view, rather than by the reason.
+
+**Some properties are written in metres and some in model units.** An
+annotation's `DisplayPlane.origin` is in metres, JT's base unit, while
+the lines that draw it and its `textOrigin` are in the unit the model
+declares. The reader converts the plane origin into the model unit so
+that a plane and the geometry on it agree. The plane's axes are unit
+vectors and are left alone.
+
+**Most saved views hold no PMI.** The test file has 89 views, of which 16
+are the ones an engineer created to present the PMI and the other 73 are
+the standard orientations every part carries. The reader emits all of
+them, because an orientation preset is still a view, and only the
+authored ones list annotations.
+
+**JT states no projection for a camera.** It gives an eye position, a
+target, and a direction, but never says whether the view is parallel or
+perspective. The reader writes `unspecified` rather than choosing one.
+
 ### Where the units come from
 
 JT states no unit on a PMI value. The model's unit is a string property
@@ -133,11 +180,13 @@ nothing else.
 
 ## Consequences
 
-- `pmix extract` and `pmix diff` accept JT files and produce the same
-  document as for STEP, so the two formats are comparable in principle.
-  They are not yet comparable in practice: identity (ADR 0004) is
-  anchored on B-rep geometry fingerprints that the JT reader does not
-  compute, so ids match within a format but not across the two.
+- `pmix extract` and `pmix diff` accept JT files and fill both layers, so
+  a JT model is compared the way a STEP model is. The two formats are not
+  compared against each other: identity (ADR 0004) is anchored on B-rep
+  geometry fingerprints the JT reader does not compute.
+- Summarising what an annotation draws is now shared by the two readers
+  (`src/geometry.rs`), so a geometry summary means the same thing
+  whichever format produced it.
 - `pmix inspect` reads JT files and reports the header, the segment
   inventory, and the elements of the segments it decodes.
 - The `unknown` list will gain JT segment types that are recognised but not

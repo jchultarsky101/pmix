@@ -83,7 +83,7 @@ fn dimension_subtype(code: Option<&str>) -> Option<DimensionSubtype> {
 }
 
 /// The `characteristic` enumeration of the PMI property list.
-fn tolerance_kind(code: Option<&str>) -> ToleranceKind {
+pub(crate) fn tolerance_kind(code: Option<&str>) -> ToleranceKind {
     match code.map(str::trim) {
         Some("0") => ToleranceKind::LineProfile,
         Some("1") => ToleranceKind::CircularRunout,
@@ -272,7 +272,7 @@ const STYLE_PARTS: &[&str] = &[
 ];
 
 /// Whether a property describes how an annotation is drawn.
-fn is_style(key: &str) -> bool {
+pub(crate) fn is_style(key: &str) -> bool {
     // Nested keys such as `ParameterDimension[0].fraction` name the same
     // setting as the bare key, so judge the last segment too.
     let leaf = key.rsplit('.').next().unwrap_or(key);
@@ -302,13 +302,19 @@ fn unmapped(entity: &Entity) -> Vec<Unmapped> {
 }
 
 /// Build the shared fields of a record.
-fn meta(ids: &mut ContentId, prefix: &str, parts: &[&str], entity: &Entity) -> Meta {
+fn meta(
+    ids: &mut ContentId,
+    prefix: &str,
+    parts: &[&str],
+    entity: &Entity,
+    manager: usize,
+) -> Meta {
     Meta {
         id: ids.make(prefix, parts),
         origin: Origin::Semantic,
         presentation: Vec::new(),
         unmapped: unmapped(entity),
-        source_refs: vec![format!("#{}", entity.user_label)],
+        source_refs: vec![source_ref(manager, entity)],
     }
 }
 
@@ -390,6 +396,7 @@ fn push_dimension(
     out: &mut Semantic,
     ids: &mut ContentId,
     entity: &Entity,
+    manager: usize,
     prefix: &str,
     description: &str,
     length: Option<&str>,
@@ -458,6 +465,7 @@ fn push_dimension(
         "dim",
         &[subtype.as_str(), &value.canonical(), text, prefix],
         entity,
+        manager,
     );
     out.dimensions.push(Dimension {
         meta,
@@ -483,6 +491,17 @@ fn push_dimension(
     });
 }
 
+/// Which semantic records came from which PMI entity, keyed by the
+/// element the entity is in and its position there. The presentation
+/// layer uses this to say what an annotation displays.
+pub type Links = BTreeMap<(usize, usize), Vec<String>>;
+
+/// How a PMI entity is named in `source_refs`. User labels repeat between
+/// elements, so the element has to be named as well.
+pub fn source_ref(manager: usize, entity: &Entity) -> String {
+    format!("pmi[{manager}]#{}", entity.user_label)
+}
+
 /// Turn the PMI of one file into semantic records.
 ///
 /// `length` is the unit the file declares its model in, which is the unit
@@ -492,15 +511,17 @@ pub fn build(
     managers: &[PmiManager],
     length: Option<&str>,
     unknown: &mut Vec<Unknown>,
-) -> Semantic {
+) -> (Semantic, Links) {
     let mut out = Semantic::default();
+    let mut links = Links::new();
     let mut ids = ContentId::new();
     // Datum systems are shared by the frames that reference them, so a
     // system is emitted once per distinct set of compartments.
     let mut systems: BTreeMap<String, String> = BTreeMap::new();
 
-    for manager in managers {
-        for entity in &manager.entities {
+    for (m, manager) in managers.iter().enumerate() {
+        for (e, entity) in manager.entities.iter().enumerate() {
+            let mut made: Vec<String> = Vec::new();
             let kind = entity.kind.as_str();
             let description = entity
                 .property("Description")
@@ -510,23 +531,25 @@ pub fn build(
             if is_dimension(&entity.kind) {
                 let before = out.dimensions.len();
                 // The entity's own measurement, when it has one.
-                push_dimension(&mut out, &mut ids, entity, "", &description, length);
+                push_dimension(&mut out, &mut ids, entity, m, "", &description, length);
                 // A callout such as a hole and thread note carries its
                 // sizes as numbered parameters rather than one value, and
                 // each of those is a dimension in its own right.
                 for index in parameter_indices(entity) {
                     let prefix = format!("ParameterDimension[{index}].");
-                    push_dimension(&mut out, &mut ids, entity, &prefix, &description, length);
+                    push_dimension(&mut out, &mut ids, entity, m, &prefix, &description, length);
                 }
+                made.extend(out.dimensions[before..].iter().map(|d| d.meta.id.clone()));
                 if out.dimensions.len() == before {
                     unknown.push(Unknown {
                         layer: Layer::Semantic,
                         kind: kind.clone(),
                         reason: "the dimension states no value".into(),
-                        source_ref: format!("#{}", entity.user_label),
+                        source_ref: source_ref(m, entity),
                         raw: description.clone(),
                     });
                 }
+                links.insert((m, e), made);
                 continue;
             }
 
@@ -579,7 +602,9 @@ pub fn build(
                     "gtol",
                     &[kind.as_str(), &canonical, &system_text, &description],
                     entity,
+                    m,
                 );
+                made.push(meta.id.clone());
                 out.tolerances.push(GeometricTolerance {
                     meta,
                     kind,
@@ -596,18 +621,21 @@ pub fn build(
                     decimal_places: None,
                     text: (!description.is_empty()).then(|| description.clone()),
                 });
+                links.insert((m, e), made);
                 continue;
             }
 
             if entity.kind == EntityKind::DatumFeatureSymbol {
                 let label = entity.property("label").unwrap_or_default().to_owned();
-                let meta = meta(&mut ids, "datum", &[&label, &description], entity);
+                let meta = meta(&mut ids, "datum", &[&label, &description], entity, m);
+                made.push(meta.id.clone());
                 out.datums.push(Datum {
                     meta,
                     label,
                     features: Vec::new(),
                     targets: Vec::new(),
                 });
+                links.insert((m, e), made);
                 continue;
             }
 
@@ -617,13 +645,15 @@ pub fn build(
                 } else {
                     description.clone()
                 };
-                let meta = meta(&mut ids, "note", &[&kind, &text], entity);
+                let meta = meta(&mut ids, "note", &[&kind, &text], entity, m);
+                made.push(meta.id.clone());
                 out.notes.push(Note {
                     meta,
                     text,
                     kind: NoteKind::General,
                     features: Vec::new(),
                 });
+                links.insert((m, e), made);
                 continue;
             }
 
@@ -644,23 +674,25 @@ pub fn build(
                     layer: Layer::Semantic,
                     kind: kind.clone(),
                     reason: "no PMI walker for this JT entity type".into(),
-                    source_ref: format!("#{}", entity.user_label),
+                    source_ref: source_ref(m, entity),
                     raw: String::new(),
                 });
                 continue;
             }
-            let meta = meta(&mut ids, "other", &[&kind, &description], entity);
+            let meta = meta(&mut ids, "other", &[&kind, &description], entity, m);
+            made.push(meta.id.clone());
             out.other.push(Other {
                 meta,
                 kind,
                 attributes,
                 features: Vec::new(),
             });
+            links.insert((m, e), made);
         }
     }
 
     out.sort();
-    out
+    (out, links)
 }
 
 #[cfg(test)]
@@ -672,6 +704,8 @@ mod tests {
             kind,
             user_label: 1,
             texts: Vec::new(),
+            polylines: Vec::new(),
+            text_polylines: Vec::new(),
             properties: props
                 .iter()
                 .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
@@ -686,7 +720,7 @@ mod tests {
             entities: vec![entity],
             ..Default::default()
         };
-        build(&[manager], Some("mm"), &mut Vec::new())
+        build(&[manager], Some("mm"), &mut Vec::new()).0
     }
 
     #[test]
@@ -805,7 +839,7 @@ mod tests {
             ..Default::default()
         };
         let mut unknown = Vec::new();
-        let out = build(&[manager], Some("mm"), &mut unknown);
+        let (out, _) = build(&[manager], Some("mm"), &mut unknown);
         assert!(out.dimensions.is_empty());
         assert_eq!(unknown.len(), 1);
         assert!(unknown[0].reason.contains("no value"), "{unknown:?}");

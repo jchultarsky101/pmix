@@ -126,6 +126,167 @@ fn the_nist_assembly_yields_its_pmi() {
 }
 
 #[test]
+fn the_nist_assembly_yields_its_annotations_and_views() {
+    let doc = pmix::extract(&fixture()).unwrap();
+    let p = &doc.presentation;
+    assert!(p.annotations.len() > 300, "{}", p.annotations.len());
+    assert_eq!(p.views.len(), 89);
+
+    // The saved views the model was built with are all present.
+    let names: BTreeSet<&str> = p.views.iter().map(|v| v.name.as_str()).collect();
+    for expected in ["Top", "Front", "Isometric", "MBD-Trimetric #1"] {
+        assert!(
+            names.contains(expected),
+            "{expected} missing from {names:?}"
+        );
+    }
+    // Every view frames the model from somewhere.
+    for v in &p.views {
+        assert!(!v.name.is_empty(), "unnamed view {}", v.id);
+        assert!(
+            v.camera.placement.axis.is_some(),
+            "{} has no direction",
+            v.id
+        );
+    }
+    // The views the engineer created to present the PMI each show some
+    // of it. The rest are the standard orientations every part carries,
+    // which are cameras and nothing more.
+    let authored: Vec<_> = p
+        .views
+        .iter()
+        .filter(|v| v.name.starts_with("MBD-"))
+        .collect();
+    assert_eq!(authored.len(), 16);
+    for v in &authored {
+        assert!(!v.annotations.is_empty(), "{} shows nothing", v.name);
+    }
+    let presets = [
+        "Top",
+        "Bottom",
+        "Left",
+        "Right",
+        "Front",
+        "Back",
+        "Isometric",
+    ];
+    assert!(
+        p.views
+            .iter()
+            .filter(|v| presets.contains(&v.name.as_str()))
+            .all(|v| v.annotations.is_empty()),
+        "an orientation preset carries PMI"
+    );
+
+    // Annotations are drawn as the PMI they present.
+    let kinds: BTreeSet<&str> = p.annotations.iter().map(|a| a.kind.as_str()).collect();
+    for expected in [
+        "linear_dimension",
+        "radial_dimension",
+        "position",
+        "flatness",
+        "datum",
+    ] {
+        assert!(
+            kinds.contains(expected),
+            "{expected} missing from {kinds:?}"
+        );
+    }
+
+    // An annotation that draws something has a plane, a summary of what
+    // it draws, and a bounding box in the model's own units.
+    let drawn: Vec<_> = p
+        .annotations
+        .iter()
+        .filter(|a| a.geometry.polylines > 0)
+        .collect();
+    assert!(drawn.len() > 100, "{}", drawn.len());
+    for a in &drawn {
+        assert!(a.plane.is_some(), "{} has no plane", a.id);
+        assert!(!a.geometry.hash.is_empty(), "{} has no hash", a.id);
+        let b = a.geometry.bbox.as_ref().expect("bounding box");
+        for i in 0..3 {
+            assert!(b.min[i] <= b.max[i], "{} has an inverted box", a.id);
+            assert!(b.max[i].abs() < 10_000.0, "{} is not in millimetres", a.id);
+        }
+        assert_eq!(a.parts.len(), 1);
+        // Coordinates are withheld unless asked for.
+        assert!(a.parts[0].polylines.is_none());
+    }
+
+    // The two layers are linked in both directions, and every id a link
+    // names exists.
+    let semantic_ids: BTreeSet<&str> = doc
+        .semantic
+        .dimensions
+        .iter()
+        .map(|d| d.meta.id.as_str())
+        .chain(doc.semantic.tolerances.iter().map(|t| t.meta.id.as_str()))
+        .chain(doc.semantic.datums.iter().map(|d| d.meta.id.as_str()))
+        .collect();
+    let linked = p.annotations.iter().filter(|a| !a.semantic.is_empty());
+    let mut linked_count = 0;
+    for a in linked {
+        linked_count += 1;
+        for id in &a.semantic {
+            assert!(semantic_ids.contains(id.as_str()), "{id} is not defined");
+        }
+    }
+    assert!(linked_count > 50, "{linked_count} annotations link to PMI");
+
+    let view_ids: BTreeSet<&str> = p.views.iter().map(|v| v.id.as_str()).collect();
+    let annotation_ids: BTreeSet<&str> = p.annotations.iter().map(|a| a.id.as_str()).collect();
+    let mut shown = 0;
+    for a in &p.annotations {
+        for v in &a.views {
+            shown += 1;
+            assert!(view_ids.contains(v.as_str()), "{v} is not a view");
+        }
+    }
+    assert!(shown > 150, "{shown} annotations placed in views");
+    for v in &p.views {
+        for a in &v.annotations {
+            assert!(annotation_ids.contains(a.as_str()), "{a} is not defined");
+        }
+    }
+}
+
+#[test]
+fn asking_for_geometry_adds_coordinates_and_changes_nothing_else() {
+    let plain = pmix::extract(&fixture()).unwrap();
+    let full = pmix::extract_with(
+        &fixture(),
+        &pmix::ExtractOptions {
+            presentation_geometry: true,
+        },
+    )
+    .unwrap();
+    assert_eq!(plain.semantic, full.semantic);
+    assert_eq!(plain.presentation.views, full.presentation.views);
+    assert_eq!(
+        plain.presentation.annotations.len(),
+        full.presentation.annotations.len()
+    );
+    let with_coordinates = full
+        .presentation
+        .annotations
+        .iter()
+        .filter(|a| a.parts.iter().any(|p| p.polylines.is_some()))
+        .count();
+    assert!(with_coordinates > 100, "{with_coordinates}");
+    // The summaries are the same either way.
+    for (a, b) in plain
+        .presentation
+        .annotations
+        .iter()
+        .zip(&full.presentation.annotations)
+    {
+        assert_eq!(a.geometry, b.geometry);
+        assert_eq!(a.id, b.id);
+    }
+}
+
+#[test]
 fn scene_graph_properties_reach_the_document() {
     let doc = pmix::extract(&fixture()).unwrap();
     let by_name = |name: &str| {

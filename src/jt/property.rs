@@ -146,6 +146,28 @@ pub fn unit_name(declared: &str) -> Option<&'static str> {
     })
 }
 
+/// How many of `unit` make a metre.
+///
+/// JT writes some properties in metres, its base unit, while PMI
+/// geometry is in the unit the model declares, so converting between
+/// them needs this.
+pub fn per_metre(unit: &str) -> Option<f64> {
+    Some(match unit {
+        "um" => 1e6,
+        "mm" => 1e3,
+        "cm" => 1e2,
+        "dm" => 1e1,
+        "m" => 1.0,
+        "km" => 1e-3,
+        "in" => 1.0 / 0.0254,
+        "ft" => 1.0 / 0.3048,
+        "yd" => 1.0 / 0.9144,
+        "mi" => 1.0 / 1609.344,
+        "mil" => 1.0 / 0.0000254,
+        _ => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,5 +229,15 @@ mod tests {
         assert_eq!(unit_name("Millimeters"), Some("mm"));
         assert_eq!(unit_name(" inches "), Some("in"));
         assert_eq!(unit_name("furlongs"), None);
+    }
+
+    #[test]
+    fn every_unit_name_converts_from_metres() {
+        for name in ["Micrometers", "Millimeters", "Meters", "Inches", "Feet"] {
+            let unit = unit_name(name).unwrap();
+            assert!(per_metre(unit).is_some_and(|f| f > 0.0), "{unit}");
+        }
+        assert_eq!(per_metre("mm"), Some(1000.0));
+        assert_eq!(per_metre("furlong"), None);
     }
 }

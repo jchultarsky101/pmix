@@ -6,6 +6,7 @@
 //! for anyone who wants to embed PMI extraction in their own tooling.
 //!
 //! - [`model`] is the JSON data model (ADR 0002, 0003, 0004).
+//! - [`geometry`] summarises what an annotation draws, for either format.
 //! - [`step`] reads STEP AP242 files: a Part 21 parser plus PMI walkers.
 //! - [`jt`] reads JT files: the file structure, the PMI Manager element,
 //!   and the scene graph properties that declare the model units (ADR 0009).
@@ -18,11 +19,13 @@
 //! dimensions, geometric tolerances, datums, datum systems) and the
 //! presentation layer (annotations and saved views), with ids that survive
 //! re-export (ADR 0004), and [`diff`] compares documents. The JT reader
-//! extracts the semantic layer and the model's properties; its
-//! presentation layer is not implemented yet.
+//! extracts both layers and the model's properties; its identity is not
+//! anchored on geometry, so ids match within a format but not across the
+//! two.
 
 pub mod diff;
 pub mod format;
+pub mod geometry;
 pub mod jt;
 pub mod model;
 pub mod reader;

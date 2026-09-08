@@ -314,7 +314,16 @@ pub struct Entity {
     /// The producing system's identifier for the entity.
     pub user_label: i32,
     /// Text shown on the annotation, resolved through the string table.
+    ///
+    /// Producing systems may write a glyph run here rather than readable
+    /// text, in which case the strings are symbol indices and the shape
+    /// of the text is carried by [`Entity::text_polylines`] instead.
     pub texts: Vec<String>,
+    /// The lines that draw the annotation: its frame, leaders, and
+    /// symbols, in world coordinates.
+    pub polylines: Vec<Vec<[f64; 3]>>,
+    /// The lines that draw the annotation's text.
+    pub text_polylines: Vec<Vec<[f64; 3]>>,
     /// Key and value pairs describing the entity.
     pub properties: Vec<(String, String)>,
     /// The producing system's name for the entity type, if it gave one.
@@ -355,20 +364,67 @@ impl Entity {
     }
 }
 
+/// One end of an association: what kind of thing it names, and which one.
+///
+/// The specification packs both into a single integer: the low 24 bits
+/// are the identifier and the next 7 say what it identifies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EndPoint {
+    /// Entity type code, from specification table 52.
+    pub kind: u8,
+    /// Index into the array of that kind, or a CAD tag when `indirect`.
+    pub index: u32,
+    /// Whether `index` names a CAD tag rather than a position.
+    pub indirect: bool,
+}
+
+impl EndPoint {
+    /// Type code of a PMI model view.
+    pub const MODEL_VIEW: u8 = 17;
+    /// Type code of a generic PMI entity.
+    pub const GENERIC: u8 = 18;
+
+    fn unpack(raw: i32) -> Self {
+        let raw = raw as u32;
+        Self {
+            kind: ((raw >> 24) & 0x7f) as u8,
+            index: raw & 0x00ff_ffff,
+            indirect: raw & 0x8000_0000 != 0,
+        }
+    }
+}
+
 /// A link between two entities.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Association {
-    pub source: i32,
-    pub destination: i32,
+    pub source: EndPoint,
+    pub destination: EndPoint,
+    /// Why the two are linked, from specification table 53.
     pub reason: i32,
 }
 
-/// A saved view.
+impl Association {
+    /// The association that puts a PMI entity in a model view.
+    pub const SHOWN_IN_VIEW: i32 = 98;
+}
+
+/// A saved view and the camera that frames it.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelView {
     pub id: i32,
     pub name: Option<String>,
     pub active: bool,
+    /// The direction the camera looks along.
+    pub eye_direction: [f64; 3],
+    /// Rotation about the eye direction, in degrees.
+    pub angle: f64,
+    /// Where the camera looks from, in world coordinates.
+    pub eye_position: [f64; 3],
+    /// Where the camera looks at, in world coordinates.
+    pub target: [f64; 3],
+    /// Diameter of the largest circle the viewport can inscribe, which
+    /// is how JT states the zoom level.
+    pub viewport_diameter: f64,
 }
 
 /// The contents of a PMI Manager element.
@@ -379,6 +435,41 @@ pub struct PmiManager {
     pub associations: Vec<Association>,
     pub model_views: Vec<ModelView>,
     pub entities: Vec<Entity>,
+    /// How many design groups the element declares. `pmix` does not model
+    /// them, but they take positions in [`PmiManager::cad_tags`].
+    pub design_groups: usize,
+    /// The CAD tag each thing in the element is known by, in the order the
+    /// specification gives: model views, then design groups, then generic
+    /// entities. An association names its ends by tag rather than by
+    /// position, so this is what resolves them.
+    pub cad_tags: Vec<i32>,
+}
+
+impl PmiManager {
+    /// What the CAD tag `tag` names, or `None` if nothing does.
+    pub fn resolve(&self, tag: i32) -> Option<Tagged> {
+        let position = self.cad_tags.iter().position(|t| *t == tag)?;
+        if position < self.model_views.len() {
+            return Some(Tagged::ModelView(position));
+        }
+        let position = position - self.model_views.len();
+        if position < self.design_groups {
+            return Some(Tagged::DesignGroup);
+        }
+        let position = position - self.design_groups;
+        (position < self.entities.len()).then_some(Tagged::Entity(position))
+    }
+}
+
+/// What a CAD tag names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tagged {
+    /// A position in [`PmiManager::model_views`].
+    ModelView(usize),
+    /// A position in [`PmiManager::entities`].
+    Entity(usize),
+    /// A design group, which `pmix` does not model.
+    DesignGroup,
 }
 
 /// Cursor over the element's bytes.
@@ -468,12 +559,66 @@ impl<'a> Reader<'a> {
         Ok(value)
     }
 
-    /// A vector of 32-bit floats, skipped rather than decoded: `pmix`
-    /// compares PMI, not the polylines that draw it.
-    fn skip_floats(&mut self) -> Result<()> {
+    /// A `VecI32` or `VecF32`, skipped: a count of values then the values.
+    fn skip_vec(&mut self) -> Result<usize> {
         let n = self.count(4)?;
-        self.skip(n * 4)
+        self.skip(n * 4)?;
+        Ok(n)
     }
+
+    /// A `VecI32` read for its values.
+    fn ints(&mut self) -> Result<Vec<i32>> {
+        let n = self.count(4)?;
+        let bytes = self.take(n * 4)?;
+        Ok(bytes
+            .chunks_exact(4)
+            .map(|c| i32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+            .collect())
+    }
+
+    fn f32(&mut self) -> Result<f64> {
+        Ok(f32::from_le_bytes(self.take(4)?.try_into().unwrap()) as f64)
+    }
+
+    /// Three 32-bit floats: a point or a direction.
+    fn point(&mut self) -> Result<[f64; 3]> {
+        Ok([self.f32()?, self.f32()?, self.f32()?])
+    }
+
+    /// A `VecF32` read as points. Generic PMI entities pack their
+    /// coordinates as XYZ triples; a count that is not a whole number of
+    /// points means the data is not what this reader expects, so it
+    /// yields nothing rather than a misaligned reading.
+    fn points(&mut self) -> Result<Vec<[f64; 3]>> {
+        let n = self.count(4)?;
+        let bytes = self.take(n * 4)?;
+        if n % 3 != 0 {
+            return Ok(Vec::new());
+        }
+        Ok(bytes
+            .chunks_exact(12)
+            .map(|c| {
+                let f = |i: usize| f32::from_le_bytes([c[i], c[i + 1], c[i + 2], c[i + 3]]) as f64;
+                [f(0), f(4), f(8)]
+            })
+            .collect())
+    }
+}
+
+/// Cut a run of vertices into polylines at the given break points.
+///
+/// The specification packs every polyline of an entity into one array of
+/// vertices and gives the index each one starts at, so consecutive breaks
+/// delimit a polyline. A break that runs past the vertices is ignored.
+fn split(breaks: &[usize], vertices: &[[f64; 3]]) -> Vec<Vec<[f64; 3]>> {
+    breaks
+        .windows(2)
+        .filter_map(|w| {
+            let (start, end) = (w[0], w[1].min(vertices.len()));
+            (start < end).then(|| vertices[start..end].to_vec())
+        })
+        .filter(|p| p.len() > 1)
+        .collect()
 }
 
 /// Parse the object data of a PMI Manager element.
@@ -482,8 +627,10 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
     let version = r.u8()?;
     r.skip(2)?; // empty field
 
-    // Design groups, which pmix does not model but must be stepped over.
-    for _ in 0..r.count(8)? {
+    // Design groups, which pmix does not model but must be stepped over
+    // and counted, because they take positions in the CAD tag order.
+    let design_groups = r.count(8)?;
+    for _ in 0..design_groups {
         r.skip(4)?;
         for _ in 0..r.count(12)? {
             match r.i32()? {
@@ -498,11 +645,11 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
 
     let mut associations = Vec::new();
     for _ in 0..r.count(20)? {
-        let source = r.i32()?;
-        r.skip(4)?;
+        let source = EndPoint::unpack(r.i32()?);
+        r.skip(4)?; // the string naming the component that owns the source
         let reason = r.i32()?;
-        let destination = r.i32()?;
-        r.skip(4)?;
+        let destination = EndPoint::unpack(r.i32()?);
+        r.skip(4)?; // and the one that owns the destination
         associations.push(Association {
             source,
             destination,
@@ -527,7 +674,13 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
 
     let mut model_views = Vec::new();
     for _ in 0..r.count(60)? {
-        r.skip(12 + 4 + 36 + 4 + 4 + 4)?; // camera and empty fields
+        let eye_direction = r.point()?;
+        let angle = r.f32()?;
+        let eye_position = r.point()?;
+        let target = r.point()?;
+        r.skip(12)?; // the model's rotation angles, which the camera implies
+        let viewport_diameter = r.f32()?;
+        r.skip(8)?; // empty fields
         let active = r.i32()? != 0;
         let id = r.i32()?;
         let name = text_of(r.u32()?, &strings);
@@ -535,7 +688,16 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
             r.atom()?;
             r.atom()?;
         }
-        model_views.push(ModelView { id, name, active });
+        model_views.push(ModelView {
+            id,
+            name,
+            active,
+            eye_direction,
+            angle,
+            eye_position,
+            target,
+            viewport_diameter,
+        });
     }
 
     let entity_count = r.count(20)?;
@@ -549,25 +711,32 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
         let valid = r.u8()? != 0;
 
         let mut texts = Vec::new();
+        let mut text_polylines = Vec::new();
         for _ in 0..r.count(4)? {
             let id = r.u32()?;
             r.skip(12 + 24)?; // font, empty fields, text box
-            let indices = r.count(2)?;
-            r.skip(indices * 2)?;
-            r.skip_floats()?;
+            let count = r.count(2)?;
+            let mut breaks = Vec::with_capacity(count.min(4096));
+            for _ in 0..count {
+                breaks.push(r.u16()? as usize);
+            }
+            text_polylines.extend(split(&breaks, &r.points()?));
             if let Some(t) = text_of(id, &strings) {
                 texts.push(t);
             }
         }
 
         // Non-text polylines: segment indices, types, widths, coordinates.
-        let n = r.count(4)?;
-        r.skip(n * 4)?;
+        let count = r.count(4)?;
+        let mut breaks = Vec::with_capacity(count.min(4096));
+        for _ in 0..count {
+            breaks.push(r.i32()?.max(0) as usize);
+        }
         let n = r.count(2)?;
-        r.skip(n * 2)?;
+        r.skip(n * 2)?; // the line type of each run
         let n = r.count(2)?;
-        r.skip(n * 2)?;
-        r.skip_floats()?;
+        r.skip(n * 2)?; // and its width
+        let polylines = split(&breaks, &r.points()?);
 
         let mut properties = Vec::new();
         for _ in 0..r.count(2)? {
@@ -585,11 +754,19 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
             kind,
             user_label,
             texts,
+            polylines,
+            text_polylines,
             properties,
             type_name,
             valid,
         });
     }
+
+    // Polygon data has to be stepped over to reach the CAD tags. A file
+    // that ends or malforms here still yields its PMI: the tags only
+    // resolve associations, so losing them costs the view membership and
+    // nothing else.
+    let cad_tags = read_cad_tags(&mut r).unwrap_or_default();
 
     Ok(PmiManager {
         version,
@@ -597,7 +774,48 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
         associations,
         model_views,
         entities,
+        design_groups,
+        cad_tags,
     })
+}
+
+/// Step over the PMI polygon data and read the CAD tag order after it.
+fn read_cad_tags(r: &mut Reader<'_>) -> Result<Vec<i32>> {
+    r.u8()?; // version number
+    let elements = r.count(4)?;
+    let vertex_counts = r.ints()?;
+    let bindings = r.ints()?;
+    r.skip_vec()?; // the dimension of each polygon
+    // Bindings are written for the non-empty elements only, three each,
+    // so they are counted separately from the elements themselves.
+    let mut filled = 0;
+    for vertices in vertex_counts.iter().take(elements) {
+        if *vertices <= 0 {
+            continue;
+        }
+        r.skip_vec()?; // primitive types
+        r.skip_vec()?; // primitive indices
+        r.skip_vec()?; // vertex indices
+        r.skip_vec()?; // vertices
+        // Three bindings per non-empty element: colour, normal, texture.
+        let binding = |which: usize| bindings.get(filled * 3 + which).copied().unwrap_or(0);
+        let (colour, normal, texture) = (binding(0), binding(1), binding(2));
+        filled += 1;
+        if normal == 1 {
+            r.skip_vec()?; // normals
+        }
+        if colour == 1 {
+            r.skip_vec()?; // colours
+        }
+        if texture == 1 {
+            r.skip_vec()?; // texture coordinates
+        }
+    }
+
+    if r.u32()? != 1 {
+        return Ok(Vec::new()); // the element carries no CAD tags
+    }
+    r.ints()
 }
 
 #[cfg(test)]
@@ -624,6 +842,80 @@ mod tests {
         data.extend(i32::MAX.to_le_bytes());
         let err = parse(&data).unwrap_err();
         assert!(err.message.contains("count"), "{}", err.message);
+    }
+
+    #[test]
+    fn an_association_end_unpacks_into_its_kind_and_index() {
+        // A generic entity, index 5, named directly.
+        let direct = EndPoint::unpack((EndPoint::GENERIC as i32) << 24 | 5);
+        assert_eq!(direct.kind, EndPoint::GENERIC);
+        assert_eq!(direct.index, 5);
+        assert!(!direct.indirect);
+        // A model view, index 63, named by CAD tag.
+        let tagged =
+            EndPoint::unpack(((EndPoint::MODEL_VIEW as u32) << 24 | 63 | 0x8000_0000) as i32);
+        assert_eq!(tagged.kind, EndPoint::MODEL_VIEW);
+        assert_eq!(tagged.index, 63);
+        assert!(tagged.indirect);
+    }
+
+    #[test]
+    fn a_cad_tag_names_a_view_then_a_group_then_an_entity() {
+        let manager = PmiManager {
+            model_views: vec![
+                ModelView {
+                    id: 1,
+                    name: None,
+                    active: false,
+                    eye_direction: [0.0, 0.0, 1.0],
+                    angle: 0.0,
+                    eye_position: [0.0; 3],
+                    target: [0.0; 3],
+                    viewport_diameter: 0.0,
+                };
+                2
+            ],
+            design_groups: 1,
+            entities: vec![
+                Entity {
+                    kind: EntityKind::Dimension,
+                    user_label: 7,
+                    texts: Vec::new(),
+                    polylines: Vec::new(),
+                    text_polylines: Vec::new(),
+                    properties: Vec::new(),
+                    type_name: None,
+                    valid: true,
+                };
+                2
+            ],
+            // Tags in the order the specification gives, but numbered
+            // arbitrarily, which is why a lookup is needed at all.
+            cad_tags: vec![40, 12, 99, 3, 71],
+            ..Default::default()
+        };
+        assert_eq!(manager.resolve(40), Some(Tagged::ModelView(0)));
+        assert_eq!(manager.resolve(12), Some(Tagged::ModelView(1)));
+        assert_eq!(manager.resolve(99), Some(Tagged::DesignGroup));
+        assert_eq!(manager.resolve(3), Some(Tagged::Entity(0)));
+        assert_eq!(manager.resolve(71), Some(Tagged::Entity(1)));
+        assert_eq!(manager.resolve(1000), None);
+    }
+
+    #[test]
+    fn polylines_are_cut_at_the_indices_that_delimit_them() {
+        let vertices: Vec<[f64; 3]> = (0..8).map(|i| [i as f64, 0.0, 0.0]).collect();
+        // The specification's own example: two lines around a polyline.
+        let lines = split(&[0, 2, 6, 8], &vertices);
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0].len(), 2);
+        assert_eq!(lines[1].len(), 4);
+        assert_eq!(lines[2].len(), 2);
+        assert_eq!(lines[1][0], [2.0, 0.0, 0.0]);
+        // A break past the end is clamped, and a single vertex is not a line.
+        assert_eq!(split(&[0, 99], &vertices).len(), 1);
+        assert!(split(&[0, 1], &vertices).is_empty());
+        assert!(split(&[], &vertices).is_empty());
     }
 
     #[test]

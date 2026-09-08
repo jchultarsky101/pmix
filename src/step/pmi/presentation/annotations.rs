@@ -6,7 +6,9 @@ use super::super::Ctx;
 use super::super::datums::placement;
 use super::super::features::feature_for;
 use super::Index;
-use super::geometry::{self, Geometry, placement_key, plane_placement, rounding_quantum};
+use crate::geometry::Geometry;
+
+use super::geometry::{self, placement_key, plane_placement, rounding_quantum};
 use crate::ExtractOptions;
 use crate::model::{
     Annotation, AnnotationKind, Leader, Measure, Part, PartForm, Placeholder, Style, TextOrigin,

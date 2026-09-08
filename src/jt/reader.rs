@@ -8,7 +8,7 @@ use crate::{ExtractOptions, Reader, Result};
 
 use super::element::Elements;
 use super::file::{Jt, SegmentKind};
-use super::{pmi, property, semantic};
+use super::{pmi, presentation, property, semantic};
 
 /// Reader for JT files (ADR 0009).
 #[derive(Debug, Clone, Copy, Default)]
@@ -28,12 +28,7 @@ fn is_file_metadata(key: &str) -> bool {
 }
 
 impl Reader for JtReader {
-    fn read(
-        &self,
-        input: &[u8],
-        file_name: &str,
-        _options: &ExtractOptions,
-    ) -> Result<PmiDocument> {
+    fn read(&self, input: &[u8], file_name: &str, options: &ExtractOptions) -> Result<PmiDocument> {
         let jt = Jt::parse(input)?;
         let mut diagnostics: Vec<Diagnostic> = Vec::new();
         let mut unknown: Vec<Unknown> = Vec::new();
@@ -102,7 +97,8 @@ impl Reader for JtReader {
             "read JT structure"
         );
 
-        let semantic = semantic::build(&managers, length, &mut unknown);
+        let (semantic, links) = semantic::build(&managers, length, &mut unknown);
+        let presentation = presentation::build(&managers, length, &links, options);
 
         // Scene-graph properties become the document's properties.
         let mut ids = ContentId::new();
@@ -148,7 +144,7 @@ impl Reader for JtReader {
             },
             properties,
             semantic,
-            presentation: Default::default(),
+            presentation,
             unknown,
             diagnostics,
         })
