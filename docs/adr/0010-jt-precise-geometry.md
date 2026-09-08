@@ -93,12 +93,43 @@ two are left unnamed. Neither is the start-loop index the figure lists
 first: one is not monotonic, and the running total of the other does not
 reach the loop count.
 
-**Which face each surface belongs to.** The surfaces are read but not yet
-attached to faces. Each carries an index the specification calls the
-represented surface index, and that index is not a position: its largest
-value exceeds the number of surfaces, in the same way a face identifier
-exceeds the number of faces. Establishing the correspondence is the last
-step before a fingerprint.
+**Which face each surface belongs to.** The surfaces are read but not
+attached to faces, and the table does not appear to say. This was
+investigated on 2026-09-08 and the obvious answers were ruled out, so
+they are recorded here rather than tried again.
+
+- **The surface index is not a face identifier.** For every part the two
+  are different sets; neither contains the other.
+- **The surface index is not a position among the surfaces.** If it were,
+  the values it skips would be exactly the surfaces the table does not
+  describe. They are not, in any part. The clearest case is the part
+  whose surfaces are all described: with nothing skipped the index would
+  run from zero to one less than the count, and instead it has gaps and
+  runs past the end.
+- **None of the five face vectors holds a surface reference.** Each was
+  scored against the set of described surfaces, in both raw and
+  accumulated form, over every part. The only vector whose values all
+  name a described surface is the flag that is zero everywhere, which
+  says nothing.
+
+What remains consistent with all of that is the specification's own
+words: the index is a mapping to the *original* B-rep surfaces. In
+Parasolid XT a face references its surface, and that reference lives in
+the XT data the topology table was chosen to avoid reading. So the
+correspondence may simply not be in the table.
+
+Three ways forward, none yet taken:
+
+- **Read only the face-to-surface reference out of the XT B-rep**, rather
+  than the whole format. Far less than a full XT reader, and it is the
+  one thing missing.
+- **Follow the edges.** An edge names the faces it separates and the
+  curve it lies on, and curves carry indices in the same numbering as
+  surfaces. If that numbering is consistent between the two, the edge
+  vectors would tie a face to a curve and so to the numbering the
+  surfaces use.
+- **Find a file whose parts describe every surface.** Then a positional
+  correspondence would be the only possibility left, and checkable.
 
 **Curves and points**, which the fingerprint recipe uses for edges and
 vertices. Surfaces are the part it needs first.

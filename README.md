@@ -310,7 +310,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] One identity scheme for both formats; datums, datum frames, and views share ids across them (ADR 0004)
 - [x] JT compressed integer packets and the smart topology table (ADR 0010)
 - [x] JT analytic surface geometry: every surface in the test file's parts (ADR 0010)
-- [ ] Attaching a JT surface to its face, then cross-format identity for dimensions and tolerances
+- [ ] Attaching a JT surface to its face, which the topology table does not appear to state (ADR 0010)
+- [ ] Cross-format identity for dimensions and tolerances
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design
