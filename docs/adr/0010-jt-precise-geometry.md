@@ -70,19 +70,27 @@ twice as many coedges as edges, which is what a closed solid requires.
 
 ### What is not read yet, and why
 
-**What each vector means.** The specification's figure for face topology
-shows four vectors; this file writes five. Until that is resolved, naming
-them would be guesswork, so the reader counts them rather than
-interpreting them. This is the same kind of gap ADR 0009 records for the
-PMI element, where the figures also disagreed with real files, and it was
-settled the same way: by reading bytes.
+**Three of the five face vectors are named, from what they contain.**
+The specification's figure shows four vectors per face; this file writes
+five, so position alone identifies nothing. The first holds values that
+are distinct, ascending, start at zero, and outrun the face count, which
+is what the specification describes a face identifier as: unique, and not
+an index. Two others hold only zeros and ones, so they are the two flags;
+one is clear on every face of every part, which is what an outward facing
+solid gives for the orientation flag, and the other varies. The remaining
+two are left unnamed. Neither is the start-loop index the figure lists
+first: one is not monotonic, and the running total of the other does not
+reach the loop count.
 
 **Three of the eight tables.** They reach the arithmetic or
-move-to-front codec within their first few vectors. The other five are
-read until the vectors end.
+move-to-front codec within their first few vectors, so their faces are
+not read either. The other five give up their faces.
 
 **The geometric data section**, which is what identity actually needs.
-It follows the topology in the same element.
+It follows the topology in the same element, past a vector every table
+reaches that uses the arithmetic codec. So the arithmetic codec is now
+the thing standing between the reader and the surfaces, rather than one
+of several open questions.
 
 ## Alternatives considered
 

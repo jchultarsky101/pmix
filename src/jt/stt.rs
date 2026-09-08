@@ -6,10 +6,11 @@
 //! topology, and analytic geometry. That is what `pmix` needs: the
 //! surfaces a PMI callout applies to, without a Parasolid reader.
 //!
-//! This reads the counts that head the table and walks the compressed
-//! vectors after them. What each vector means is not established yet:
-//! this file writes five vectors per face where the specification's
-//! figure shows four, so naming them would be guesswork.
+//! This reads the counts that head the table, the faces, and walks the
+//! rest of the vectors to show the chain is understood. The face section
+//! holds five vectors where the specification's figure shows four; three
+//! of the five are identified from what they contain, and the other two
+//! are left unnamed rather than guessed at.
 
 use std::fmt;
 
@@ -69,11 +70,37 @@ pub struct Counts {
     pub edges: usize,
 }
 
+/// One face of a part's B-rep.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Face {
+    /// The identifier the producing system persisted for this face.
+    ///
+    /// A PMI association names a face by its position among the faces of
+    /// its body ordered by increasing identifier, which is why this is
+    /// needed at all (specification section 11.13). It is not a position
+    /// itself: the values are distinct and ascending but leave gaps, so
+    /// the largest exceeds the number of faces.
+    pub identifier: u32,
+    /// Whether the face normal points into the shell that owns it.
+    ///
+    /// The specification writes two per-face flags and this reader
+    /// cannot tell which of its two flag vectors is which by position,
+    /// because the section has an extra vector the figure does not show.
+    /// The reading is taken from content: this one is clear on every
+    /// face of every part in the test file, which is what an outward
+    /// facing solid gives, while [`Face::normal_reversed`] varies.
+    pub inward: bool,
+    /// Whether the face normal opposes the normal of its surface.
+    pub normal_reversed: bool,
+}
+
 /// What the reader can make of one part's topology table.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Topology {
     pub version: u8,
     pub counts: Counts,
+    /// The faces, in the order the table stores them.
+    pub faces: Vec<Face>,
     /// How many compressed vectors were read before one could not be,
     /// and the number of values each held. Reading the whole chain is
     /// what shows the table is understood; the meaning of each vector is
@@ -85,9 +112,9 @@ pub struct Topology {
 
 /// Read a part's topology table.
 ///
-/// The counts are read from the header. The compressed vectors after
-/// them are walked to show the table is consistent, but their contents
-/// are not interpreted yet.
+/// The counts are read from the header and the faces from the section
+/// that follows the bodies, regions, and shells. The rest of the vectors
+/// are walked without being interpreted.
 pub fn parse(data: &[u8]) -> Result<Topology> {
     let head = data.get(..29).ok_or(SttError::Truncated)?;
     let count = |k: usize| u32::from_le_bytes(head[1 + k * 4..5 + k * 4].try_into().unwrap());
@@ -113,24 +140,58 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
             coedges: raw[5] as usize,
             edges: raw[6] as usize,
         },
+        faces: Vec::new(),
         vectors: Vec::new(),
         stopped: None,
     };
 
     let mut cursor = Cursor::new(&data[29..]);
-    // The predictor only matters once the vectors are interpreted, so
-    // they are read as written for now.
+    // Two vectors for the bodies, two for the regions, and four for the
+    // shells stand between the header and the faces.
+    const BEFORE_FACES: usize = 8;
+    let mut faces: Vec<Vec<i32>> = Vec::new();
     loop {
         if cursor.at >= data.len() - 29 {
             break;
         }
+        let index = out.vectors.len();
+        let in_faces = (BEFORE_FACES..BEFORE_FACES + 5).contains(&index);
+        // Read every vector as written. Which of them a predictor applies
+        // to depends on what they turn out to be, so it is undone below.
         match cursor.packet(Predictor::None) {
-            Ok(values) => out.vectors.push(values.len()),
+            Ok(values) => {
+                out.vectors.push(values.len());
+                if in_faces {
+                    faces.push(values);
+                }
+            }
             Err(e) => {
                 out.stopped = Some(e.to_string());
                 break;
             }
         }
+    }
+
+    if faces.len() == 5 && faces.iter().all(|v| v.len() == out.counts.faces) {
+        // The first vector is written as differences, so each identifier
+        // is the running total.
+        let mut identifier = faces[0].clone();
+        for i in 1..identifier.len() {
+            identifier[i] = identifier[i].wrapping_add(identifier[i - 1]);
+        }
+        // The flags are the vectors written as they stand whose values
+        // are only ever set or clear; the other two are not identified.
+        let flags: Vec<&Vec<i32>> = faces[1..]
+            .iter()
+            .filter(|v| v.iter().all(|x| (0..=1).contains(x)))
+            .collect();
+        out.faces = (0..out.counts.faces)
+            .map(|i| Face {
+                identifier: identifier[i] as u32,
+                inward: flags.first().is_some_and(|v| v[i] != 0),
+                normal_reversed: flags.get(1).is_some_and(|v| v[i] != 0),
+            })
+            .collect();
     }
     Ok(out)
 }
@@ -153,6 +214,17 @@ mod tests {
         }
         let err = parse(&data).unwrap_err();
         assert!(matches!(err, SttError::Implausible(_)), "{err}");
+    }
+
+    #[test]
+    fn faces_are_left_empty_when_the_vectors_cannot_be_read() {
+        let mut data = vec![1u8];
+        for c in [1u32, 1, 1, 4, 4, 8, 4] {
+            data.extend(c.to_le_bytes());
+        }
+        let t = parse(&data).unwrap();
+        assert!(t.faces.is_empty());
+        assert!(t.stopped.is_none() || t.faces.is_empty());
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Reading the smart topology table of a real JT file (ADR 0010).
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use pmix::jt::codec::{Cursor, Predictor};
@@ -95,6 +96,50 @@ fn a_table_says_why_it_stopped_rather_than_guessing_on() {
         let why = t.stopped.as_deref().unwrap();
         assert!(why.starts_with("compressed packet at byte"), "{why}");
     }
+}
+
+/// The check that catches a wrong bitlength decode. A face identifier is
+/// unique within its body, so a decode that drops or repeats a bit shows
+/// up here as a repeated identifier. Getting the field-width constant
+/// wrong does exactly that on the one part whose identifiers use the
+/// adaptive path.
+#[test]
+fn every_face_identifier_is_distinct_and_ascending() {
+    let tables = tables();
+    let with_faces: Vec<_> = tables.iter().filter(|t| !t.faces.is_empty()).collect();
+    assert_eq!(with_faces.len(), 5, "the tables whose face vectors decode");
+    for t in with_faces {
+        assert_eq!(t.faces.len(), t.counts.faces);
+        let ids: Vec<u32> = t.faces.iter().map(|f| f.identifier).collect();
+        let distinct: BTreeSet<u32> = ids.iter().copied().collect();
+        assert_eq!(distinct.len(), ids.len(), "repeated identifier in {ids:?}");
+        assert!(
+            ids.windows(2).all(|w| w[1] > w[0]),
+            "identifiers are stored ascending: {ids:?}"
+        );
+        assert_eq!(ids[0], 0, "the first identifier is zero");
+        // An identifier is not a position, so it outruns the face count.
+        assert!(
+            *ids.last().unwrap() as usize >= t.counts.faces,
+            "identifiers leave gaps: {ids:?}"
+        );
+    }
+}
+
+#[test]
+fn faces_point_out_of_their_shell_and_some_reverse_their_surface() {
+    for t in tables().iter().filter(|t| !t.faces.is_empty()) {
+        assert!(
+            t.faces.iter().all(|f| !f.inward),
+            "every part is a solid whose faces point outward"
+        );
+    }
+    // The other flag is what distinguishes the two, and it varies.
+    let reversed: usize = tables()
+        .iter()
+        .map(|t| t.faces.iter().filter(|f| f.normal_reversed).count())
+        .sum();
+    assert!(reversed > 0);
 }
 
 #[test]

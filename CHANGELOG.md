@@ -7,12 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The bitlength codec read the wrong number of bits for a field-width
+  change, so any vector using its adaptive path decoded to wrong values.
+  The specification's prose and its code sample disagree on the width;
+  real files settle it. Nothing released was affected, because the
+  topology table this codec serves has not been in a release.
+
 ### Added
 
 - A reader for JT's compressed integer packets (`pmix::jt::codec`), which
   is what every table-shaped JT segment is built from. The null and
   bitlength codecs are implemented; a packet using one of the other three
   is reported with the byte it was found at rather than guessed at.
+- Face identifiers and the two per-face flags are read from the smart
+  topology table, which is what lets a PMI association be resolved to a
+  face (ADR 0010).
 - A reader for the smart topology table (`pmix::jt::stt`, ADR 0010),
   which abstracts a part's precise B-rep without needing a Parasolid
   reader. `pmix inspect` now reports each part's bodies, faces, and
