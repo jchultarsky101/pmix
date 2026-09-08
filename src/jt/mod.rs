@@ -3,6 +3,10 @@
 //! - [`mod@file`] reads the file structure: header, table of contents, and
 //!   segments, decompressing segment payloads on demand.
 //! - [`mod@element`] walks the element stream inside a decompressed segment.
+//! - [`mod@codec`] decodes the compressed integer packets that JT's
+//!   topology and geometry tables are built from.
+//! - [`mod@stt`] reads the Smart Topology Table, which abstracts a part's
+//!   precise B-rep without a Parasolid reader.
 //! - [`mod@pmi`] reads the PMI Manager element those segments carry.
 //! - [`mod@property`] reads the scene graph's properties, which declare the
 //!   unit that PMI measures are expressed in.
@@ -16,6 +20,7 @@
 //! file and decodes only the segments that carry PMI and metadata.
 //! Geometry segments are listed but never decoded.
 
+pub mod codec;
 pub mod element;
 pub mod file;
 pub mod identity;
@@ -24,6 +29,7 @@ pub mod presentation;
 pub mod property;
 pub mod reader;
 pub mod semantic;
+pub mod stt;
 
 pub use element::{Element, Elements};
 pub use file::{ByteOrder, Guid, Header, Jt, ParseError, Segment, SegmentKind};

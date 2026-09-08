@@ -81,6 +81,7 @@ describes.
 - **Nothing is compared across the two formats.** Identity (ADR 0004) is
   anchored on B-rep geometry fingerprints that the JT reader does not
   compute, so ids match within a format but not between them.
+  [ADR 0010](0010-jt-precise-geometry.md) takes up that geometry.
 
 ## What the file format turned out to require
 

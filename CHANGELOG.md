@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A reader for JT's compressed integer packets (`pmix::jt::codec`), which
+  is what every table-shaped JT segment is built from. The null and
+  bitlength codecs are implemented; a packet using one of the other three
+  is reported with the byte it was found at rather than guessed at.
+- A reader for the smart topology table (`pmix::jt::stt`, ADR 0010),
+  which abstracts a part's precise B-rep without needing a Parasolid
+  reader. `pmix inspect` now reports each part's bodies, faces, and
+  edges. What each compressed vector after the counts means is not
+  established yet, so they are counted rather than interpreted.
+
 ## [0.2.1] - 2026-09-08
 
 ### Changed
