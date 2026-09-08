@@ -118,6 +118,8 @@ pub(crate) fn walk(ctx: &mut Ctx<'_>) {
                     name,
                     category,
                     kind,
+                    // A STEP file the reader handles describes one part.
+                    part: None,
                     value,
                     applies_to: applies_to.clone(),
                     unmapped,

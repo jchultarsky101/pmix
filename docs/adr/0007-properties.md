@@ -143,6 +143,28 @@ rule deliberately preserves.
 Properties that describe how the file was written rather than what was
 designed, such as the translator version and the level-of-detail
 settings, are marked as validation properties and left out of the diff.
-A part is not yet named as the owner of its properties, because the
-reader does not link a metadata segment to its scene-graph node; until
-it does, two parts stating the same name and value are recorded once.
+
+### Which part states a property
+
+Added 2026-09-08. A property carries the part that states it, in the
+`part` field, so an assembly's materials and volumes can be told apart.
+
+A part names itself on its scene-graph node, and the scene graph's
+property table says which node points at which segment, through the late
+loaded property atoms that make late loading possible in the first
+place. That resolves every segment in the test file to a node.
+
+It does not resolve every segment to a *name*, because the node that
+owns a segment is often a child of the part rather than the part itself,
+and children are unnamed. A metadata segment also states its own name,
+and the two sources together name all thirty in the test file: nine from
+the node, twenty-one from the segment.
+
+The part is part of a property's identity, so two parts made of
+different materials are two records rather than one that collides. A
+part saying the same thing twice is still recorded once.
+
+The reader does not walk the scene graph's parent and child links. Doing
+so would name the remaining nodes directly rather than through the
+segment, and is what the semantic records will need when assemblies are
+modelled (ADR 0004). It is not needed for properties.

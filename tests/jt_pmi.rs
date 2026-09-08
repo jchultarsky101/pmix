@@ -360,6 +360,50 @@ fn a_part_states_its_material_and_size() {
 }
 
 #[test]
+fn a_property_says_which_part_states_it() {
+    let doc = pmix::extract(&fixture()).unwrap();
+    let material = |p: &&pmix::model::Property| p.name.trim_end_matches(':') == "CAD_MATERIAL";
+    let attached: Vec<&pmix::model::Property> = doc
+        .properties
+        .iter()
+        .filter(material)
+        .filter(|p| p.part.is_some())
+        .collect();
+    assert!(attached.len() >= 6, "{} materials attached", attached.len());
+
+    // The parts are the ones the assembly is built from.
+    let parts: BTreeSet<&str> = attached.iter().filter_map(|p| p.part.as_deref()).collect();
+    assert!(
+        parts.iter().any(|p| p.contains("HEX NUT")),
+        "the fasteners are named: {parts:?}"
+    );
+    assert!(
+        parts.iter().any(|p| p.contains("crada box")),
+        "the housings are named: {parts:?}"
+    );
+
+    // Two parts made of different things are two facts, not one, and
+    // they are told apart by id.
+    let ids: BTreeSet<&str> = attached.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids.len(), attached.len(), "a material per part");
+
+    // A volume belongs to the part it measures.
+    let volumes: Vec<&pmix::model::Property> = doc
+        .properties
+        .iter()
+        .filter(|p| p.name.trim_end_matches(':') == "CAD_VOLUME" && p.part.is_some())
+        .collect();
+    assert!(volumes.len() >= 5);
+    // Most of the file's properties now say whose they are.
+    let with_part = doc.properties.iter().filter(|p| p.part.is_some()).count();
+    assert!(
+        with_part * 2 > doc.properties.len(),
+        "{with_part} of {} properties name a part",
+        doc.properties.len()
+    );
+}
+
+#[test]
 fn a_file_compared_with_itself_reports_no_change() {
     let doc = pmix::extract(&fixture()).unwrap();
     let report = pmix::diff::diff(&doc, &doc);

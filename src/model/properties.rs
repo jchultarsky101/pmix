@@ -22,6 +22,11 @@ pub struct Property {
     pub category: Option<String>,
     pub kind: PropertyKind,
     pub value: PropertyValue,
+    /// The part that states this property, in a file that holds several.
+    /// Absent when the file describes one part, or when the reader cannot
+    /// tell which part a property belongs to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part: Option<String>,
     /// The record this property is about; absent means the whole part.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub applies_to: Option<String>,

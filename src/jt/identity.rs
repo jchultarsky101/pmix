@@ -187,7 +187,12 @@ pub fn finalise(doc: &mut PmiDocument, keys: &Keys) {
         if let Some(a) = &mut p.applies_to {
             remap(a, &map);
         }
-        let key = [p.name.as_str(), p.applies_to.as_deref().unwrap_or("")].join("|");
+        let key = [
+            p.part.as_deref().unwrap_or(""),
+            p.name.as_str(),
+            p.applies_to.as_deref().unwrap_or(""),
+        ]
+        .join("|");
         batch.push((i, key, hash_content(&p, &["id", "source_refs"])));
     }
     for (i, id) in assign(batch, "prop", true) {

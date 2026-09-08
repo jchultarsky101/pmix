@@ -7,7 +7,7 @@ use crate::model::{
 use crate::{ExtractOptions, Reader, Result};
 
 use super::element::Elements;
-use super::file::{Jt, SegmentKind};
+use super::file::{Guid, Jt, SegmentKind};
 use super::{identity, meta, pmi, presentation, property, semantic};
 
 /// Reader for JT files (ADR 0009).
@@ -37,6 +37,33 @@ fn is_file_metadata(key: &str) -> bool {
         || key == "PartitionType"
         || key == "Translator Version"
         || key == "PMI_TYPE_TABLE"
+}
+
+/// The name a scene-graph node gives itself, if it gives one.
+fn node_name(scene: &property::Properties, node: i32) -> Option<String> {
+    let pairs = scene.by_element.get(&node)?;
+    ["CAD_PARTNAME::", "JT_PROP_NAME", "Name::"]
+        .iter()
+        .find_map(|key| {
+            pairs
+                .iter()
+                .find(|(k, v)| k == key && !v.is_empty())
+                .map(|(_, v)| v.clone())
+        })
+}
+
+/// Which part a segment belongs to.
+///
+/// A part names itself on its scene-graph node, but the node that owns a
+/// segment is often a child of the part rather than the part itself, and
+/// children are unnamed. A metadata segment states its own name as well,
+/// so the two together cover every segment in the files seen so far.
+fn part_of(scene: &property::Properties, segment: Guid, stated: Option<&str>) -> Option<String> {
+    scene
+        .owner_of(segment)
+        .and_then(|node| node_name(scene, node))
+        .or_else(|| stated.map(str::to_owned))
+        .filter(|n| !n.is_empty())
 }
 
 impl Reader for JtReader {
@@ -116,35 +143,42 @@ impl Reader for JtReader {
         // Scene-graph properties become the document's properties.
         let mut ids = ContentId::new();
         let mut properties: Vec<Property> = Vec::new();
-        let mut seen: std::collections::HashSet<(String, String)> =
+        let mut seen: std::collections::HashSet<(String, String, String)> =
             std::collections::HashSet::new();
-        let mut add = |name: &str, value: PropertyValue, text: &str, source: String| {
-            // A property may be stated by several parts. Until a part can
-            // be named, saying the same thing twice adds nothing.
-            if text.is_empty() || !seen.insert((name.to_owned(), text.to_owned())) {
-                return;
-            }
-            properties.push(Property {
-                id: ids.make("prop", &[name, text]),
-                name: name.to_owned(),
-                category: None,
-                kind: if is_file_metadata(name) {
-                    PropertyKind::Validation
-                } else {
-                    PropertyKind::User
-                },
-                value,
-                applies_to: None,
-                unmapped: Vec::new(),
-                source_refs: vec![source],
-            });
-        };
+        let mut add =
+            |name: &str, value: PropertyValue, text: &str, part: Option<String>, source: String| {
+                // One part saying a thing twice adds nothing; two parts
+                // saying the same thing are two facts.
+                let owner = part.clone().unwrap_or_default();
+                if text.is_empty()
+                    || !seen.insert((owner.clone(), name.to_owned(), text.to_owned()))
+                {
+                    return;
+                }
+                properties.push(Property {
+                    id: ids.make("prop", &[&owner, name, text]),
+                    name: name.to_owned(),
+                    category: None,
+                    kind: if is_file_metadata(name) {
+                        PropertyKind::Validation
+                    } else {
+                        PropertyKind::User
+                    },
+                    part,
+                    value,
+                    applies_to: None,
+                    unmapped: Vec::new(),
+                    source_refs: vec![source],
+                });
+            };
         for (element, pairs) in &scene.by_element {
+            let part = node_name(&scene, *element);
             for (name, value) in pairs {
                 add(
                     name,
                     PropertyValue::from_text(value),
                     value,
+                    part.clone(),
                     format!("#{element}"),
                 );
             }
@@ -163,6 +197,11 @@ impl Reader for JtReader {
                 if element.object_type != meta::PROPERTY_PROXY {
                     continue;
                 }
+                let stated = meta::parse(element.data)
+                    .into_iter()
+                    .find(|(k, _)| k.trim_end_matches(':') == "Name")
+                    .map(|(_, v)| v.to_string());
+                let part = part_of(&scene, segment.id, stated.as_deref());
                 for (name, value) in meta::parse(element.data) {
                     let text = value.to_string();
                     let typed = match value {
@@ -174,7 +213,13 @@ impl Reader for JtReader {
                         meta::Value::Date(ref v) => PropertyValue::Text { value: v.clone() },
                         meta::Value::Unset => continue,
                     };
-                    add(&name, typed, &text, format!("meta[{}]", segment.offset));
+                    add(
+                        &name,
+                        typed,
+                        &text,
+                        part.clone(),
+                        format!("meta[{}]", segment.offset),
+                    );
                 }
             }
         }
