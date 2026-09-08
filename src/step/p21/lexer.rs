@@ -313,6 +313,11 @@ impl<'a> Lexer<'a> {
             }
             // Fall through: integer too large, treat as real.
         }
+        // Almost every real is already in a form Rust accepts, and reals
+        // are the bulk of a Part 21 file, so try it before allocating.
+        if let Ok(v) = text.parse::<f64>() {
+            return Ok(Some((Token::Real(v), span)));
+        }
         // Rust's float parser rejects "1." and "1.E5"; normalise those.
         let mut norm = String::with_capacity(text.len() + 1);
         let bytes = text.as_bytes();

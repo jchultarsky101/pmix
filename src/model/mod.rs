@@ -13,7 +13,7 @@ mod presentation;
 mod properties;
 mod semantic;
 
-pub use id::{ContentId, content_hash};
+pub use id::{ContentHasher, ContentId, content_hash};
 pub use measure::{Direction, Measure, Placement};
 pub use presentation::*;
 pub use properties::*;

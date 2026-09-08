@@ -433,7 +433,12 @@ fn build(
         }
     }
 
-    let geometry_summary = all.summary(quantum);
+    // With one occurrence the aggregate is that occurrence, so summarising
+    // it again would hash the same coordinates twice.
+    let geometry_summary = match parts.as_slice() {
+        [only] => only.geometry.clone(),
+        _ => all.summary(quantum),
+    };
     let mut seen_refs = BTreeSet::new();
     source_refs.retain(|r| seen_refs.insert(r.clone()));
     let semantic: Vec<String> = semantic.into_iter().collect();

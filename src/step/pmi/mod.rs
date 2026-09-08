@@ -29,15 +29,29 @@ use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
 /// Extract everything the walkers understand from `ex`.
 pub fn extract(ex: &Exchange, file_name: &str, options: &ExtractOptions) -> PmiDocument {
-    let mut ctx = Ctx::new(ex);
-    let units = units::document_units(&mut ctx);
-    datums::walk(&mut ctx);
-    dimensions::walk(&mut ctx);
-    tolerances::walk(&mut ctx);
-    presentation::walk(&mut ctx, options);
-    properties::walk(&mut ctx);
-    identity::finalise(&mut ctx);
-    let unknown = ctx.collect_unknown();
+    // Each walker's time, so that a slow file can be attributed to a
+    // phase rather than guessed at. Silent unless debug logging is on.
+    macro_rules! phase {
+        ($name:literal, $e:expr) => {{
+            let started = std::time::Instant::now();
+            let value = $e;
+            tracing::debug!(
+                phase = $name,
+                ms = started.elapsed().as_secs_f64() * 1000.0,
+                "walked"
+            );
+            value
+        }};
+    }
+    let mut ctx = phase!("ctx", Ctx::new(ex));
+    let units = phase!("units", units::document_units(&mut ctx));
+    phase!("datums", datums::walk(&mut ctx));
+    phase!("dimensions", dimensions::walk(&mut ctx));
+    phase!("tolerances", tolerances::walk(&mut ctx));
+    phase!("presentation", presentation::walk(&mut ctx, options));
+    phase!("properties", properties::walk(&mut ctx));
+    phase!("identity", identity::finalise(&mut ctx));
+    let unknown = phase!("unknown", ctx.collect_unknown());
 
     let mut diagnostics: Vec<Diagnostic> = ex
         .diagnostics
