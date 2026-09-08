@@ -3,6 +3,7 @@
 - **Status:** Accepted, 2026-09-07
 - **Deciders:** Julian Chultarsky
 - **Depends on:** [ADR 0002](0002-semantic-pmi-model.md), [ADR 0003](0003-presentation-pmi-model.md)
+- **Amended:** 2026-09-07, when the JT reader adopted these keys
 
 ## Context
 
@@ -145,9 +146,58 @@ collisions, rewrites cross references, and sorts every array by id.
 - **Assemblies.** Files with several product definition shapes are not yet
   handled by the readers; when they are, identity keys gain the owning
   product's identifier and datum ids become `datum:<product>/A`.
-- **JT.** JT features reference XT B-rep faces. The fingerprint recipe
-  applies once the JT reader parses that B-rep; until then JT features are
-  keyed on their text and the reader marks their ids as text-derived.
+- **Matching a STEP file against a JT file.** Partly solved; see below.
+
+## Identity in JT
+
+Added 2026-09-07, when the JT reader was given this scheme. The machinery
+that turns a key into an id is shared (`src/identity.rs`), so both readers
+use one vocabulary of prefixes, one collision rule, and one rounding.
+
+**Where a JT record is anchored.** A STEP dimension is keyed on the
+features it applies to, and a feature is keyed on the fingerprints of its
+B-rep faces. JT states no features: it associates PMI with B-rep faces and
+edges by index into an XT B-rep the reader does not parse. So a JT
+dimension or tolerance is anchored on where its annotation attaches to the
+part instead: the **leader terminator** points, sorted and rounded to the
+coarse quantum, and where an annotation is drawn without leaders, the
+origin of the plane it sits on. Every dimension in the JT test file has
+leader terminators; feature control frames are split, so the plane is the
+fallback rather than the exception.
+
+Both anchors are model-space geometry, so both make the same bargain the
+STEP fingerprint makes: the id survives a re-export of one design and
+changes if the design is remodelled.
+
+**What matches across the two formats, and what does not.**
+
+| Record | Key | Same id from STEP and JT? |
+| ------ | --- | ------------------------- |
+| Datum | `label` | Yes. `datum:A` in either format. |
+| DatumSystem | compartments of datum letters | Yes. `dsys:A\|B\|C` in either format. |
+| SavedView | `name` | Yes when the name is plain enough to read as an id; `view:Top` in either format. |
+| Annotation | linked semantic ids + `kind`, else `kind` + plane + box | Follows whatever its semantic records do. |
+| Dimension, GeometricTolerance | STEP: `kind` + feature ids. JT: `kind` + attachment points. | **No.** Different keys for the same design element. |
+
+The three that match are the records whose identity is design intent
+rather than geometry, which is why they can match at all: a datum is its
+letter in any format. The two that do not are the ones a designer would
+identify by *what they are on*, and the two formats say that differently.
+
+**What would close the gap.** A JT feature key computed from the XT B-rep
+faces a PMI entity references, using the fingerprint recipe above. That
+needs an XT B-rep parser, and it needs one file exported to both formats
+from one model to check the fingerprints actually agree. No such pair is
+published: NIST offers the CTC and FTC models as STEP and the MTC assembly
+as native CAD only, and the JT derivatives the CAx-IF produces are not
+public. Until a pair exists, a cross-format match would be untestable, so
+the reader does not claim one.
+
+**Assemblies remain out of scope**, as above, and the JT test file is an
+assembly: each of its parts states its own datum A, so the ids are
+`datum:A`, `datum:A-2`, and so on under the collision rule. Qualifying
+them by the owning part is the same work for both readers and belongs with
+assembly support.
 
 ## Alternatives considered
 

@@ -389,18 +389,38 @@ fn parameter_indices(entity: &Entity) -> Vec<usize> {
     found
 }
 
+/// Where the ids and identity keys of new records are collected.
+pub struct Naming<'a> {
+    ids: &'a mut ContentId,
+    keys: &'a mut Keys,
+}
+
+/// One measurement to be turned into a record: which entity states it,
+/// which element that entity is in, and where it sits on the part.
+pub struct Measured<'a> {
+    entity: &'a Entity,
+    manager: usize,
+    /// Empty for the entity's own measurement, `ParameterDimension[0].`
+    /// and so on for the ones a callout nests inside itself.
+    prefix: &'a str,
+    anchor: &'a str,
+    description: &'a str,
+    length: Option<&'a str>,
+}
+
 /// Add a dimension record for the measurement under `prefix`, if it
 /// states a value. A dimension with no value is a callout that only
 /// frames the parameters nested inside it.
-fn push_dimension(
-    out: &mut Semantic,
-    ids: &mut ContentId,
-    entity: &Entity,
-    manager: usize,
-    prefix: &str,
-    description: &str,
-    length: Option<&str>,
-) {
+fn push_dimension(out: &mut Semantic, into: &mut Naming<'_>, at: Measured<'_>) {
+    let Measured {
+        entity,
+        manager,
+        prefix,
+        anchor,
+        description,
+        length,
+    } = at;
+    let Naming { ids, keys } = into;
     let Some(value) = number_under(entity, prefix, "value") else {
         return;
     };
@@ -460,6 +480,12 @@ fn push_dimension(
         .filter(|n| !n.is_empty())
         .unwrap_or(description);
 
+    let kind = match (angular, sized) {
+        (true, true) => DimensionKind::AngularSize,
+        (true, false) => DimensionKind::AngularLocation,
+        (false, true) => DimensionKind::Size,
+        (false, false) => DimensionKind::Location,
+    };
     let meta = meta(
         ids,
         "dim",
@@ -467,14 +493,21 @@ fn push_dimension(
         entity,
         manager,
     );
+    // Which slot of a callout this is belongs to identity: a callout
+    // states its diameter and its depth in a fixed order.
+    keys.insert(
+        meta.id.clone(),
+        [
+            kind.as_str(),
+            subtype.as_str(),
+            anchor,
+            prefix.trim_end_matches('.'),
+        ]
+        .join("|"),
+    );
     out.dimensions.push(Dimension {
         meta,
-        kind: match (angular, sized) {
-            (true, true) => DimensionKind::AngularSize,
-            (true, false) => DimensionKind::AngularLocation,
-            (false, true) => DimensionKind::Size,
-            (false, false) => DimensionKind::Location,
-        },
+        kind,
         subtype,
         value: Some(value),
         limits: None,
@@ -496,6 +529,64 @@ fn push_dimension(
 /// layer uses this to say what an annotation displays.
 pub type Links = BTreeMap<(usize, usize), Vec<String>>;
 
+/// What the reader knows about each record's identity, by the temporary
+/// id the record carries until [`crate::jt::identity`] replaces it.
+pub type Keys = BTreeMap<String, String>;
+
+/// What one pass of the semantic walker produced.
+#[derive(Debug, Default)]
+pub struct Built {
+    pub semantic: Semantic,
+    pub links: Links,
+    pub keys: Keys,
+}
+
+/// Where on the part an annotation is attached, as an identity key.
+///
+/// JT states no features, so this stands in for the feature references
+/// that anchor a STEP record (ADR 0004). A leader terminator is a point
+/// on the part that the annotation points at, which is the closest thing
+/// the format gives to "what this callout is about"; an annotation drawn
+/// without leaders is anchored by the plane it sits on instead.
+///
+/// Both are model-space geometry, so both survive a re-export of the
+/// same design and both change if the design is remodelled, which is the
+/// same bargain the STEP fingerprint makes.
+pub fn anchor(entity: &Entity, per_metre: f64) -> String {
+    let mut points: Vec<String> = entity
+        .ending_with(".terminator")
+        .iter()
+        .filter_map(|(_, v)| point(v, 1.0))
+        .collect();
+    if points.is_empty() {
+        // The display plane's origin is written in metres.
+        if let Some(p) = entity
+            .property("DisplayPlane.origin")
+            .and_then(|v| point(v, per_metre))
+        {
+            return format!("@{p}");
+        }
+        return String::new();
+    }
+    points.sort();
+    points.dedup();
+    points.join(";")
+}
+
+/// Read three numbers, scale them, and round them for an identity key.
+fn point(text: &str, scale: f64) -> Option<String> {
+    let v: Vec<f64> = text
+        .split_whitespace()
+        .map(|n| n.parse().ok())
+        .collect::<Option<Vec<f64>>>()?;
+    (v.len() == 3).then(|| {
+        crate::identity::triple(
+            [v[0] * scale, v[1] * scale, v[2] * scale],
+            crate::identity::COARSE_QUANTUM,
+        )
+    })
+}
+
 /// How a PMI entity is named in `source_refs`. User labels repeat between
 /// elements, so the element has to be named as well.
 pub fn source_ref(manager: usize, entity: &Entity) -> String {
@@ -507,13 +598,13 @@ pub fn source_ref(manager: usize, entity: &Entity) -> String {
 /// `length` is the unit the file declares its model in, which is the unit
 /// every PMI measure is expressed in; `angle` is degrees, which is what
 /// the PMI property list specifies for angular values.
-pub fn build(
-    managers: &[PmiManager],
-    length: Option<&str>,
-    unknown: &mut Vec<Unknown>,
-) -> (Semantic, Links) {
+pub fn build(managers: &[PmiManager], length: Option<&str>, unknown: &mut Vec<Unknown>) -> Built {
+    let per_metre = length
+        .and_then(crate::jt::property::per_metre)
+        .unwrap_or(1.0);
     let mut out = Semantic::default();
     let mut links = Links::new();
+    let mut keys = Keys::new();
     let mut ids = ContentId::new();
     // Datum systems are shared by the frames that reference them, so a
     // system is emitted once per distinct set of compartments.
@@ -523,6 +614,7 @@ pub fn build(
         for (e, entity) in manager.entities.iter().enumerate() {
             let mut made: Vec<String> = Vec::new();
             let kind = entity.kind.as_str();
+            let anchor = anchor(entity, per_metre);
             let description = entity
                 .property("Description")
                 .unwrap_or_default()
@@ -531,13 +623,39 @@ pub fn build(
             if is_dimension(&entity.kind) {
                 let before = out.dimensions.len();
                 // The entity's own measurement, when it has one.
-                push_dimension(&mut out, &mut ids, entity, m, "", &description, length);
+                let mut naming = Naming {
+                    ids: &mut ids,
+                    keys: &mut keys,
+                };
+                push_dimension(
+                    &mut out,
+                    &mut naming,
+                    Measured {
+                        entity,
+                        manager: m,
+                        prefix: "",
+                        anchor: &anchor,
+                        description: &description,
+                        length,
+                    },
+                );
                 // A callout such as a hole and thread note carries its
                 // sizes as numbered parameters rather than one value, and
                 // each of those is a dimension in its own right.
                 for index in parameter_indices(entity) {
                     let prefix = format!("ParameterDimension[{index}].");
-                    push_dimension(&mut out, &mut ids, entity, m, &prefix, &description, length);
+                    push_dimension(
+                        &mut out,
+                        &mut naming,
+                        Measured {
+                            entity,
+                            manager: m,
+                            prefix: &prefix,
+                            anchor: &anchor,
+                            description: &description,
+                            length,
+                        },
+                    );
                 }
                 made.extend(out.dimensions[before..].iter().map(|d| d.meta.id.clone()));
                 if out.dimensions.len() == before {
@@ -604,6 +722,7 @@ pub fn build(
                     entity,
                     m,
                 );
+                keys.insert(meta.id.clone(), [kind.as_str(), &anchor].join("|"));
                 made.push(meta.id.clone());
                 out.tolerances.push(GeometricTolerance {
                     meta,
@@ -628,6 +747,7 @@ pub fn build(
             if entity.kind == EntityKind::DatumFeatureSymbol {
                 let label = entity.property("label").unwrap_or_default().to_owned();
                 let meta = meta(&mut ids, "datum", &[&label, &description], entity, m);
+                keys.insert(meta.id.clone(), label.clone());
                 made.push(meta.id.clone());
                 out.datums.push(Datum {
                     meta,
@@ -646,6 +766,7 @@ pub fn build(
                     description.clone()
                 };
                 let meta = meta(&mut ids, "note", &[&kind, &text], entity, m);
+                keys.insert(meta.id.clone(), [kind.as_str(), text.as_str()].join("|"));
                 made.push(meta.id.clone());
                 out.notes.push(Note {
                     meta,
@@ -680,6 +801,10 @@ pub fn build(
                 continue;
             }
             let meta = meta(&mut ids, "other", &[&kind, &description], entity, m);
+            keys.insert(
+                meta.id.clone(),
+                [kind.as_str(), description.as_str()].join("|"),
+            );
             made.push(meta.id.clone());
             out.other.push(Other {
                 meta,
@@ -692,7 +817,11 @@ pub fn build(
     }
 
     out.sort();
-    (out, links)
+    Built {
+        semantic: out,
+        links,
+        keys,
+    }
 }
 
 #[cfg(test)]
@@ -720,7 +849,7 @@ mod tests {
             entities: vec![entity],
             ..Default::default()
         };
-        build(&[manager], Some("mm"), &mut Vec::new()).0
+        build(&[manager], Some("mm"), &mut Vec::new()).semantic
     }
 
     #[test]
@@ -839,7 +968,7 @@ mod tests {
             ..Default::default()
         };
         let mut unknown = Vec::new();
-        let (out, _) = build(&[manager], Some("mm"), &mut unknown);
+        let out = build(&[manager], Some("mm"), &mut unknown).semantic;
         assert!(out.dimensions.is_empty());
         assert_eq!(unknown.len(), 1);
         assert!(unknown[0].reason.contains("no value"), "{unknown:?}");

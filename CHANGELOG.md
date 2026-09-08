@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- JT records now get identity keys (ADR 0004) instead of content hashes,
+  so a JT id names which callout a record is rather than what it
+  currently says. Changing a value, a tolerance, or a callout's text
+  leaves the id alone, and `pmix diff` reports such an edit as a change
+  rather than as a removal and an addition.
+- Datums, datum reference frames, and saved views now get the same id
+  from a STEP file and a JT file of one design: `datum:A`,
+  `dsys:A|B|C`, `view:Top`. Dimensions and geometric tolerances do not
+  yet, because the STEP reader anchors them on B-rep fingerprints and
+  the JT reader has no B-rep to fingerprint; ADR 0004 records what would
+  close that.
+- The machinery that turns an identity key into an id is shared by the
+  readers (`pmix::identity`), so both use one vocabulary of prefixes and
+  one collision rule. JT tolerance ids change prefix from `gtol` to
+  `tol` and annotation ids from `anno` to `ann` to match STEP.
 - The JT presentation layer (ADR 0003, ADR 0009): annotations with their
   kind, plane, style, and a summary of the lines that draw them, and
   saved views with their camera and the annotations each one shows.

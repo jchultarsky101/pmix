@@ -259,10 +259,14 @@ serial such as `007` stays text. See
 Every array is sorted by id. Ids are *identity keys*
 ([ADR 0004](docs/adr/0004-identity.md)): they name which design element a
 record is, so the same tolerance keeps its id across re-exports even when
-its value changes. Datums, datum systems, and saved views get readable ids
-(`datum:A`, `dsys:A|B|C`, `view:MBD_A`); features, dimensions,
-tolerances, and annotations get hashed ids anchored on the B-rep geometry
-they apply to. Measures are kept in the unit the file declares. Anything
+its value changes. Both readers use one scheme. Datums, datum systems, and
+saved views get readable ids (`datum:A`, `dsys:A|B|C`, `view:MBD_A`), and
+those are the same from a STEP file and a JT file of one design, because
+their identity is design intent rather than geometry. Features,
+dimensions, tolerances, and annotations get hashed ids anchored on the
+geometry they apply to: the B-rep faces for STEP, and where the annotation
+attaches to the part for JT, which is why those two do not yet match
+across the formats. Measures are kept in the unit the file declares. Anything
 the reader recognises but cannot map is reported under `unknown` rather
 than dropped. The model lives in [`src/model/`](src/model/).
 
@@ -300,6 +304,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] JT reader: file structure, segments, and decompression (ADR 0009)
 - [x] JT reader: PMI Manager element, model units, and the semantic layer
 - [x] JT reader: annotations and saved views, with the PMI each view shows
+- [x] One identity scheme for both formats; datums, datum frames, and views share ids across them (ADR 0004)
+- [ ] Cross-format identity for dimensions and tolerances, which needs a JT B-rep reader
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 - [ ] Publish to crates.io, once the base functionality is complete
 
