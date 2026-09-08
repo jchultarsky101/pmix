@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-08
+
+The headline is that a JT extract now carries what a part is made of, not
+just the PMI drawn on it: material, volume, density, mass units, Young's
+modulus, and the part's name.
+
+### Changed
+
+- Two properties that state the same name and value are recorded once
+  rather than once per part. Until a property can be attributed to the
+  part that states it, the repetition carried no information. A JT
+  document is smaller for it even though it now carries more.
+
 ### Fixed
 
 - The bitlength codec read the wrong number of bits for a field-width
@@ -27,23 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is what every table-shaped JT segment is built from. The null and
   bitlength codecs are implemented; a packet using one of the other three
   is reported with the byte it was found at rather than guessed at.
-- Face identifiers and the two per-face flags are read from the smart
-  topology table, which is what lets a PMI association be resolved to a
-  face (ADR 0010).
 - A reader for the smart topology table (`pmix::jt::stt`, ADR 0010),
   which abstracts a part's precise B-rep without needing a Parasolid
-  reader. `pmix inspect` now reports each part's bodies, faces, and
-  edges. What each compressed vector after the counts means is not
-  established yet, so they are counted rather than interpreted.
+  reader. It gives each part's bodies, faces, and edges, which
+  `pmix inspect` now reports, and each face's identifier, which is what
+  will let a PMI association be resolved to the face it applies to. This
+  is groundwork: nothing in the extracted document depends on it yet.
 
 ## [0.2.1] - 2026-09-08
 
 ### Changed
-
-- Two properties that state the same name and value are recorded once
-  rather than once per part. Until a property can be attributed to the
-  part that states it, the repetition carried no information. This makes
-  a JT document smaller even though it now carries more.
 
 - Reading a model is about **1.85x faster**, and around 2.5x on the files
   that carry the most annotation geometry. The output is unchanged: every
@@ -225,7 +231,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/jchultarsky101/pmix/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jchultarsky101/pmix/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jchultarsky101/pmix/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/jchultarsky101/pmix/compare/v0.1.0...v0.1.1
