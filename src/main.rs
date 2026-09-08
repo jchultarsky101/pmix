@@ -415,11 +415,23 @@ fn inspect_jt(input: PathBuf, opts: InspectOptions) -> Result<()> {
                     t.counts.bodies, t.counts.faces, t.counts.edges,
                 )?;
                 match &t.geometry {
-                    Some(g) => writeln!(
-                        out,
-                        "      {} surfaces ({} described), {} curves, {} points",
-                        g.surfaces, g.represented_surfaces, g.curves, g.points
-                    )?,
+                    Some(g) => {
+                        writeln!(
+                            out,
+                            "      {} surfaces ({} described), {} curves, {} points",
+                            g.surfaces, g.represented_surfaces, g.curves, g.points
+                        )?;
+                        let mut kinds: std::collections::BTreeMap<&str, usize> =
+                            std::collections::BTreeMap::new();
+                        for (_, surface) in &t.surfaces {
+                            *kinds.entry(surface.kind()).or_default() += 1;
+                        }
+                        if !kinds.is_empty() {
+                            let listed: Vec<String> =
+                                kinds.iter().map(|(k, n)| format!("{n} {k}")).collect();
+                            writeln!(out, "      {}", listed.join(", "))?;
+                        }
+                    }
                     None => writeln!(
                         out,
                         "      stopped after {} of its vectors, so the geometry was not reached",

@@ -309,7 +309,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] JT reader: annotations and saved views, with the PMI each view shows
 - [x] One identity scheme for both formats; datums, datum frames, and views share ids across them (ADR 0004)
 - [x] JT compressed integer packets and the smart topology table (ADR 0010)
-- [ ] JT analytic surface geometry, then cross-format identity for dimensions and tolerances
+- [x] JT analytic surface geometry: every surface in the test file's parts (ADR 0010)
+- [ ] Attaching a JT surface to its face, then cross-format identity for dimensions and tolerances
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

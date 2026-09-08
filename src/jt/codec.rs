@@ -383,6 +383,20 @@ impl<'a> Cursor<'a> {
         Ok(values)
     }
 
+    /// A `VecF64`: a count of values, then the values. Unlike the
+    /// integer arrays around it this is written as it stands.
+    pub fn floats(&mut self) -> Result<Vec<f64>> {
+        let n = self.i32()?;
+        if n < 0 {
+            return self.err(format!("negative float count {n}"));
+        }
+        let bytes = self.take(n as usize * 8)?;
+        Ok(bytes
+            .chunks_exact(8)
+            .map(|c| f64::from_le_bytes(c.try_into().unwrap()))
+            .collect())
+    }
+
     /// [`Cursor::packet`] read as unsigned values.
     pub fn packet_u32(&mut self, predictor: Predictor) -> Result<Vec<u32>> {
         Ok(self
