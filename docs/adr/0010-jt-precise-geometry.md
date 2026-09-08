@@ -60,9 +60,11 @@ wrong geometry is worse than none.
 
 ### What is read so far
 
-The whole topology: the counts that head the table, its twenty-three
-compressed vectors, the checksum that closes it, and the counts that head
-the geometry after it. `pmix inspect` reports both sets per part.
+The whole topology, and the surfaces of the geometry after it: the
+counts, the twenty-three compressed vectors, the checksum, the geometry
+counts, and every analytic surface the table describes, with its
+location, axis, radii, and half angle. `pmix inspect` reports the counts
+and the mix of surface kinds per part.
 
 The counts are trustworthy: they are plain integers, and they check
 against each other. Every part in the test file states one body, at least
@@ -91,9 +93,32 @@ two are left unnamed. Neither is the start-loop index the figure lists
 first: one is not monotonic, and the running total of the other does not
 reach the loop count.
 
-**The geometric data itself**, which is what identity actually needs.
-Its counts are read; the surfaces and their parameters are not. That is
-now the only thing between the reader and a face fingerprint.
+**Which face each surface belongs to.** The surfaces are read but not yet
+attached to faces. Each carries an index the specification calls the
+represented surface index, and that index is not a position: its largest
+value exceeds the number of surfaces, in the same way a face identifier
+exceeds the number of faces. Establishing the correspondence is the last
+step before a fingerprint.
+
+**Curves and points**, which the fingerprint recipe uses for edges and
+vertices. Surfaces are the part it needs first.
+
+### What the surfaces required
+
+**A surface type is written one above the value the specification
+lists.** The table gives PLANE as 0 and TORUS as 4; files write 1 and 5.
+The arrays prove it. Each surface draws a location and two directions
+from shared arrays, and only the curved kinds draw radii and angles, so
+the length of the radius and angle arrays is fixed by the mix of kinds.
+With the documented values those arrays are far too short for the
+surfaces they would have to describe; subtracting one makes every part
+in the test file come out exact, all eight of them.
+
+That the arrays are laid end to end is what makes this checkable at all:
+one surface read wrongly derails every surface after it, so ending on
+exactly the declared count is a strong statement that the reading is
+right. A further sign: the cones come out at a half angle of exactly a
+quarter of pi, which is a chamfer cut at forty-five degrees.
 
 ### What the move-to-front codec required
 

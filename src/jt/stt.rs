@@ -94,6 +94,77 @@ pub struct Face {
     pub normal_reversed: bool,
 }
 
+/// An analytic surface a face lies on.
+///
+/// The table describes only the five kinds that have a closed form. A
+/// face on anything else has no entry, which is why the geometry states
+/// how many of its surfaces it represents.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Surface {
+    Plane {
+        location: [f64; 3],
+        axis: [f64; 3],
+    },
+    Cylinder {
+        location: [f64; 3],
+        axis: [f64; 3],
+        radius: f64,
+    },
+    Cone {
+        location: [f64; 3],
+        axis: [f64; 3],
+        radius: f64,
+        /// Half the angle at the apex, in radians.
+        semi_angle: f64,
+    },
+    Sphere {
+        location: [f64; 3],
+        axis: [f64; 3],
+        radius: f64,
+    },
+    Torus {
+        location: [f64; 3],
+        axis: [f64; 3],
+        major_radius: f64,
+        minor_radius: f64,
+    },
+}
+
+impl Surface {
+    /// The name this reader uses for the kind of surface.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Plane { .. } => "plane",
+            Self::Cylinder { .. } => "cylinder",
+            Self::Cone { .. } => "cone",
+            Self::Sphere { .. } => "sphere",
+            Self::Torus { .. } => "torus",
+        }
+    }
+
+    /// Where the surface sits.
+    pub fn location(&self) -> [f64; 3] {
+        match self {
+            Self::Plane { location, .. }
+            | Self::Cylinder { location, .. }
+            | Self::Cone { location, .. }
+            | Self::Sphere { location, .. }
+            | Self::Torus { location, .. } => *location,
+        }
+    }
+
+    /// The direction that orients it.
+    pub fn axis(&self) -> [f64; 3] {
+        match self {
+            Self::Plane { axis, .. }
+            | Self::Cylinder { axis, .. }
+            | Self::Cone { axis, .. }
+            | Self::Sphere { axis, .. }
+            | Self::Torus { axis, .. } => *axis,
+        }
+    }
+}
+
 /// How many of each thing the geometry holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct GeometryCounts {
@@ -117,6 +188,10 @@ pub struct Topology {
     pub geometry: Option<GeometryCounts>,
     /// The checksum the file states over its topology.
     pub hash: Option<u32>,
+    /// The surfaces the geometry describes, each with the index of the
+    /// surface it stands for. Surfaces run parallel to faces, so that
+    /// index is also the face's position in [`Topology::faces`].
+    pub surfaces: Vec<(usize, Surface)>,
     /// How many compressed vectors were read before one could not be,
     /// and the number of values each held. Reading the whole chain is
     /// what shows the table is understood; the meaning of each vector is
@@ -159,6 +234,7 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
         faces: Vec::new(),
         geometry: None,
         hash: None,
+        surfaces: Vec::new(),
         vectors: Vec::new(),
         stopped: None,
     };
@@ -205,13 +281,19 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
         if let (Some(surfaces), Some(rs), Some(curves), Some(rc), Some(points)) =
             (word(1), word(2), word(3), word(4), word(5))
         {
-            out.geometry = Some(GeometryCounts {
+            let counts = GeometryCounts {
                 surfaces: surfaces as usize,
                 represented_surfaces: rs as usize,
                 curves: curves as usize,
                 represented_curves: rc as usize,
                 points: points as usize,
-            });
+            };
+            out.geometry = Some(counts);
+            if counts.represented_surfaces > 0 {
+                // The counts are six words past the last vector.
+                cursor.at += 6 * 4;
+                out.surfaces = read_surfaces(&mut cursor).unwrap_or_default();
+            }
         }
     }
 
@@ -235,6 +317,107 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
                 normal_reversed: flags.get(1).is_some_and(|v| v[i] != 0),
             })
             .collect();
+    }
+    Ok(out)
+}
+
+/// Read the surfaces the geometry describes.
+///
+/// Each surface takes what it needs from four arrays laid end to end,
+/// in the order the surfaces appear: every kind takes a location and two
+/// directions, and the kinds with curvature take radii and angles as
+/// well (specification figure H.15).
+fn read_surfaces(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Surface)>> {
+    let index = cursor.packet_u32(Predictor::Lag1)?;
+    // The type values run one above the enumeration the specification
+    // lists, so a plane is written as 1 rather than 0. The counts prove
+    // it: with the documented values the radius and angle arrays are far
+    // too short for the surfaces they would have to describe, and with
+    // these they match exactly.
+    let kinds: Vec<u32> = cursor
+        .packet_u32(Predictor::None)?
+        .into_iter()
+        .map(|k| k.saturating_sub(1))
+        .collect();
+    let coordinates = cursor.floats()?;
+    let axes = cursor.floats()?;
+    let radii = cursor.floats()?;
+    let radians = cursor.floats()?;
+
+    let triple = |v: &[f64], at: usize| -> Option<[f64; 3]> {
+        Some([*v.get(at)?, *v.get(at + 1)?, *v.get(at + 2)?])
+    };
+    let (mut coordinate, mut axis, mut radius, mut radian) = (0, 0, 0, 0);
+    let mut out = Vec::with_capacity(kinds.len().min(1 << 16));
+    for (position, kind) in kinds.iter().enumerate() {
+        let (Some(location), Some(direction)) =
+            (triple(&coordinates, coordinate), triple(&axes, axis))
+        else {
+            break;
+        };
+        // Every kind takes a location and a pair of directions; the
+        // second direction fixes the rotation about the first and says
+        // nothing a fingerprint needs, so it is stepped over.
+        coordinate += 3;
+        axis += 6;
+        let mut take_radius = || {
+            let v = radii.get(radius).copied();
+            radius += 1;
+            v
+        };
+        let surface = match kind {
+            0 => Surface::Plane {
+                location,
+                axis: direction,
+            },
+            1 | 3 => {
+                let Some(r) = take_radius() else { break };
+                if *kind == 1 {
+                    Surface::Cylinder {
+                        location,
+                        axis: direction,
+                        radius: r,
+                    }
+                } else {
+                    Surface::Sphere {
+                        location,
+                        axis: direction,
+                        radius: r,
+                    }
+                }
+            }
+            2 => {
+                let Some(r) = take_radius() else { break };
+                let Some(angle) = radians.get(radian).copied() else {
+                    break;
+                };
+                radian += 1;
+                Surface::Cone {
+                    location,
+                    axis: direction,
+                    radius: r,
+                    semi_angle: angle,
+                }
+            }
+            4 => {
+                let (Some(major), Some(minor)) = (take_radius(), take_radius()) else {
+                    break;
+                };
+                Surface::Torus {
+                    location,
+                    axis: direction,
+                    major_radius: major,
+                    minor_radius: minor,
+                }
+            }
+            // A kind the table does not define leaves the arrays at an
+            // unknown offset, so nothing after it can be trusted.
+            _ => break,
+        };
+        out.push((
+            index.get(position).copied().unwrap_or(position as u32) as usize,
+            surface,
+        ));
     }
     Ok(out)
 }

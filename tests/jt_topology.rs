@@ -137,6 +137,79 @@ fn the_geometry_after_the_topology_matches_it() {
 }
 
 #[test]
+fn every_described_surface_is_recovered() {
+    use pmix::jt::stt::Surface;
+    let mut kinds: BTreeSet<&str> = BTreeSet::new();
+    for t in tables() {
+        let g = t.geometry.unwrap();
+        // The four arrays a surface draws from are laid end to end, so
+        // reading one surface wrongly would derail every one after it.
+        // Ending on exactly the count the geometry declares is what says
+        // the reading is right.
+        assert_eq!(
+            t.surfaces.len(),
+            g.represented_surfaces,
+            "every described surface recovered"
+        );
+        for (_, surface) in &t.surfaces {
+            kinds.insert(surface.kind());
+            // An axis is a direction, so it has unit length.
+            let axis = surface.axis();
+            let length = (axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]).sqrt();
+            assert!(
+                (length - 1.0).abs() < 1e-6,
+                "{surface:?} has an axis of length {length}"
+            );
+            // A radius is a size, so it is positive and not absurd. The
+            // file states lengths in metres.
+            match surface {
+                Surface::Cylinder { radius, .. }
+                | Surface::Sphere { radius, .. }
+                | Surface::Cone { radius, .. } => {
+                    assert!(*radius > 0.0 && *radius < 10.0, "{surface:?}")
+                }
+                Surface::Torus {
+                    major_radius,
+                    minor_radius,
+                    ..
+                } => {
+                    assert!(*major_radius > 0.0 && *minor_radius > 0.0, "{surface:?}");
+                }
+                Surface::Plane { .. } => {}
+            }
+            if let Surface::Cone { semi_angle, .. } = surface {
+                // Half the angle at the apex, so it is a quarter turn at
+                // most.
+                assert!(
+                    *semi_angle > 0.0 && *semi_angle < std::f64::consts::FRAC_PI_2,
+                    "{surface:?}"
+                );
+            }
+        }
+    }
+    // The assembly uses every kind the table can describe.
+    assert_eq!(
+        kinds,
+        BTreeSet::from(["cone", "cylinder", "plane", "sphere", "torus"])
+    );
+}
+
+#[test]
+fn a_chamfer_is_recovered_as_a_cone_at_forty_five_degrees() {
+    use pmix::jt::stt::Surface;
+    // A machined chamfer is cut at 45 degrees, so its cone's half angle
+    // is an eighth of a turn. Finding that exactly is a strong sign the
+    // angles are read from the right place.
+    let eighth = std::f64::consts::FRAC_PI_4;
+    let found = tables().iter().any(|t| {
+        t.surfaces.iter().any(|(_, s)| {
+            matches!(s, Surface::Cone { semi_angle, .. } if (semi_angle - eighth).abs() < 1e-9)
+        })
+    });
+    assert!(found, "no chamfer cut at 45 degrees");
+}
+
+#[test]
 fn the_codec_refuses_a_packet_it_cannot_read() {
     // A packet claiming more values than the bytes could hold must fail
     // rather than allocate.
