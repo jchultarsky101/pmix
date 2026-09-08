@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A property now says which part states it**, in a new `part` field, so
+  an assembly's materials and volumes can be told apart. The scene
+  graph's late loaded property atoms say which node owns which segment,
+  and a part names itself on its node; where the owning node is an
+  unnamed child, the metadata segment's own name is used instead. The two
+  together name every segment in the test file.
+- The part is part of a property's identity, so two parts made of
+  different materials are two records rather than one. A part saying the
+  same thing twice is still recorded once.
+
 ## [0.3.0] - 2026-09-08
 
 The headline is that a JT extract now carries what a part is made of, not

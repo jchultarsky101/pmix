@@ -10,6 +10,12 @@ use std::collections::BTreeMap;
 use super::element::Elements;
 use super::file::Guid;
 
+/// Object type identifier of the Late Loaded Property Atom Element,
+/// which is how a node points at a segment of the file.
+pub const LATE_LOADED_PROPERTY_ATOM: Guid = Guid([
+    0xe5, 0x5b, 0xb0, 0xe0, 0xbd, 0xfb, 0xd1, 0x11, 0xa3, 0xa7, 0x00, 0xaa, 0x00, 0xd1, 0x09, 0x54,
+]);
+
 /// Object type identifier of the String Property Atom Element.
 pub const STRING_PROPERTY_ATOM: Guid = Guid([
     0x6e, 0x10, 0xdd, 0x10, 0xc8, 0x2a, 0xd1, 0x11, 0x9b, 0x6b, 0x00, 0x80, 0xc7, 0xbb, 0x59, 0x97,
@@ -23,6 +29,12 @@ const MARKER: usize = 4 + 16;
 pub struct Properties {
     /// Key and value pairs, keyed by the object identifier they belong to.
     pub by_element: BTreeMap<i32, Vec<(String, String)>>,
+    /// The segments each element points at, by the key it points under.
+    ///
+    /// This is how a part says where its geometry, its PMI, and its own
+    /// metadata live: the value of the property is not a string but a
+    /// reference to another segment of the file.
+    pub segments: BTreeMap<i32, Vec<(String, Guid)>>,
 }
 
 impl Properties {
@@ -33,6 +45,14 @@ impl Properties {
             .flatten()
             .find(|(k, _)| k == key)
             .map(|(_, v)| v.as_str())
+    }
+
+    /// Which element points at `segment`, if any does.
+    pub fn owner_of(&self, segment: Guid) -> Option<i32> {
+        self.segments
+            .iter()
+            .find(|(_, refs)| refs.iter().any(|(_, g)| *g == segment))
+            .map(|(id, _)| *id)
     }
 }
 
@@ -73,17 +93,26 @@ pub fn read(payload: &[u8]) -> Properties {
     // first and the property atoms after them. Walk them all, then read
     // the table that follows the last one.
     let mut atoms: BTreeMap<i32, String> = BTreeMap::new();
+    let mut referenced: BTreeMap<i32, Guid> = BTreeMap::new();
     let mut start = 0;
     while starts_a_stream(payload, start) {
         let mut elements = Elements::new(&payload[start..]);
         for element in elements.by_ref() {
-            if element.object_type != STRING_PROPERTY_ATOM {
-                continue;
-            }
             // Base property atom data is a version byte and state flags,
             // then this element's own version byte, then the value.
-            if let Some(value) = string_at(element.data, 1 + 4 + 1) {
-                atoms.insert(element.object_id, value);
+            const AFTER_BASE: usize = 1 + 4 + 1;
+            if element.object_type == STRING_PROPERTY_ATOM {
+                if let Some(value) = string_at(element.data, AFTER_BASE) {
+                    atoms.insert(element.object_id, value);
+                }
+            } else if element.object_type == LATE_LOADED_PROPERTY_ATOM {
+                if let Some(id) = element
+                    .data
+                    .get(AFTER_BASE..AFTER_BASE + 16)
+                    .and_then(|b| b.try_into().ok())
+                {
+                    referenced.insert(element.object_id, Guid(id));
+                }
             }
         }
         let next = start + elements.position() + MARKER;
@@ -117,8 +146,14 @@ pub fn read(payload: &[u8]) -> Properties {
             }
             let Some(value) = int(pos) else { return out };
             pos += 4;
-            if let (Some(k), Some(v)) = (atoms.get(&key), atoms.get(&value)) {
+            let Some(k) = atoms.get(&key) else { continue };
+            if let Some(v) = atoms.get(&value) {
                 pairs.push((k.clone(), v.clone()));
+            } else if let Some(segment) = referenced.get(&value) {
+                out.segments
+                    .entry(owner)
+                    .or_default()
+                    .push((k.clone(), *segment));
             }
         }
         if !pairs.is_empty() {
