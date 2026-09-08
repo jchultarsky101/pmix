@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The arithmetic codec for JT's compressed integer packets. Six of the
+  eight parts in the test file now give up their face identifiers, and
+  most read their whole topology bar the last few vectors. Only the
+  move-to-front codec is still missing.
+
+### Fixed
+
+- The bit reader assumed one refill always supplied enough bits, which
+  holds for the 32-bit words a packet's code text is written as but not
+  for the bytes a histogram is written as. Reading a field wider than a
+  byte from a histogram overflowed.
+
+### Added
+
 - **A property now says which part states it**, in a new `part` field, so
   an assembly's materials and volumes can be told apart. The scene
   graph's late loaded property atoms say which node owns which segment,
