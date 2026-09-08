@@ -10,6 +10,8 @@
 //! - [`mod@pmi`] reads the PMI Manager element those segments carry.
 //! - [`mod@property`] reads the scene graph's properties, which declare the
 //!   unit that PMI measures are expressed in.
+//! - [`mod@meta`] reads the metadata segments, where a part's own
+//!   properties are stated.
 //! - [`mod@semantic`] maps what those two produce onto the model of ADR 0002,
 //!   and [`mod@presentation`] onto that of ADR 0003.
 //! - [`mod@identity`] replaces the temporary ids of both with identity
@@ -24,6 +26,7 @@ pub mod codec;
 pub mod element;
 pub mod file;
 pub mod identity;
+pub mod meta;
 pub mod pmi;
 pub mod presentation;
 pub mod property;

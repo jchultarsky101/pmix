@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A part's own metadata is now extracted from JT** (`pmix::jt::meta`):
+  material, density, volume, mass units, Young's modulus, part name, and
+  the system that wrote the file. These live in the metadata segments,
+  which the reader previously listed but never opened. Values keep the
+  type the file gives them, and a number written as digits is read as a
+  number so `pmix diff` can compare it.
 - A reader for JT's compressed integer packets (`pmix::jt::codec`), which
   is what every table-shaped JT segment is built from. The null and
   bitlength codecs are implemented; a packet using one of the other three
@@ -33,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.1] - 2026-09-08
 
 ### Changed
+
+- Two properties that state the same name and value are recorded once
+  rather than once per part. Until a property can be attributed to the
+  part that states it, the repetition carried no information. This makes
+  a JT document smaller even though it now carries more.
 
 - Reading a model is about **1.85x faster**, and around 2.5x on the files
   that carry the most annotation geometry. The output is unchanged: every
