@@ -381,6 +381,55 @@ fn inspect_jt(input: PathBuf, opts: InspectOptions) -> Result<()> {
                 }
             }
         }
+        // The Smart Topology Table abstracts a part's precise B-rep, so
+        // it says how much geometry the PMI can be attached to.
+        let mut topology = Vec::new();
+        for segment in jt.segments() {
+            if segment.kind != pmix::jt::SegmentKind::Stt {
+                continue;
+            }
+            let Ok(data) = jt.segment_data(segment) else {
+                continue;
+            };
+            for element in pmix::jt::Elements::new(&data) {
+                if element.object_type != pmix::jt::stt::STT_ELEMENT {
+                    continue;
+                }
+                if let Ok(t) = pmix::jt::stt::parse(element.data) {
+                    topology.push((segment.offset, t));
+                }
+            }
+        }
+        if !topology.is_empty() {
+            writeln!(out)?;
+            writeln!(out, "B-rep topology (from the smart topology table):")?;
+            for (offset, t) in &topology {
+                let body = if t.counts.bodies == 1 {
+                    "body"
+                } else {
+                    "bodies"
+                };
+                writeln!(
+                    out,
+                    "  at {offset}: {} {body}, {} faces, {} edges; {} vectors read{}",
+                    t.counts.bodies,
+                    t.counts.faces,
+                    t.counts.edges,
+                    t.vectors.len(),
+                    if t.stopped.is_some() {
+                        ", then one this reader cannot decode"
+                    } else {
+                        ""
+                    },
+                )?;
+                if let Some(why) = &t.stopped {
+                    if opts.diagnostics {
+                        writeln!(out, "      stopped: {why}")?;
+                    }
+                }
+            }
+        }
+
         let failed: Vec<_> = reports.iter().filter(|r| r.error.is_some()).collect();
         if !failed.is_empty() && opts.diagnostics {
             writeln!(out)?;

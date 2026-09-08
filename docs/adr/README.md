@@ -15,3 +15,4 @@ never rewritten; a superseding decision gets a new record that links back.
 | [0007](0007-properties.md) | Product and record properties | Accepted |
 | [0008](0008-numeric-property-values.md) | Reading numeric property values | Accepted |
 | [0009](0009-jt-reader.md) | Reading JT files | Accepted |
+| [0010](0010-jt-precise-geometry.md) | Reading JT precise geometry | Accepted |

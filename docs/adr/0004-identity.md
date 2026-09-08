@@ -184,8 +184,10 @@ rather than geometry, which is why they can match at all: a datum is its
 letter in any format. The two that do not are the ones a designer would
 identify by *what they are on*, and the two formats say that differently.
 
-**What would close the gap.** A JT feature key computed from the XT B-rep
-faces a PMI entity references, using the fingerprint recipe above. That
+**What would close the gap.** A JT feature key computed from the geometry
+a PMI entity references, using the fingerprint recipe above.
+[ADR 0010](0010-jt-precise-geometry.md) records how that geometry is being
+read and how far it has got. That
 needs an XT B-rep parser, and it needs one file exported to both formats
 from one model to check the fingerprints actually agree. No such pair is
 published: NIST offers the CTC and FTC models as STEP and the MTC assembly
