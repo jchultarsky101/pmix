@@ -8,7 +8,7 @@ use crate::{ExtractOptions, Reader, Result};
 
 use super::element::Elements;
 use super::file::{Jt, SegmentKind};
-use super::{identity, pmi, presentation, property, semantic};
+use super::{identity, meta, pmi, presentation, property, semantic};
 
 /// Reader for JT files (ADR 0009).
 #[derive(Debug, Clone, Copy, Default)]
@@ -19,12 +19,24 @@ const WRITER_KEYS: &[&str] = &["JT_PROP_APPLICATION", "JT_PROP_CAD_SYSTEM"];
 
 /// Properties that describe the file rather than the design, and so are
 /// not part of what `pmix diff` compares.
+///
+/// The test is on how the file came to be written, not on whether the
+/// value looks interesting: a translator version and a level-of-detail
+/// setting change when the model is exported again, while a material or
+/// a volume changes only when the design does.
 fn is_file_metadata(key: &str) -> bool {
+    let key = key.trim_end_matches(':');
     key.starts_with("JT_PMI_")
         || key.starts_with("PMISort")
         || key.starts_with("__CAD_INST_UID")
+        || key.starts_with("__PLM_")
+        || key.starts_with("LAYERFILTER")
+        || key.starts_with("TOOLKIT_")
+        || key.starts_with("AdvCompress")
         || key == "JT_PROP_MEASUREMENT_UNITS"
         || key == "PartitionType"
+        || key == "Translator Version"
+        || key == "PMI_TYPE_TABLE"
 }
 
 impl Reader for JtReader {
@@ -104,25 +116,66 @@ impl Reader for JtReader {
         // Scene-graph properties become the document's properties.
         let mut ids = ContentId::new();
         let mut properties: Vec<Property> = Vec::new();
+        let mut seen: std::collections::HashSet<(String, String)> =
+            std::collections::HashSet::new();
+        let mut add = |name: &str, value: PropertyValue, text: &str, source: String| {
+            // A property may be stated by several parts. Until a part can
+            // be named, saying the same thing twice adds nothing.
+            if text.is_empty() || !seen.insert((name.to_owned(), text.to_owned())) {
+                return;
+            }
+            properties.push(Property {
+                id: ids.make("prop", &[name, text]),
+                name: name.to_owned(),
+                category: None,
+                kind: if is_file_metadata(name) {
+                    PropertyKind::Validation
+                } else {
+                    PropertyKind::User
+                },
+                value,
+                applies_to: None,
+                unmapped: Vec::new(),
+                source_refs: vec![source],
+            });
+        };
         for (element, pairs) in &scene.by_element {
             for (name, value) in pairs {
-                if value.is_empty() {
+                add(
+                    name,
+                    PropertyValue::from_text(value),
+                    value,
+                    format!("#{element}"),
+                );
+            }
+        }
+        // A part states its own properties in a metadata segment: its
+        // material, its volume, the system that wrote it.
+        for segment in jt
+            .segments()
+            .iter()
+            .filter(|s| s.kind == SegmentKind::MetaData)
+        {
+            let Ok(data) = jt.segment_data(segment) else {
+                continue;
+            };
+            for element in Elements::new(&data) {
+                if element.object_type != meta::PROPERTY_PROXY {
                     continue;
                 }
-                properties.push(Property {
-                    id: ids.make("prop", &[name, value]),
-                    name: name.clone(),
-                    category: None,
-                    kind: if is_file_metadata(name) {
-                        PropertyKind::Validation
-                    } else {
-                        PropertyKind::User
-                    },
-                    value: PropertyValue::from_text(value),
-                    applies_to: None,
-                    unmapped: Vec::new(),
-                    source_refs: vec![format!("#{element}")],
-                });
+                for (name, value) in meta::parse(element.data) {
+                    let text = value.to_string();
+                    let typed = match value {
+                        // Text goes through the reader's usual rule, so a
+                        // volume written as digits becomes a number.
+                        meta::Value::Text(ref v) => PropertyValue::from_text(v),
+                        meta::Value::Integer(v) => PropertyValue::Integer { value: v as i64 },
+                        meta::Value::Number(v) => PropertyValue::Number { value: v },
+                        meta::Value::Date(ref v) => PropertyValue::Text { value: v.clone() },
+                        meta::Value::Unset => continue,
+                    };
+                    add(&name, typed, &text, format!("meta[{}]", segment.offset));
+                }
             }
         }
         properties.sort_by(|a, b| a.id.cmp(&b.id));

@@ -118,3 +118,31 @@ presence.
   an empty unit.
 - `docs/test-data.md` documents the ignored `data/` directory, where local
   model sets can be kept for exploring the readers by hand.
+
+## Where JT properties come from
+
+Added 2026-09-08. A JT file states properties in two places, and the
+reader takes both.
+
+The **scene graph's property table** holds what the structure needs: the
+model units, the name and unique identifier of each node, layer numbers.
+
+The **metadata segments** hold what a part says about itself, as property
+proxy elements (specification section 8.2): its material, density,
+volume, mass units, and Young's modulus, its name, and the system that
+wrote it. These are the properties an engineer would recognise as design
+data, and they were the reason to open those segments at all.
+
+Both are typed by this ADR's rules. A value the file types as a number
+or a date keeps that type; a value the file types as text goes through
+the coercion of [ADR 0008](0008-numeric-property-values.md), so a volume
+written as `842.167` compares as a number while a density written as
+`7.73e-06` stays text, its exponent being the kind of formatting that
+rule deliberately preserves.
+
+Properties that describe how the file was written rather than what was
+designed, such as the translator version and the level-of-detail
+settings, are marked as validation properties and left out of the diff.
+A part is not yet named as the owner of its properties, because the
+reader does not link a metadata segment to its scene-graph node; until
+it does, two parts stating the same name and value are recorded once.

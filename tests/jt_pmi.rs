@@ -312,6 +312,54 @@ fn scene_graph_properties_reach_the_document() {
 }
 
 #[test]
+fn a_part_states_its_material_and_size() {
+    let doc = pmix::extract(&fixture()).unwrap();
+    let named = |name: &str| -> Vec<&pmix::model::Property> {
+        doc.properties
+            .iter()
+            .filter(|p| p.name.trim_end_matches(':') == name)
+            .collect()
+    };
+    // The assembly is built from several materials, each stated by the
+    // part that is made of it.
+    let materials: Vec<&str> = named("CAD_MATERIAL")
+        .iter()
+        .filter_map(|p| match &p.value {
+            pmix::model::PropertyValue::Text { value } => Some(value.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(materials.len() > 5, "{materials:?}");
+    assert!(
+        materials.iter().any(|m| m.contains("Steel")),
+        "{materials:?}"
+    );
+    assert!(
+        materials.iter().any(|m| m.contains("Aluminum")),
+        "{materials:?}"
+    );
+    // A volume written as digits is read as a number, so it compares.
+    let volumes = named("CAD_VOLUME");
+    assert!(volumes.len() > 5);
+    assert!(volumes.iter().all(|p| matches!(
+        p.value,
+        pmix::model::PropertyValue::Number { .. } | pmix::model::PropertyValue::Integer { .. }
+    )));
+    // These are design data, so the diff compares them.
+    for p in named("CAD_MATERIAL").iter().chain(volumes.iter()) {
+        assert_eq!(p.kind, pmix::model::PropertyKind::User);
+    }
+    // How the file was written is not, so the diff leaves it alone.
+    for name in ["Translator Version", "LAYERFILTER000", "PMI_TYPE_TABLE"] {
+        for p in named(name) {
+            assert_eq!(p.kind, pmix::model::PropertyKind::Validation, "{name}");
+        }
+    }
+    // Every part is named.
+    assert!(named("Name").len() > 20);
+}
+
+#[test]
 fn a_file_compared_with_itself_reports_no_change() {
     let doc = pmix::extract(&fixture()).unwrap();
     let report = pmix::diff::diff(&doc, &doc);
