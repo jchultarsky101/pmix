@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The arithmetic codec for JT's compressed integer packets. Six of the
-  eight parts in the test file now give up their face identifiers, and
-  most read their whole topology bar the last few vectors. Only the
-  move-to-front codec is still missing.
+- The arithmetic and move-to-front codecs for JT's compressed integer
+  packets. **Every part in the test file now reads its whole B-rep
+  topology**, gives up its face identifiers, and states how many surfaces
+  and curves its geometry holds, which `pmix inspect` reports. Only the
+  chopper codec is unimplemented, and no file has asked for it.
 
 ### Fixed
 

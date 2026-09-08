@@ -70,34 +70,6 @@ fn the_compressed_vectors_after_the_header_are_readable() {
     }
 }
 
-#[test]
-fn a_table_says_why_it_stopped_rather_than_guessing_on() {
-    // Every table stops somewhere, for one of two honest reasons: it
-    // reaches a codec the reader does not implement, or it reaches the
-    // end of the vectors and the bytes after them are not a packet.
-    // Neither produces numbers the reader cannot stand behind.
-    let tables = tables();
-    assert!(tables.iter().all(|t| t.stopped.is_some()));
-    let unimplemented = tables
-        .iter()
-        .filter(|t| {
-            t.stopped
-                .as_deref()
-                .is_some_and(|w| w.contains("not implemented"))
-        })
-        .count();
-    assert!(
-        unimplemented >= 2,
-        "some parts reach a codec not written yet, not {unimplemented}"
-    );
-    // Whatever the reason, it names the byte it stopped at, so the edge
-    // of what the reader understands is always locatable.
-    for t in &tables {
-        let why = t.stopped.as_deref().unwrap();
-        assert!(why.starts_with("compressed packet at byte"), "{why}");
-    }
-}
-
 /// The check that catches a wrong bitlength decode. A face identifier is
 /// unique within its body, so a decode that drops or repeats a bit shows
 /// up here as a repeated identifier. Getting the field-width constant
@@ -107,7 +79,7 @@ fn a_table_says_why_it_stopped_rather_than_guessing_on() {
 fn every_face_identifier_is_distinct_and_ascending() {
     let tables = tables();
     let with_faces: Vec<_> = tables.iter().filter(|t| !t.faces.is_empty()).collect();
-    assert_eq!(with_faces.len(), 6, "the tables whose face vectors decode");
+    assert_eq!(with_faces.len(), 8, "every part gives up its faces");
     for t in with_faces {
         assert_eq!(t.faces.len(), t.counts.faces);
         let ids: Vec<u32> = t.faces.iter().map(|f| f.identifier).collect();
@@ -140,6 +112,28 @@ fn faces_point_out_of_their_shell_and_some_reverse_their_surface() {
         .map(|t| t.faces.iter().filter(|f| f.normal_reversed).count())
         .sum();
     assert!(reversed > 0);
+}
+
+/// The whole topology now decodes, and the counts that follow it prove
+/// the chain ended where it should: a B-rep has one surface per face and
+/// one curve per edge, so reading the wrong number of vectors would put
+/// arbitrary bytes here instead.
+#[test]
+fn the_geometry_after_the_topology_matches_it() {
+    let tables = tables();
+    assert_eq!(tables.len(), 8);
+    for t in &tables {
+        assert!(t.stopped.is_none(), "{:?}", t.stopped);
+        assert_eq!(t.vectors.len(), 23, "the topology is a fixed chain");
+        let g = t.geometry.expect("the geometry counts follow the topology");
+        assert_eq!(g.surfaces, t.counts.faces, "one surface per face");
+        assert_eq!(g.curves, t.counts.edges, "one curve per edge");
+        // Not every surface is written out; the rest are implied.
+        assert!(g.represented_surfaces <= g.surfaces);
+        assert!(g.represented_curves <= g.curves);
+        assert!(g.points > 0);
+        assert!(t.hash.is_some());
+    }
 }
 
 #[test]

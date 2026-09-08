@@ -351,6 +351,14 @@ impl<'a> Cursor<'a> {
                     }
                 }
             }
+            5 => {
+                // A move-to-front packet holds no code text of its own:
+                // it is two packets, the values as they were first seen
+                // and the offsets that replay them.
+                let values = self.packet(Predictor::None)?;
+                let offsets = self.packet(Predictor::None)?;
+                move_to_front(count, &values, &offsets)
+            }
             other => {
                 return self.err(format!(
                     "codec {other} is not implemented; the null, bitlength, and \
@@ -441,6 +449,44 @@ fn arithmetic(bits: &mut Bits<'_>, count: usize, hist: &Histogram, oob: &[i32]) 
             high = (high << 1) | 1;
             code = (code << 1) | bits.unsigned(1) as u16;
         }
+    }
+    out
+}
+
+/// How many recently seen values the move-to-front window holds.
+const WINDOW: usize = 16;
+
+/// Replay a move-to-front stream.
+///
+/// Data that keeps returning to the same few values is cheaper to write
+/// as positions in a window of what was seen lately than as the values
+/// themselves. An offset outside the window means the value was not in
+/// it and is taken from the values stream instead, which is what the
+/// specification calls an escape.
+fn move_to_front(count: usize, values: &[i32], offsets: &[i32]) -> Vec<i32> {
+    let mut out = Vec::with_capacity(count.min(1 << 16));
+    let mut window: Vec<i32> = Vec::with_capacity(WINDOW);
+    let mut next_value = 0;
+    for offset in offsets.iter().take(count) {
+        let value = match usize::try_from(*offset) {
+            Ok(at) if at < window.len() => {
+                // Seen lately: name it by where it sits, and move it to
+                // the front so the next mention is cheaper still.
+                let value = window.remove(at);
+                window.insert(0, value);
+                value
+            }
+            _ => {
+                let Some(value) = values.get(next_value) else {
+                    break;
+                };
+                next_value += 1;
+                window.insert(0, *value);
+                window.truncate(WINDOW);
+                *value
+            }
+        };
+        out.push(value);
     }
     out
 }
@@ -552,8 +598,42 @@ mod tests {
     }
 
     #[test]
+    fn a_move_to_front_stream_replays_the_window() {
+        // Values seen for the first time come from the values stream and
+        // enter the window; an offset names one already in it and moves
+        // it to the front.
+        let values = [7, 9, 4];
+        // escape, escape, "the one at 1" (7), escape, "the one at 2" (9)
+        let offsets = [99, 99, 1, 99, 2];
+        assert_eq!(
+            move_to_front(5, &values, &offsets),
+            [7, 9, 7, 4, 9],
+            "window replay"
+        );
+        // Running out of values ends the run rather than inventing one.
+        assert_eq!(move_to_front(4, &[1], &[99, 99]), [1]);
+        // An offset into an empty window is an escape like any other.
+        assert_eq!(move_to_front(1, &[5], &[0]), [5]);
+        assert!(move_to_front(3, &[], &[99]).is_empty());
+    }
+
+    #[test]
+    fn the_window_forgets_what_it_has_not_seen_lately() {
+        // Seventeen new values, then the oldest is no longer nameable.
+        let values: Vec<i32> = (0..17).collect();
+        let offsets: Vec<i32> = vec![99; 17];
+        let out = move_to_front(17, &values, &offsets);
+        assert_eq!(out, values);
+        // The window holds the last sixteen, most recent first, so the
+        // furthest offset is the seventeenth value's predecessor.
+        let mut probe = offsets.clone();
+        probe.push(15);
+        assert_eq!(move_to_front(18, &values, &probe).last(), Some(&1));
+    }
+
+    #[test]
     fn an_unimplemented_codec_is_reported_rather_than_guessed() {
-        for codec in [4u8, 5, 9] {
+        for codec in [4u8, 9] {
             let bytes = packet_bytes(2, codec, 0, &[]);
             let mut c = Cursor::new(&bytes);
             let err = c.packet(Predictor::None).unwrap_err();

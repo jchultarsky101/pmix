@@ -52,21 +52,30 @@ implemented as its own module with its own tests, because it is used by
 the ULP and LWPA segments too should those ever be read.
 
 **Implement only the codecs that real files use, and refuse the rest.**
-The packet allows five codecs. The null, bitlength, and arithmetic codecs
-are written; chopper and move-to-front are not. An unimplemented codec is
+The packet allows five codecs. All but the chopper are written, that
+being the only one no file has yet asked for. An unimplemented codec is
 reported with the byte it was found at rather than guessed at, because a
 guess would produce plausible numbers rather than an error, and plausible
 wrong geometry is worse than none.
 
 ### What is read so far
 
-The counts that head the table, and a walk over the compressed vectors
-after them. `pmix inspect` reports the counts per part.
+The whole topology: the counts that head the table, its twenty-three
+compressed vectors, the checksum that closes it, and the counts that head
+the geometry after it. `pmix inspect` reports both sets per part.
 
 The counts are trustworthy: they are plain integers, and they check
 against each other. Every part in the test file states one body, at least
 as many shells as regions, at least as many loops as faces, and exactly
 twice as many coedges as edges, which is what a closed solid requires.
+
+The topology is a fixed chain of twenty-three vectors: two for the
+bodies, two for the regions, four for the shells, five for the faces,
+three for the loops, two for the coedges, and five for the edges. Reading
+exactly that many lands on the geometry counts, and those check the
+reading: a B-rep has one surface per face and one curve per edge, and
+every part in the test file agrees on both. Reading the wrong number of
+vectors would put arbitrary bytes there instead.
 
 ### What is not read yet, and why
 
@@ -82,14 +91,21 @@ two are left unnamed. Neither is the start-loop index the figure lists
 first: one is not monotonic, and the running total of the other does not
 reach the loop count.
 
-**Two of the eight tables.** They reach the move-to-front codec within
-their first few vectors, so their faces are not read either. The other
-six give up their faces.
+**The geometric data itself**, which is what identity actually needs.
+Its counts are read; the surfaces and their parameters are not. That is
+now the only thing between the reader and a face fingerprint.
 
-**The geometric data section**, which is what identity actually needs.
-It follows the topology in the same element. Most tables now read
-twenty-three of their vectors, which is the whole topology bar the last
-few, so the move-to-front codec is the remaining obstacle.
+### What the move-to-front codec required
+
+Nothing contradicted the specification here, but the specification says
+little: there is no algorithm section for it, only a paragraph. It holds
+no code text of its own, just two nested packets, the values in the
+order they were first seen and the offsets that replay them against a
+window of the sixteen most recent. An offset outside the window means
+the value was not in it and comes from the values stream instead.
+
+Adding it took every table to the end of its topology, which is what
+made the geometry counts readable and confirmed the chain length.
 
 ### What the arithmetic codec required
 
