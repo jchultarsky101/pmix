@@ -52,8 +52,8 @@ implemented as its own module with its own tests, because it is used by
 the ULP and LWPA segments too should those ever be read.
 
 **Implement only the codecs that real files use, and refuse the rest.**
-The packet allows five codecs. The null and bitlength codecs are written;
-arithmetic, chopper, and move-to-front are not. An unimplemented codec is
+The packet allows five codecs. The null, bitlength, and arithmetic codecs
+are written; chopper and move-to-front are not. An unimplemented codec is
 reported with the byte it was found at rather than guessed at, because a
 guess would produce plausible numbers rather than an error, and plausible
 wrong geometry is worse than none.
@@ -82,15 +82,36 @@ two are left unnamed. Neither is the start-loop index the figure lists
 first: one is not monotonic, and the running total of the other does not
 reach the loop count.
 
-**Three of the eight tables.** They reach the arithmetic or
-move-to-front codec within their first few vectors, so their faces are
-not read either. The other five give up their faces.
+**Two of the eight tables.** They reach the move-to-front codec within
+their first few vectors, so their faces are not read either. The other
+six give up their faces.
 
 **The geometric data section**, which is what identity actually needs.
-It follows the topology in the same element, past a vector every table
-reaches that uses the arithmetic codec. So the arithmetic codec is now
-the thing standing between the reader and the surfaces, rather than one
-of several open questions.
+It follows the topology in the same element. Most tables now read
+twenty-three of their vectors, which is the whole topology bar the last
+few, so the move-to-front codec is the remaining obstacle.
+
+### What the arithmetic codec required
+
+Three things about it are not what the specification says, and each was
+settled by reading a real file.
+
+**The histogram follows the code text, not precedes it.** The figure can
+be read either way; only one of the two produces an entry count a file
+could hold.
+
+**A value in the histogram is unsigned, though the field is typed I32.**
+The specification stores a value as its distance above the table's
+minimum, which cannot be negative, so reading it signed corrupts any
+value whose top stored bit is set. The symptom is subtle: identifiers
+came out nearly right, ascending with occasional runs that stepped
+backwards.
+
+**A histogram with no escape symbol is followed by nothing.** The figure
+shows an out-of-band count and array after every arithmetic packet. In
+practice they are written only when the histogram has an escape symbol
+to stand in for them, which is what makes them necessary. Reading a
+count that is not there consumes the next packet's header.
 
 ## Alternatives considered
 

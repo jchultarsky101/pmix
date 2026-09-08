@@ -87,8 +87,8 @@ fn a_table_says_why_it_stopped_rather_than_guessing_on() {
         })
         .count();
     assert!(
-        unimplemented >= 3,
-        "most parts reach a codec not written yet, not {unimplemented}"
+        unimplemented >= 2,
+        "some parts reach a codec not written yet, not {unimplemented}"
     );
     // Whatever the reason, it names the byte it stopped at, so the edge
     // of what the reader understands is always locatable.
@@ -107,7 +107,7 @@ fn a_table_says_why_it_stopped_rather_than_guessing_on() {
 fn every_face_identifier_is_distinct_and_ascending() {
     let tables = tables();
     let with_faces: Vec<_> = tables.iter().filter(|t| !t.faces.is_empty()).collect();
-    assert_eq!(with_faces.len(), 5, "the tables whose face vectors decode");
+    assert_eq!(with_faces.len(), 6, "the tables whose face vectors decode");
     for t in with_faces {
         assert_eq!(t.faces.len(), t.counts.faces);
         let ids: Vec<u32> = t.faces.iter().map(|f| f.identifier).collect();

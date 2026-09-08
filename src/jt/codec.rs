@@ -58,60 +58,82 @@ const BLOCK_LENGTH_BITS: u32 = 4;
 /// Bits per digit of the variable-length integers a packet header uses.
 const NIBBLE_BITS: u32 = 4;
 
-/// Reads bits from the packed code text, most significant bit first.
+/// Reads bits most significant bit first.
+///
+/// Two things in a packet are bit packed and they are packed over
+/// different units: the code text over 32-bit words, and the histogram
+/// before it over plain bytes, padded to a whole byte at the end.
 struct Bits<'a> {
-    words: &'a [u8],
+    data: &'a [u8],
     next: usize,
-    /// The current word, already shifted so the next bit is the highest.
+    /// The current unit, already shifted so the next bit is the highest.
     val: u32,
     /// How many bits of `val` are still unread.
     held: u32,
+    /// Bytes taken per refill: four for code text, one for a histogram.
+    unit: usize,
 }
 
 impl<'a> Bits<'a> {
-    fn new(words: &'a [u8]) -> Self {
+    /// Over the 32-bit words a packet's code text is written as.
+    fn over_words(data: &'a [u8]) -> Self {
         Self {
-            words,
+            data,
             next: 0,
             val: 0,
             held: 0,
+            unit: 4,
         }
     }
 
-    /// Take the next whole word into the buffer.
+    /// Over plain bytes, as a histogram is written.
+    fn over_bytes(data: &'a [u8]) -> Self {
+        Self {
+            data,
+            next: 0,
+            val: 0,
+            held: 0,
+            unit: 1,
+        }
+    }
+
+    /// Take the next unit into the buffer.
     fn refill(&mut self) {
-        let word = self
-            .words
-            .get(self.next..self.next + 4)
-            .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
-            .unwrap_or(0);
-        self.next += 4;
-        self.val = word;
-        self.held = 32;
+        let taken = self.data.get(self.next..self.next + self.unit);
+        self.val = match (taken, self.unit) {
+            (Some(b), 4) => u32::from_le_bytes(b.try_into().unwrap()),
+            (Some(b), _) => u32::from(b[0]) << 24,
+            (None, _) => 0,
+        };
+        self.next += self.unit;
+        self.held = self.unit as u32 * 8;
     }
 
+    /// The next `n` bits, most significant first.
+    ///
+    /// A read may span any number of refills, which matters for the
+    /// byte-packed histogram where a single field is wider than a unit.
     fn unsigned(&mut self, n: u32) -> u32 {
-        if n == 0 {
-            return 0;
+        let mut out: u32 = 0;
+        let mut left = n.min(32);
+        while left > 0 {
+            if self.held == 0 {
+                self.refill();
+            }
+            let take = left.min(self.held);
+            let chunk = self.val >> (32 - take);
+            out = out.checked_shl(take).unwrap_or(0) | chunk;
+            self.val = self.val.checked_shl(take).unwrap_or(0);
+            self.held -= take;
+            left -= take;
         }
-        if self.held == 0 {
-            self.refill();
-        }
-        if self.held >= n {
-            let out = self.val >> (32 - n);
-            self.val = self.val.checked_shl(n).unwrap_or(0);
-            self.held -= n;
-            return out;
-        }
-        // The value straddles two words.
-        let taken = self.held;
-        let mut out = self.val >> (32 - n);
-        self.refill();
-        let rest = n - taken;
-        out |= self.val >> (32 - rest);
-        self.val = self.val.checked_shl(rest).unwrap_or(0);
-        self.held -= rest;
         out
+    }
+
+    /// How many bits have been taken, which is what says where the
+    /// byte-aligned data after a bit-packed block begins.
+    fn consumed(&self) -> usize {
+        self.next * 8 - self.held as usize
     }
 
     fn signed(&mut self, n: u32) -> i32 {
@@ -142,6 +164,74 @@ impl<'a> Bits<'a> {
         }
         ((value << (32 - width)) as i32) >> (32 - width)
     }
+}
+
+/// One value the arithmetic coder can emit, and how often it occurs.
+#[derive(Debug, Clone, Copy)]
+struct Symbol {
+    /// Whether this stands for a value held outside the coded stream.
+    escape: bool,
+    /// Relative frequency, which is what gives the value its share of
+    /// the coding range.
+    count: u32,
+    /// Where this symbol's share begins.
+    cumulative: u32,
+    value: i32,
+}
+
+/// The trimmed histogram the arithmetic coder works from.
+#[derive(Debug, Clone, Default)]
+struct Histogram {
+    symbols: Vec<Symbol>,
+    total: u32,
+}
+
+impl Histogram {
+    /// The symbol whose share of the range covers `at`.
+    fn at(&self, at: u32) -> Option<&Symbol> {
+        self.symbols
+            .iter()
+            .rev()
+            .find(|s| s.cumulative <= at)
+            .or_else(|| self.symbols.first())
+    }
+}
+
+/// Read the histogram, which is bit packed and padded to a whole byte.
+fn histogram(bytes: &[u8]) -> Result<(Histogram, usize)> {
+    let mut bits = Bits::over_bytes(bytes);
+    let count = bits.unsigned(16) as usize;
+    let count_bits = bits.unsigned(6);
+    let value_bits = bits.unsigned(7);
+    let minimum = bits.unsigned(32) as i32;
+    // Each entry costs at least one bit, so a count the bytes cannot
+    // hold means this is not a histogram.
+    let entry_bits = (1 + count_bits + value_bits) as usize;
+    if count.saturating_mul(entry_bits.max(1)) > bytes.len() * 8 {
+        return Err(CodecError {
+            offset: 0,
+            message: format!(
+                "a histogram of {count} entries cannot fit in {} bytes",
+                bytes.len()
+            ),
+        });
+    }
+    let mut out = Histogram::default();
+    for _ in 0..count {
+        let escape = bits.unsigned(1) == 1;
+        let occurrences = bits.unsigned(count_bits);
+        // The value is stored as its distance above the minimum, so it
+        // is never negative however the specification types the field.
+        let value = bits.unsigned(value_bits) as i32;
+        out.symbols.push(Symbol {
+            escape,
+            count: occurrences,
+            cumulative: out.total,
+            value: value.wrapping_add(minimum),
+        });
+        out.total += occurrences;
+    }
+    Ok((out, bits.consumed().div_ceil(8)))
 }
 
 /// Bits needed to hold `v`, which is none at all for zero.
@@ -188,6 +278,22 @@ impl<'a> Cursor<'a> {
         Ok(self.take(1)?[0])
     }
 
+    /// A count that must be possible for the bytes that remain.
+    fn count_of_values(&mut self) -> Result<usize> {
+        let n = self.i32()?;
+        if n < 0 {
+            return self.err(format!("negative count {n}"));
+        }
+        let remaining = self.data.len().saturating_sub(self.at);
+        if n as usize * 4 > remaining {
+            return self.err(format!(
+                "{n} values need {} bytes, {remaining} remain",
+                n as usize * 4
+            ));
+        }
+        Ok(n as usize)
+    }
+
     /// Read one compressed packet and undo `predictor`.
     pub fn packet(&mut self, predictor: Predictor) -> Result<Vec<i32>> {
         let count = self.i32()?;
@@ -207,24 +313,48 @@ impl<'a> Cursor<'a> {
 
         let codec = self.u8()?;
         let mut values = match codec {
-            0 | 1 => {
+            0 | 1 | 3 => {
                 let bits = self.i32()?;
                 if bits < 0 {
                     return self.err(format!("negative code text length {bits}"));
                 }
                 let words = (bits as usize).div_ceil(32);
-                let text = self.take(words * 4)?;
-                let mut reader = Bits::new(text);
-                if codec == 0 {
-                    (0..count).map(|_| reader.signed(32)).collect()
-                } else {
-                    bitlength(&mut reader, count)
+                let text = self.take(words * 4)?.to_vec();
+                match codec {
+                    0 => {
+                        let mut reader = Bits::over_words(&text);
+                        (0..count).map(|_| reader.signed(32)).collect()
+                    }
+                    1 => bitlength(&mut Bits::over_words(&text), count),
+                    _ => {
+                        // The histogram follows the code text, and the
+                        // values held outside the coded stream follow
+                        // that. There are none unless the histogram has
+                        // an escape symbol to stand in for them, and
+                        // nothing is written for them in that case.
+                        let (hist, used) = histogram(&self.data[self.at..])?;
+                        self.at += used;
+                        let mut oob = Vec::new();
+                        if hist.symbols.iter().any(|s| s.escape) {
+                            let outside = self.count_of_values()?;
+                            oob.reserve(outside.min(1 << 16));
+                            for _ in 0..outside {
+                                oob.push(self.i32()?);
+                            }
+                        }
+                        // With nothing coded, every value is outside.
+                        if bits == 0 {
+                            oob
+                        } else {
+                            arithmetic(&mut Bits::over_words(&text), count, &hist, &oob)
+                        }
+                    }
                 }
             }
             other => {
                 return self.err(format!(
-                    "codec {other} is not implemented; only the null and bitlength \
-                     codecs have been seen in real files"
+                    "codec {other} is not implemented; the null, bitlength, and \
+                     arithmetic codecs are"
                 ));
             }
         };
@@ -253,6 +383,66 @@ impl<'a> Cursor<'a> {
             .map(|v| v as u32)
             .collect())
     }
+}
+
+/// Decode the arithmetic codec.
+///
+/// A value's share of the coding range is its frequency in the
+/// histogram, so a common value costs less than a rare one. A value too
+/// rare to be worth a share is written outside the coded stream and its
+/// place taken by an escape symbol.
+fn arithmetic(bits: &mut Bits<'_>, count: usize, hist: &Histogram, oob: &[i32]) -> Vec<i32> {
+    let mut out = Vec::with_capacity(count.min(1 << 16));
+    if hist.total == 0 {
+        return out;
+    }
+    let scale = hist.total;
+    let mut low: u16 = 0;
+    let mut high: u16 = 0xffff;
+    let mut code = bits.unsigned(16) as u16;
+    let mut escapes = 0;
+
+    for _ in 0..count {
+        // Where the current code falls within the histogram's range.
+        let range = (high as u32 - low as u32) + 1;
+        let at = (((code as u32 - low as u32) + 1) * scale - 1) / range;
+        let Some(symbol) = hist.at(at.min(scale.saturating_sub(1))) else {
+            break;
+        };
+        if symbol.escape {
+            match oob.get(escapes) {
+                Some(v) => out.push(*v),
+                None => break,
+            }
+            escapes += 1;
+        } else {
+            out.push(symbol.value);
+        }
+
+        // Narrow the range to the symbol's share, then shift out the
+        // bits the two ends now agree on.
+        let (lower, upper) = (symbol.cumulative, symbol.cumulative + symbol.count);
+        let range = (high as u32 - low as u32) + 1;
+        high = (low as u32).wrapping_add(range * upper / scale - 1) as u16;
+        low = (low as u32).wrapping_add(range * lower / scale) as u16;
+        loop {
+            if (!(high ^ low)) >> 15 == 1 {
+                // The ends agree on their top bit, so it is settled.
+            } else if (low >> 14) == 1 && (high >> 14) == 2 {
+                // The ends straddle the middle and are converging too
+                // slowly to settle a bit; drop the second bit instead.
+                code ^= 0x4000;
+                low &= 0x3fff;
+                high |= 0x4000;
+            } else {
+                break;
+            }
+            low <<= 1;
+            high = (high << 1) | 1;
+            code = (code << 1) | bits.unsigned(1) as u16;
+        }
+    }
+    out
 }
 
 /// Decode the bitlength codec: either one field width for every value, or
@@ -314,7 +504,7 @@ mod tests {
     #[test]
     fn bits_are_read_from_the_top_of_each_word() {
         let word = 0b1011_0000_0000_0000_0000_0000_0000_0000u32.to_le_bytes();
-        let mut bits = Bits::new(&word);
+        let mut bits = Bits::over_words(&word);
         assert_eq!(bits.unsigned(1), 1);
         assert_eq!(bits.unsigned(1), 0);
         assert_eq!(bits.unsigned(2), 0b11);
@@ -326,7 +516,7 @@ mod tests {
         let words = [0x0000_000fu32, 0xf000_0000];
         let mut bytes = words[0].to_le_bytes().to_vec();
         bytes.extend(words[1].to_le_bytes());
-        let mut bits = Bits::new(&bytes);
+        let mut bits = Bits::over_words(&bytes);
         assert_eq!(bits.unsigned(28), 0);
         // Four bits left in the first word, four taken from the second.
         assert_eq!(bits.unsigned(8), 0b1111_1111);
@@ -335,7 +525,7 @@ mod tests {
     #[test]
     fn signed_fields_are_sign_extended() {
         let word = 0b1111_0111_0000_0000_0000_0000_0000_0000u32.to_le_bytes();
-        let mut bits = Bits::new(&word);
+        let mut bits = Bits::over_words(&word);
         assert_eq!(bits.signed(4), -1);
         assert_eq!(bits.signed(4), 7);
     }
@@ -363,7 +553,7 @@ mod tests {
 
     #[test]
     fn an_unimplemented_codec_is_reported_rather_than_guessed() {
-        for codec in [3u8, 4, 5, 9] {
+        for codec in [4u8, 5, 9] {
             let bytes = packet_bytes(2, codec, 0, &[]);
             let mut c = Cursor::new(&bytes);
             let err = c.packet(Predictor::None).unwrap_err();
@@ -379,6 +569,100 @@ mod tests {
         let bytes = packet_bytes(-5, 1, 0, &[]);
         let mut c = Cursor::new(&bytes);
         assert!(c.packet(Predictor::None).is_err());
+    }
+
+    /// Build a histogram's bytes: 16-bit entry count, 6-bit count width,
+    /// 7-bit value width, 32-bit minimum, then the entries.
+    fn histogram_bytes(
+        count_bits: u32,
+        value_bits: u32,
+        minimum: i32,
+        entries: &[(bool, u32, u32)],
+    ) -> Vec<u8> {
+        let mut bits: Vec<bool> = Vec::new();
+        let mut put = |v: u32, n: u32| {
+            for k in (0..n).rev() {
+                bits.push((v >> k) & 1 == 1);
+            }
+        };
+        put(entries.len() as u32, 16);
+        put(count_bits, 6);
+        put(value_bits, 7);
+        put(minimum as u32, 32);
+        for (escape, occurrences, value) in entries {
+            put(u32::from(*escape), 1);
+            put(*occurrences, count_bits);
+            put(*value, value_bits);
+        }
+        let mut out = vec![0u8; bits.len().div_ceil(8)];
+        for (i, bit) in bits.iter().enumerate() {
+            if *bit {
+                out[i / 8] |= 1 << (7 - i % 8);
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn a_histogram_gives_each_value_its_share_of_the_range() {
+        let bytes = histogram_bytes(8, 8, -5, &[(false, 3, 0), (true, 1, 0), (false, 6, 12)]);
+        let (h, used) = histogram(&bytes).unwrap();
+        assert_eq!(used, bytes.len());
+        assert_eq!(h.total, 10);
+        assert_eq!(h.symbols.len(), 3);
+        // A value is stored as its distance above the minimum.
+        assert_eq!(h.symbols[0].value, -5);
+        assert_eq!(h.symbols[2].value, 7);
+        assert!(h.symbols[1].escape);
+        // Shares are laid end to end, and a point falls in exactly one.
+        assert_eq!(h.symbols[0].cumulative, 0);
+        assert_eq!(h.symbols[1].cumulative, 3);
+        assert_eq!(h.symbols[2].cumulative, 4);
+        assert_eq!(h.at(0).unwrap().value, -5);
+        assert_eq!(h.at(2).unwrap().value, -5);
+        assert!(h.at(3).unwrap().escape);
+        assert_eq!(h.at(9).unwrap().value, 7);
+    }
+
+    #[test]
+    fn a_histogram_too_large_for_its_bytes_is_refused() {
+        let mut bytes = 0xffffu32.to_le_bytes().to_vec();
+        bytes.extend([0u8; 8]);
+        assert!(histogram(&bytes).is_err());
+    }
+
+    #[test]
+    fn values_written_outside_the_coded_stream_are_used_as_they_stand() {
+        // Nothing is coded, so every value is out of band and the
+        // histogram is nothing but the escape symbol.
+        let hist = histogram_bytes(8, 8, 0, &[(true, 1, 0)]);
+        let mut bytes = 3i32.to_le_bytes().to_vec();
+        bytes.push(3); // the arithmetic codec
+        bytes.extend(0i32.to_le_bytes()); // no code text
+        bytes.extend(&hist);
+        bytes.extend(3i32.to_le_bytes()); // three values outside
+        for v in [11i32, -22, 33] {
+            bytes.extend(v.to_le_bytes());
+        }
+        let mut c = Cursor::new(&bytes);
+        assert_eq!(c.packet(Predictor::None).unwrap(), [11, -22, 33]);
+        assert_eq!(c.at, bytes.len());
+    }
+
+    #[test]
+    fn a_histogram_without_an_escape_is_followed_by_nothing() {
+        // With no escape symbol there are no out-of-band values, so the
+        // packet ends at the histogram and the next one starts there.
+        let hist = histogram_bytes(8, 8, 0, &[(false, 1, 7)]);
+        let mut bytes = 2i32.to_le_bytes().to_vec();
+        bytes.push(3);
+        bytes.extend(0i32.to_le_bytes());
+        bytes.extend(&hist);
+        let end = bytes.len();
+        bytes.extend(99i32.to_le_bytes()); // whatever follows
+        let mut c = Cursor::new(&bytes);
+        let _ = c.packet(Predictor::None).unwrap();
+        assert_eq!(c.at, end, "the packet stops before what follows it");
     }
 
     #[test]
