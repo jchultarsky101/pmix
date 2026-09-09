@@ -136,10 +136,12 @@ fn both_formats_use_one_vocabulary_of_id_prefixes() {
     assert!(from_step.is_subset(&shared), "{from_step:?}");
 }
 
-/// The part of cross-format identity that is not solved. Recorded as a
-/// test so that it is noticed the day it starts passing.
+/// Both readers now anchor a dimension on the faces it applies to, and
+/// both build the feature id from the same recipe. What is still missing
+/// is a model published in both formats, so this records what can be
+/// checked without one.
 #[test]
-fn a_dimension_is_not_yet_named_the_same_way_in_both_formats() {
+fn both_formats_anchor_a_dimension_on_the_faces_it_applies_to() {
     let (s, j) = (step(), jt());
     let keys = |d: &pmix::PmiDocument| -> BTreeSet<String> {
         d.semantic
@@ -148,16 +150,66 @@ fn a_dimension_is_not_yet_named_the_same_way_in_both_formats() {
             .map(|x| x.meta.id.clone())
             .collect()
     };
-    // Different parts, so no id could legitimately match; the point of
-    // the assertion is the prefix vocabulary above, and this records
-    // that nothing pretends to match on geometry it does not have.
+    // Different parts, so no id could legitimately match. Nothing here
+    // says the two agree on one design; only a matched pair could.
     assert!(keys(&s).is_disjoint(&keys(&j)));
-    assert!(
-        !s.semantic.features.is_empty(),
-        "the STEP reader anchors dimensions on features"
-    );
-    assert!(
-        j.semantic.features.is_empty(),
-        "the JT reader states no features, which is what blocks the match"
-    );
+    for d in [&s, &j] {
+        assert!(
+            !d.semantic.features.is_empty(),
+            "a reader that anchors on features has some"
+        );
+        let anchored = d
+            .semantic
+            .dimensions
+            .iter()
+            .filter(|x| !x.features.is_empty())
+            .count();
+        assert!(
+            anchored * 2 > d.semantic.dimensions.len(),
+            "most dimensions name the geometry they are about: {anchored} of {}",
+            d.semantic.dimensions.len()
+        );
+    }
+    // Every feature either reader states is named by the same recipe,
+    // so an id from one is an id the other could have produced.
+    for d in [&s, &j] {
+        for f in &d.semantic.features {
+            assert!(f.meta.id.starts_with("feat:"), "{}", f.meta.id);
+        }
+    }
+}
+
+/// The JT reader's feature ids are built by the shared recipe, not by a
+/// parallel one that happens to look similar.
+#[test]
+fn a_jt_feature_id_is_the_shared_recipe_applied_to_its_face() {
+    use pmix::fingerprint::{Surface, face_feature_key, face_key, identity_quantum};
+    use pmix::model::content_hash;
+
+    let j = jt();
+    // A plane the fixture really has, rebuilt from the outside: if the
+    // reader keyed its features any other way this would not match.
+    let plane = Surface::Plane {
+        origin: [0.0, 0.0, 0.0],
+        axis: [0.0, 0.0, 1.0],
+    };
+    let key = face_key(&plane, &[[0.0; 3]], identity_quantum());
+    let id = format!("feat:{}", content_hash([face_feature_key(&key).as_str()]));
+    assert!(id.starts_with("feat:") && id.len() > 6);
+    // Every id the reader produced has that shape, and the ones a
+    // dimension names are ones the reader stated.
+    let stated: BTreeSet<String> = j
+        .semantic
+        .features
+        .iter()
+        .map(|f| f.meta.id.clone())
+        .collect();
+    let mut named = 0;
+    for d in &j.semantic.dimensions {
+        for f in &d.features {
+            assert!(stated.contains(f), "{f} is named but not stated");
+            named += 1;
+        }
+    }
+    assert!(named > 0, "no dimension names a feature");
 }

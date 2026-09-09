@@ -24,6 +24,7 @@
 
 pub mod codec;
 pub mod element;
+pub mod features;
 pub mod file;
 pub mod identity;
 pub mod meta;

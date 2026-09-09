@@ -151,8 +151,10 @@ pmix inspect assembly.jt --type "PMI data" --json
 Geometry segments are listed but never decoded, because `pmix` compares
 PMI rather than shape ([ADR 0009](docs/adr/0009-jt-reader.md)). The
 exception is the smart topology table, which abstracts a part's precise
-geometry and is being read so that JT dimensions can be anchored on the
-faces they apply to ([ADR 0010](docs/adr/0010-jt-precise-geometry.md)).
+geometry and is read in full so that JT dimensions can be anchored on the
+faces they apply to ([ADR 0010](docs/adr/0010-jt-precise-geometry.md)):
+each face with the surface it lies on, its loops, and the edges and
+curves those run along, and the tag a PMI callout names it by.
 
 ### Logging
 
@@ -305,13 +307,15 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] `pmix diff` (ADR 0005)
 - [x] Product and record properties (ADR 0007)
 - [x] JT reader: file structure, segments, and decompression (ADR 0009)
+- [x] JT 9 files: 32-bit table of contents, ZLIB segments, and two-byte element versions (ADR 0009)
 - [x] JT reader: PMI Manager element, model units, and the semantic layer
 - [x] JT reader: annotations and saved views, with the PMI each view shows
 - [x] One identity scheme for both formats; datums, datum frames, and views share ids across them (ADR 0004)
 - [x] JT compressed integer packets and the smart topology table (ADR 0010)
-- [x] JT analytic surface geometry: every surface in the test file's parts (ADR 0010)
-- [ ] Attaching a JT surface to its face, which the topology table does not appear to state (ADR 0010)
-- [ ] Cross-format identity for dimensions and tolerances
+- [x] JT analytic surface and curve geometry, each attached to the face or edge it belongs to (ADR 0010)
+- [x] Resolving a JT callout to the B-rep faces it applies to (ADR 0010)
+- [x] One fingerprint recipe for both readers, anchoring a dimension on the faces it is about (ADR 0004)
+- [ ] Confirming a JT and a STEP fingerprint agree, which needs a model published in both formats
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

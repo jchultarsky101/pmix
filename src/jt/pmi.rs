@@ -12,6 +12,7 @@
 
 use std::fmt;
 
+use super::codec::{Cursor, Predictor};
 use super::file::Guid;
 
 /// Object type identifier of the PMI Manager element.
@@ -379,10 +380,22 @@ pub struct EndPoint {
 }
 
 impl EndPoint {
+    /// Type code of a B-rep vertex.
+    pub const VERTEX: u8 = 14;
+    /// Type code of a B-rep edge.
+    pub const EDGE: u8 = 15;
+    /// Type code of a B-rep face.
+    pub const FACE: u8 = 16;
     /// Type code of a PMI model view.
     pub const MODEL_VIEW: u8 = 17;
     /// Type code of a generic PMI entity.
     pub const GENERIC: u8 = 18;
+
+    /// Whether this end names a piece of a part's B-rep rather than an
+    /// annotation.
+    pub fn is_brep(&self) -> bool {
+        matches!(self.kind, Self::VERTEX | Self::EDGE | Self::FACE)
+    }
 
     fn unpack(raw: i32) -> Self {
         let raw = raw as u32;
@@ -436,19 +449,25 @@ pub struct PmiManager {
     pub model_views: Vec<ModelView>,
     pub entities: Vec<Entity>,
     /// How many design groups the element declares. `pmix` does not model
-    /// them, but they take positions in [`PmiManager::cad_tags`].
+    /// them, but they take positions in [`PmiManager::cad_tag_index`].
     pub design_groups: usize,
-    /// The CAD tag each thing in the element is known by, in the order the
+    /// Where each thing in the element has its CAD tag, in the order the
     /// specification gives: model views, then design groups, then generic
-    /// entities. An association names its ends by tag rather than by
-    /// position, so this is what resolves them.
-    pub cad_tags: Vec<i32>,
+    /// entities. The values are positions in [`PmiManager::cad_tags`],
+    /// and an association names its ends by one of those positions, so
+    /// this is what resolves them.
+    pub cad_tag_index: Vec<i32>,
+    /// The persistent identifiers the originating system gave its
+    /// entities, PMI and B-rep alike. This is the list an association
+    /// end indexes into when it names a face or an edge.
+    pub cad_tags: Vec<i64>,
 }
 
 impl PmiManager {
-    /// What the CAD tag `tag` names, or `None` if nothing does.
+    /// What the thing at position `tag` in the CAD tag list is, or
+    /// `None` if it is not one of the PMI entities this reader models.
     pub fn resolve(&self, tag: i32) -> Option<Tagged> {
-        let position = self.cad_tags.iter().position(|t| *t == tag)?;
+        let position = self.cad_tag_index.iter().position(|t| *t == tag)?;
         if position < self.model_views.len() {
             return Some(Tagged::ModelView(position));
         }
@@ -458,6 +477,49 @@ impl PmiManager {
         }
         let position = position - self.design_groups;
         (position < self.entities.len()).then_some(Tagged::Entity(position))
+    }
+}
+
+impl PmiManager {
+    /// The tag the originating system knows this end's entity by.
+    ///
+    /// An end names its entity either by position or, as every file seen
+    /// so far does for B-rep, by a place in the tag list. A face's tag is
+    /// what the topology table's attributes carry, so this is the step
+    /// from an annotation to the geometry it applies to.
+    pub fn tag_of(&self, end: EndPoint) -> Option<i64> {
+        end.indirect
+            .then(|| self.cad_tags.get(end.index as usize).copied())
+            .flatten()
+            .filter(|t| *t != i64::MIN)
+    }
+
+    /// The faces of a part's B-rep that `entity` is associated with, as
+    /// the tags that name them.
+    ///
+    /// `entity` is a position in [`PmiManager::entities`].
+    pub fn faces_of(&self, entity: usize) -> Vec<u32> {
+        let mut found: Vec<u32> = self
+            .associations
+            .iter()
+            .filter_map(|a| {
+                let (named, face) = match (a.source.kind, a.destination.kind) {
+                    (EndPoint::GENERIC, EndPoint::FACE) => (a.source, a.destination),
+                    (EndPoint::FACE, EndPoint::GENERIC) => (a.destination, a.source),
+                    _ => return None,
+                };
+                if self.resolve(named.index as i32) != Some(Tagged::Entity(entity)) {
+                    return None;
+                }
+                // A tag is written as 32 bits in every file seen so far,
+                // and a face tag that did not fit would name the wrong
+                // face rather than none, so it is dropped.
+                u32::try_from(self.tag_of(face)?).ok()
+            })
+            .collect();
+        found.sort_unstable();
+        found.dedup();
+        found
     }
 }
 
@@ -765,8 +827,9 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
     // Polygon data has to be stepped over to reach the CAD tags. A file
     // that ends or malforms here still yields its PMI: the tags only
     // resolve associations, so losing them costs the view membership and
-    // nothing else.
-    let cad_tags = read_cad_tags(&mut r).unwrap_or_default();
+    // the B-rep an annotation applies to, and nothing else.
+    let cad_tag_index = read_cad_tags(&mut r).unwrap_or_default();
+    let cad_tags = read_cad_tag_pool(&mut r).unwrap_or_default();
 
     Ok(PmiManager {
         version,
@@ -775,8 +838,60 @@ pub fn parse(data: &[u8]) -> Result<PmiManager> {
         model_views,
         entities,
         design_groups,
+        cad_tag_index,
         cad_tags,
     })
+}
+
+/// Read the pool of persistent identifiers that follows the per-entity
+/// indices (specification section 10.2.16).
+///
+/// A tag is either 32 or 64 bits wide and the two are stored in separate
+/// vectors, so the type vector says which of the two each tag comes
+/// from, in order.
+fn read_cad_tag_pool(r: &mut Reader<'_>) -> Result<Vec<i64>> {
+    r.u8()?; // version number
+    r.i32()?; // the length in bytes, for a reader that wants to skip it
+    r.i32()?; // version number
+    let mut cursor = Cursor::new(&r.d[r.p..]);
+    let mut packet = |predictor| {
+        cursor
+            .packet(predictor)
+            .map_err(|e| PmiError {
+                offset: 0,
+                message: e.to_string(),
+            })
+            .map(|v| v.into_iter().map(i64::from).collect::<Vec<i64>>())
+    };
+    let types = packet(Predictor::None)?;
+    let narrow = if types.contains(&1) {
+        packet(Predictor::None)?
+    } else {
+        Vec::new()
+    };
+    // Sixty-four bit tags would need the Int64 codec, which no file has
+    // asked for. Their positions are kept so the narrow tags after them
+    // stay at the positions an association names.
+    let wide = types.iter().filter(|t| **t == 2).count();
+    let (mut from_narrow, mut out) = (0, Vec::with_capacity(types.len().min(1 << 16)));
+    for kind in &types {
+        match kind {
+            1 => {
+                let Some(tag) = narrow.get(from_narrow) else {
+                    break;
+                };
+                from_narrow += 1;
+                out.push(*tag);
+            }
+            // Nothing can be said about a tag that was not read, and a
+            // wrong tag is worse than a missing one.
+            _ => out.push(i64::MIN),
+        }
+    }
+    if wide > 0 {
+        tracing::debug!("{wide} CAD tags are 64 bit and were not read");
+    }
+    Ok(out)
 }
 
 /// Step over the PMI polygon data and read the CAD tag order after it.
@@ -889,9 +1004,10 @@ mod tests {
                 };
                 2
             ],
-            // Tags in the order the specification gives, but numbered
+            // Where each thing has its tag, in the order the
+            // specification gives, but pointing into the tag list
             // arbitrarily, which is why a lookup is needed at all.
-            cad_tags: vec![40, 12, 99, 3, 71],
+            cad_tag_index: vec![40, 12, 99, 3, 71],
             ..Default::default()
         };
         assert_eq!(manager.resolve(40), Some(Tagged::ModelView(0)));
@@ -900,6 +1016,38 @@ mod tests {
         assert_eq!(manager.resolve(3), Some(Tagged::Entity(0)));
         assert_eq!(manager.resolve(71), Some(Tagged::Entity(1)));
         assert_eq!(manager.resolve(1000), None);
+    }
+
+    #[test]
+    fn an_end_that_names_a_face_gives_up_its_tag() {
+        let manager = PmiManager {
+            cad_tags: vec![101, 202, 303],
+            ..Default::default()
+        };
+        let face = EndPoint {
+            kind: EndPoint::FACE,
+            index: 1,
+            indirect: true,
+        };
+        assert!(face.is_brep());
+        assert_eq!(manager.tag_of(face), Some(202));
+        // An end naming its entity by position holds no tag.
+        assert_eq!(
+            manager.tag_of(EndPoint {
+                indirect: false,
+                ..face
+            }),
+            None
+        );
+        // Nor does one past the end of the list.
+        assert_eq!(manager.tag_of(EndPoint { index: 9, ..face }), None);
+        // A sixty-four bit tag was not read, so it names nothing rather
+        // than naming the wrong face.
+        let wide = PmiManager {
+            cad_tags: vec![i64::MIN],
+            ..Default::default()
+        };
+        assert_eq!(wide.tag_of(EndPoint { index: 0, ..face }), None);
     }
 
     #[test]

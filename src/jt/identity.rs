@@ -6,12 +6,17 @@
 //! compartments, and a saved view is its name in either format, so those
 //! records get the same id from a STEP file and a JT file of one design.
 //!
-//! Dimensions and geometric tolerances cannot yet. STEP anchors them on
-//! fingerprints of the B-rep faces they apply to; JT states no features,
-//! so the reader anchors them on where the annotation attaches to the
-//! part instead (see [`super::semantic::anchor`]). Both survive a
-//! re-export, but they are different keys, so a dimension read from STEP
-//! and the same dimension read from JT do not share an id.
+//! Dimensions and geometric tolerances now anchor the same way too,
+//! where the file says enough. A PMI association names the B-rep faces a
+//! callout applies to, and those faces are fingerprinted by the recipe
+//! the STEP reader uses (see [`super::features`]), so the key is built
+//! the same way from the same geometry. A callout whose faces the file
+//! does not give falls back to where the annotation attaches to the part
+//! (see [`super::semantic::anchor`]), which survives a re-export but is
+//! not a key a STEP file would produce.
+//!
+//! That the two agree has not been observed, only arranged: no model is
+//! published in both formats, so there is no pair to check it against.
 
 use std::collections::HashMap;
 
@@ -23,6 +28,19 @@ use super::semantic::Keys;
 /// Fields that name a record rather than state its content, and so are
 /// left out of the hash that orders records sharing an identity key.
 const NOT_CONTENT: &[&str] = &["id", "source_refs", "presentation"];
+
+/// Offer `id` as what `key` resolves to, keeping the plainer of the two.
+///
+/// Several records may state one letter, in which case all but one carry
+/// a suffix. A reference to the letter means the datum rather than one
+/// particular record of it, so it resolves to the record that carries
+/// the letter plainly.
+fn offer<K: std::hash::Hash + Eq>(map: &mut HashMap<K, String>, key: K, id: &str) {
+    let slot = map.entry(key).or_insert_with(|| id.to_owned());
+    if (id.len(), id) < (slot.len(), slot.as_str()) {
+        *slot = id.to_owned();
+    }
+}
 
 /// Assign final ids to every record in `doc`.
 pub fn finalise(doc: &mut PmiDocument, keys: &Keys) {
@@ -57,10 +75,9 @@ pub fn finalise(doc: &mut PmiDocument, keys: &Keys) {
     let mut by_element: HashMap<(String, String), String> = HashMap::new();
     let mut by_label: HashMap<String, String> = HashMap::new();
     for d in &doc.semantic.datums {
-        by_element
-            .entry((element_of(&d.meta.source_refs), d.label.clone()))
-            .or_insert_with(|| d.meta.id.clone());
-        by_label.entry(d.label.clone()).or_insert(d.meta.id.clone());
+        offer(&mut by_label, d.label.clone(), &d.meta.id);
+        let key = (element_of(&d.meta.source_refs), d.label.clone());
+        offer(&mut by_element, key, &d.meta.id);
     }
 
     // 2. Datum reference frames, keyed by the letters in precedence
@@ -303,11 +320,16 @@ mod tests {
     /// Run the whole reader pipeline over one PMI element.
     fn extract(entities: Vec<Entity>) -> PmiDocument {
         let manager = PmiManager {
-            cad_tags: (0..entities.len() as i32).collect(),
+            cad_tag_index: (0..entities.len() as i32).collect(),
             entities,
             ..Default::default()
         };
-        let built = super::super::semantic::build(&[manager], Some("mm"), &mut Vec::new());
+        let built = super::super::semantic::build(
+            &[manager],
+            Some("mm"),
+            &Default::default(),
+            &mut Vec::new(),
+        );
         let mut doc = PmiDocument {
             schema_version: crate::model::SCHEMA_VERSION,
             source: crate::model::Source {
