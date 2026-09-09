@@ -46,6 +46,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cylinder it is about. `pmix inspect` reports how many of a part's faces
   carry a tag.
 
+- **JT 9 files can be read.** They differ from JT 10 in four places, none
+  of them in the specification: a 105-byte header stating the offset of
+  the table of contents in 32 bits, 28-byte table entries, ZLIB rather
+  than XZ compression, and element version numbers written as two bytes
+  rather than one. A JT 9 file's scene-graph properties now extract the
+  same way a JT 10 file's do. Its PMI and precise geometry are read as
+  version 10 states them and are **not** verified, so a pre-10 file
+  carrying either gets a diagnostic saying so.
+
 ### Fixed
 
 - **JT vectors that use a predictor were decoded wrongly.** A predictor

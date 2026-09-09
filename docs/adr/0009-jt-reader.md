@@ -64,9 +64,31 @@ describes.
 - **Little-endian only.** The header carries a byte order flag, but every
   file available is little-endian and untested code for the other case
   would be a liability. A big-endian file is rejected with a clear error.
-- **Version 10 verified.** The reader parses the header of any version and
-  reports what it finds, but only 10.x is tested. Older layouts differ and
-  will be added when a test file for them exists.
+- **Version 10 and 9 read; only 10 verified for PMI.** JT 9 differs in
+  four places, each found from a real file on 2026-09-08 and none of them
+  in the 10.6 specification, which documents only the current form.
+  1. The header is **105 bytes**, not 109: it states the offset of the
+     table of contents in 32 bits rather than 64, which moves the scene
+     graph identifier after it.
+  2. A table of contents entry is **28 bytes**, not 32, for the same
+     reason.
+  3. Segments are compressed with **ZLIB** (flag and algorithm 2) rather
+     than XZ (3). The specification's table lists only 3, because 10
+     dropped the older codec.
+  4. Element version numbers are **two bytes** each, not one. Nothing
+     documents this, but the specification requires the topmost bit of a
+     property atom's state flags, `0x40000000`, to be set for viewing,
+     and that bit only lands where it should when the versions are read
+     as pairs. Strings also count their terminator in their length,
+     which is trimmed so a key means the same thing in either version.
+
+  The scene graph is verified against a real JT 9.5 file, and a synthetic
+  fixture in `tests/jt_v9.rs` holds every one of the four differences so
+  they cannot regress. **PMI and precise geometry in a JT 9 file are
+  not verified**: no such file carries either, so those readers have
+  never been tried on one, and the fourth difference above would break
+  them silently. A pre-10 file that carries PMI gets a diagnostic saying
+  so rather than a confident answer.
 - **Annotation text is usually absent.** A producing system may write
   the glyphs of an annotation's text rather than the text, in which case
   the string table holds symbol indices and no reader can recover the
@@ -194,3 +216,6 @@ nothing else.
   decoded, so nothing is silently ignored.
 - `docs/test-data.md` records the NIST assembly as a verified PMI-bearing
   JT fixture.
+- Reading JT 9 costs one dependency, `miniz_oxide`, for ZLIB. It is pure
+  Rust, as ADR 0006 requires, and is the same crate `flate2` uses for its
+  Rust backend.

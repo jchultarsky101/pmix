@@ -80,7 +80,11 @@ impl Reader for JtReader {
             .filter(|s| s.kind == SegmentKind::LogicalSceneGraph)
         {
             match jt.segment_data(segment) {
-                Ok(data) => scene.by_element.extend(property::read(&data).by_element),
+                Ok(data) => {
+                    let read = property::read(&data, jt.header.major);
+                    scene.by_element.extend(read.by_element);
+                    scene.segments.extend(read.segments);
+                }
                 Err(e) => diagnostics.push(Diagnostic {
                     message: format!("scene graph segment could not be read: {e}"),
                     source_ref: Some(segment.id.to_string()),
@@ -128,6 +132,25 @@ impl Reader for JtReader {
                     }),
                 }
             }
+        }
+        // Version 9 states its element versions in two bytes where
+        // version 10 states them in one, which the scene graph reader
+        // knows about because a file was there to work it out from. No
+        // such file carries PMI, so that reader has never been tried on
+        // one, and a wrong reading there would be silent.
+        if jt.header.major < 10
+            && jt
+                .segments()
+                .iter()
+                .any(|s| s.kind.carries_pmi() || s.kind == SegmentKind::Stt)
+        {
+            diagnostics.push(Diagnostic {
+                message: format!(
+                    "this file is JT {}.{}, and its PMI and geometry are read as                      version 10 states them; treat what they yield as unverified",
+                    jt.header.major, jt.header.minor
+                ),
+                source_ref: None,
+            });
         }
         tracing::debug!(
             segments = jt.segments().len(),

@@ -265,15 +265,26 @@ impl<'a> Jt<'a> {
         }
         let toc = header.toc_offset as usize;
         let count = i32_at(bytes, toc)?.max(0) as usize;
+        // An entry states its segment's offset in the same width the
+        // header states the table's own, so version 10 entries are four
+        // bytes longer than the ones before them.
+        let wide = header.major >= 10;
+        let entry = if wide { 32 } else { 28 };
         let mut segments = Vec::with_capacity(count.min(4096));
         for i in 0..count {
-            let at = toc + 4 + i * 32;
-            let attributes = u32_at(bytes, at + 28)?;
+            let at = toc + 4 + i * entry;
+            let offset = if wide {
+                u64_at(bytes, at + 16)?
+            } else {
+                u32_at(bytes, at + 16)? as u64
+            };
+            let after = at + 16 + if wide { 8 } else { 4 };
+            let attributes = u32_at(bytes, after + 4)?;
             segments.push(Segment {
                 id: guid_at(bytes, at)?,
                 kind: SegmentKind::from_code((attributes >> 24) as u8),
-                offset: u64_at(bytes, at + 16)?,
-                length: u32_at(bytes, at + 24)?,
+                offset,
+                length: u32_at(bytes, after)?,
                 attributes,
             });
         }
@@ -314,10 +325,17 @@ impl<'a> Jt<'a> {
             }
         };
         let reserved = i32_at(bytes, 81)?;
-        let toc_offset = u64_at(bytes, 85)?;
-        let lsg_segment = guid_at(bytes, 93)?;
-        // A non-zero reserved field is followed by one more identifier.
-        let length = if reserved != 0 { 109 + 16 } else { 109 };
+        // Version 10 widened the offset of the table of contents to 64
+        // bits, which moved everything after it. Older files state it in
+        // 32, so their header is four bytes shorter.
+        let (toc_offset, lsg_segment, length) = if major >= 10 {
+            let toc = u64_at(bytes, 85)?;
+            // A non-zero reserved field is followed by one more identifier.
+            let length = if reserved != 0 { 109 + 16 } else { 109 };
+            (toc, guid_at(bytes, 93)?, length)
+        } else {
+            (u32_at(bytes, 85)? as u64, guid_at(bytes, 89)?, 105)
+        };
         Ok(Header {
             version,
             major,
@@ -360,31 +378,48 @@ impl<'a> Jt<'a> {
             offset: body + 8,
             needed: 1,
         })?;
-        // Flag 3 means compression is on; the algorithm byte counts toward
-        // the compressed length.
-        if flag != 3 || algorithm == 1 {
-            return Ok(self.bytes[body + 9..end].to_vec());
+        // The flag and the algorithm say the same thing: version 10
+        // writes 3 for XZ, and version 9 and older write 2 for ZLIB. The
+        // algorithm byte counts toward the compressed length.
+        let uncompressed = || Ok(self.bytes[body + 9..end].to_vec());
+        let known = matches!(algorithm, 2 | 3);
+        if algorithm == 1 || !matches!(flag, 2 | 3) {
+            return uncompressed();
         }
-        if algorithm != 3 {
+        if !known {
+            // The flag says the data is compressed by something this
+            // reader has no decoder for. Handing back the bytes as they
+            // stand would parse as nonsense, so say so instead.
             return Err(ParseError::UnknownCompression {
                 segment: segment.id,
                 algorithm,
             });
         }
+        // The compressed length is what says how far the payload runs,
+        // and it is the field to trust: this file's segments state a
+        // length one byte short of what they occupy, so bounding the
+        // payload by that instead would cut the last byte off the
+        // stream. The buffer is still the hard limit.
         let from = body + 9;
-        let to = (body + 8 + compressed_len).min(end);
+        let to = (body + 8 + compressed_len).min(self.bytes.len());
         let payload = self.bytes.get(from..to).ok_or(ParseError::Truncated {
             offset: from,
             needed: compressed_len,
         })?;
-        let mut out = Vec::new();
-        lzma_rs::xz_decompress(&mut std::io::Cursor::new(payload), &mut out).map_err(|e| {
-            ParseError::Decompression {
-                segment: segment.id,
-                reason: e.to_string(),
+        let fail = |reason: String| ParseError::Decompression {
+            segment: segment.id,
+            reason,
+        };
+        match algorithm {
+            2 => miniz_oxide::inflate::decompress_to_vec_zlib(payload)
+                .map_err(|e| fail(e.to_string())),
+            _ => {
+                let mut out = Vec::new();
+                lzma_rs::xz_decompress(&mut std::io::Cursor::new(payload), &mut out)
+                    .map_err(|e| fail(e.to_string()))?;
+                Ok(out)
             }
-        })?;
-        Ok(out)
+        }
     }
 }
 

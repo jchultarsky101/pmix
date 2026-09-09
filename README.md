@@ -307,6 +307,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] `pmix diff` (ADR 0005)
 - [x] Product and record properties (ADR 0007)
 - [x] JT reader: file structure, segments, and decompression (ADR 0009)
+- [x] JT 9 files: 32-bit table of contents, ZLIB segments, and two-byte element versions (ADR 0009)
 - [x] JT reader: PMI Manager element, model units, and the semantic layer
 - [x] JT reader: annotations and saved views, with the PMI each view shows
 - [x] One identity scheme for both formats; datums, datum frames, and views share ids across them (ADR 0004)

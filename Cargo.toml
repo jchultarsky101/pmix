@@ -25,9 +25,12 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-# Pure-Rust XZ decoder: JT segments are XZ compressed and a C
+# Pure-Rust XZ decoder: JT 10 segments are XZ compressed and a C
 # dependency would break cross-compilation for the release targets.
 lzma-rs = "0.3"
+# Pure-Rust ZLIB decoder, for the same reason: JT 9 and older compress
+# their segments with ZLIB rather than XZ.
+miniz_oxide = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"

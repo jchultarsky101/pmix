@@ -65,7 +65,14 @@ fn string_at(data: &[u8], pos: usize) -> Option<String> {
         .chunks_exact(2)
         .map(|c| u16::from_le_bytes([c[0], c[1]]))
         .collect();
-    Some(String::from_utf16_lossy(&units))
+    // JT 9 counts the terminator in the length and JT 10 does not, so a
+    // key read from an older file would otherwise not match one read
+    // from a newer file of the same design.
+    Some(
+        String::from_utf16_lossy(&units)
+            .trim_end_matches('\0')
+            .to_owned(),
+    )
 }
 
 /// Whether an element stream begins at `pos`, judged by whether the first
@@ -87,7 +94,22 @@ fn starts_a_stream(payload: &[u8], pos: usize) -> bool {
 /// Anything malformed yields fewer properties rather than an error: the
 /// properties are supporting metadata, and a file whose table cannot be
 /// read should still give up its PMI.
-pub fn read(payload: &[u8]) -> Properties {
+/// How many bytes of a property atom come before its value.
+///
+/// An atom states a version, then its state flags, then its own version,
+/// then the value. JT 10 writes each version as one byte; JT 9 and
+/// older write two, which the specification does not mention because it
+/// documents only the current form.
+///
+/// The file settles it. The specification requires the topmost bit of
+/// the state flags, `0x40000000`, to be set for general viewing
+/// support, and in a JT 9 atom that bit only lands where it should when
+/// the versions are read as pairs.
+fn before_value(major: u32) -> usize {
+    if major >= 10 { 1 + 4 + 1 } else { 2 + 4 + 2 }
+}
+
+pub fn read(payload: &[u8], major: u32) -> Properties {
     // A scene graph holds several element streams one after another, each
     // closed by the end-of-elements marker: the nodes and attributes come
     // first and the property atoms after them. Walk them all, then read
@@ -98,17 +120,15 @@ pub fn read(payload: &[u8]) -> Properties {
     while starts_a_stream(payload, start) {
         let mut elements = Elements::new(&payload[start..]);
         for element in elements.by_ref() {
-            // Base property atom data is a version byte and state flags,
-            // then this element's own version byte, then the value.
-            const AFTER_BASE: usize = 1 + 4 + 1;
+            let after_base = before_value(major);
             if element.object_type == STRING_PROPERTY_ATOM {
-                if let Some(value) = string_at(element.data, AFTER_BASE) {
+                if let Some(value) = string_at(element.data, after_base) {
                     atoms.insert(element.object_id, value);
                 }
             } else if element.object_type == LATE_LOADED_PROPERTY_ATOM {
                 if let Some(id) = element
                     .data
-                    .get(AFTER_BASE..AFTER_BASE + 16)
+                    .get(after_base..after_base + 16)
                     .and_then(|b| b.try_into().ok())
                 {
                     referenced.insert(element.object_id, Guid(id));
@@ -242,7 +262,7 @@ mod tests {
         payload.extend(8i32.to_le_bytes());
         payload.extend(0i32.to_le_bytes()); // end of this element's list
 
-        let props = read(&payload);
+        let props = read(&payload, 10);
         assert_eq!(props.find("JT_PROP_MEASUREMENT_UNITS"), Some("millimeters"));
         assert_eq!(props.by_element[&42].len(), 1);
         assert_eq!(props.find("absent"), None);
@@ -255,8 +275,8 @@ mod tests {
         payload.extend([0xFF; 16]);
         payload.extend(1i16.to_le_bytes());
         payload.extend(9i32.to_le_bytes()); // claims nine tables
-        assert!(read(&payload).by_element.is_empty());
-        assert!(read(&[]).by_element.is_empty());
+        assert!(read(&payload, 10).by_element.is_empty());
+        assert!(read(&[], 10).by_element.is_empty());
     }
 
     #[test]
