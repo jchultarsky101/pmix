@@ -247,6 +247,9 @@ pub(crate) struct Ctx<'a> {
     pub dimension_ids: HashMap<Id, String>,
     /// Feature (temporary) record id to the fingerprints of its geometry.
     pub feature_fingerprints: HashMap<String, Vec<fingerprint::Fingerprint>>,
+    /// Feature (temporary) record id to what anchors it when the file
+    /// gives it no geometry: the datum it establishes or is a target of.
+    pub feature_anchors: HashMap<String, String>,
     /// Datum instance id to record id.
     pub datum_ids: HashMap<Id, Option<String>>,
     /// Datum record id to its label, for rendering.
@@ -302,6 +305,7 @@ impl<'a> Ctx<'a> {
             properties: Vec::new(),
             dimension_ids: HashMap::new(),
             feature_fingerprints: HashMap::new(),
+            feature_anchors: HashMap::new(),
             datum_ids: HashMap::new(),
             datum_labels: HashMap::new(),
             datum_system_ids: HashMap::new(),

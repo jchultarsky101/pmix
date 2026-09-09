@@ -1,0 +1,54 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('pmix synthetic fixture: a datum established by targets, none of which the file gives geometry'),'2;1');
+FILE_NAME('datum_targets.stp','2026-09-09T00:00:00',('pmix'),('pmix'),'pmix synthetic','pmix','');
+FILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }'));
+ENDSEC;
+DATA;
+/* units: millimetres and radians */
+#1=(LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.));
+#2=(NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.));
+#3=(GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNIT_ASSIGNED_CONTEXT((#1,#2)) REPRESENTATION_CONTEXT('','3D'));
+/* product skeleton */
+#10=PRODUCT('SYN-005','pmix synthetic part','',(#11));
+#11=PRODUCT_CONTEXT('',#12,'mechanical');
+#12=APPLICATION_CONTEXT('managed model based 3d engineering');
+#13=PRODUCT_DEFINITION_FORMATION('','',#10);
+#14=PRODUCT_DEFINITION('design','',#13,#15);
+#15=PRODUCT_DEFINITION_CONTEXT('part definition',#12,'design');
+#16=PRODUCT_DEFINITION_SHAPE('','',#14);
+/* one planar face, so the shape representation is not empty */
+#20=CARTESIAN_POINT('',(0.,0.,0.));
+#21=DIRECTION('',(0.,0.,1.));
+#22=DIRECTION('',(1.,0.,0.));
+#23=AXIS2_PLACEMENT_3D('',#20,#21,#22);
+#24=PLANE('',#23);
+#25=ADVANCED_FACE('top',(),#24,.T.);
+#26=ADVANCED_BREP_SHAPE_REPRESENTATION('',(#25),#3);
+#27=SHAPE_DEFINITION_REPRESENTATION(#16,#26);
+/* datum A, established by a datum feature and two targets. None of the
+   three is given any geometry, which is how a casting datum taken from
+   target spots is commonly written. The feature is unnamed, so without
+   the datum to anchor it there is nothing left but its entity number. */
+#40=DATUM_FEATURE('',$,#16,.T.);
+#41=DATUM('','',#16,.F.,'A');
+#42=SHAPE_ASPECT_RELATIONSHIP('',$,#40,#41);
+#43=PLACED_DATUM_TARGET_FEATURE('Datum Target.1','point',#16,.T.,'1');
+#44=SHAPE_ASPECT_RELATIONSHIP('',$,#43,#41);
+#45=PLACED_DATUM_TARGET_FEATURE('Datum Target.2','point',#16,.T.,'2');
+#46=SHAPE_ASPECT_RELATIONSHIP('',$,#45,#41);
+/* datum B, whose feature the writer did name. The name is a CAD label
+   that moves when the model is edited, so the datum's letter is the
+   better anchor and takes precedence. */
+#47=DATUM_FEATURE('Simple Datum.7',$,#16,.T.);
+#48=DATUM('','',#16,.F.,'B');
+#49=SHAPE_ASPECT_RELATIONSHIP('',$,#47,#48);
+/* a flatness tolerance on the face, referring to datum A */
+#50=SHAPE_ASPECT('','',#16,.T.);
+#51=GEOMETRIC_ITEM_SPECIFIC_USAGE('','',#50,#26,#25);
+#52=LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(0.05),#1);
+#53=(GEOMETRIC_TOLERANCE('','',#52,#50) GEOMETRIC_TOLERANCE_WITH_DATUM_REFERENCE((#55)) POSITION_TOLERANCE());
+#54=DATUM_REFERENCE(1,#41);
+#55=DATUM_REFERENCE(1,#41);
+ENDSEC;
+END-ISO-10303-21;

@@ -25,6 +25,104 @@ fn check(name: &str) {
     }
 }
 
+/// A shape aspect the file gives no geometry is still anchored when it
+/// establishes a datum or is a target of one: a drawing names those by
+/// the datum's letter, which is design intent and survives a re-export
+/// where an entity number does not.
+///
+/// The check renumbers every entity in the file, which is the one thing
+/// a re-export reliably does. An id that moves is an id keyed on the
+/// numbering.
+#[test]
+fn a_datum_feature_without_geometry_keys_on_the_datum_it_establishes() {
+    let dir = synthetic_dir();
+    let text = std::fs::read_to_string(dir.join("datum_targets.stp")).unwrap();
+    let doc = pmix::extract(&dir.join("datum_targets.stp")).expect("extracts");
+    assert!(
+        doc.diagnostics.is_empty(),
+        "both are anchored, so nothing is reported: {:?}",
+        doc.diagnostics
+    );
+    let orphans: Vec<&pmix::model::Feature> = doc
+        .semantic
+        .features
+        .iter()
+        .filter(|f| f.geometry.is_empty())
+        .collect();
+    assert_eq!(orphans.len(), 2, "one datum feature each for A and B");
+    // One of them the file did not even name, so without the datum to
+    // anchor it there would be nothing left but its entity number.
+    assert!(orphans.iter().any(|f| f.name.is_none()));
+    assert!(orphans.iter().any(|f| f.name.is_some()));
+
+    let extract = |text: &str, tag: &str| -> pmix::PmiDocument {
+        let tmp = std::env::temp_dir().join(format!("pmix-datum_targets-{tag}.stp"));
+        std::fs::write(&tmp, text).unwrap();
+        pmix::extract(&tmp).expect("extracts")
+    };
+    let ids = |d: &pmix::PmiDocument| -> Vec<String> {
+        d.semantic
+            .features
+            .iter()
+            .map(|f| f.meta.id.clone())
+            .collect()
+    };
+
+    // Every entity number shifted, which is the one thing a re-export
+    // reliably does. An id that moves is an id keyed on the numbering.
+    let moved = renumbered(&text, 5000);
+    assert_ne!(text, moved);
+    assert_eq!(
+        ids(&doc),
+        ids(&extract(&moved, "renumbered")),
+        "a feature id moved with the numbering"
+    );
+
+    // And the name a CAD system gave the other one is a label that moves
+    // when the model is edited, so the datum's letter takes precedence.
+    let renamed = text.replace("'Simple Datum.7'", "'Simple Datum.9'");
+    assert_ne!(text, renamed);
+    assert_eq!(
+        ids(&doc),
+        ids(&extract(&renamed, "renamed")),
+        "a feature id followed the CAD label rather than the datum"
+    );
+
+    // The records that name it agree.
+    let after = extract(&moved, "renumbered");
+    assert_eq!(doc.semantic.datums.len(), 2);
+    for (a, b) in doc.semantic.datums.iter().zip(&after.semantic.datums) {
+        assert_eq!(a.label, b.label);
+        assert_eq!(a.features, b.features);
+    }
+    assert_eq!(
+        doc.semantic.tolerances[0].meta.id,
+        after.semantic.tolerances[0].meta.id
+    );
+}
+
+/// Every `#123` in `text` shifted by `by`, which is what a re-export does
+/// to a file even when the design has not changed.
+fn renumbered(text: &str, by: usize) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        out.push(c);
+        if c != '#' {
+            continue;
+        }
+        let mut digits = String::new();
+        while chars.peek().is_some_and(char::is_ascii_digit) {
+            digits.push(chars.next().unwrap());
+        }
+        match digits.parse::<usize>() {
+            Ok(n) => out.push_str(&(n + by).to_string()),
+            Err(_) => out.push_str(&digits),
+        }
+    }
+    out
+}
+
 /// The same design stated in inches and in millimetres is one design,
 /// so it must key the same way. Everything keyed on geometry is put into
 /// millimetres first; without that, a fingerprint of a plane at x=1 inch

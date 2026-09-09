@@ -274,6 +274,29 @@ moving a number by a guess would be worse than not moving it.
 declared as inches. Both give the same face ids and the same dimension
 ids. Without the conversion they share none.
 
+### A shape aspect with no geometry is named by the datum it establishes
+
+Added 2026-09-09. A file may declare a datum feature or a datum target
+and give it no geometry at all — the common way to write a casting datum
+taken from target spots. Across the NIST corpus 44 features had nothing
+to anchor on, and fell back to the aspect's name or, failing that, its
+source entity number, which this ADR itself says does not survive a
+re-export.
+
+Twenty-six of the 44 establish a datum or are a target of one, and a
+drawing names those by the datum's letter: `A`, or `A` target `1`. That
+is design intent, stable in the way a letter is, and it is already how
+the datum record itself is keyed. So it anchors them, and it takes
+precedence over the aspect's own name, because a name like
+`Simple Datum.5` carries a CAD-assigned index that moves when the model
+is edited.
+
+The remaining **18 are bare shape aspects a note or a tolerance hangs
+off** — `SHAPE_ASPECT('','NOTE',…)`. The file states nothing about them
+beyond their existence, so nothing can anchor them; they keep the entity
+number and the reader now says plainly in a diagnostic that their ids
+will not survive a re-export, rather than leaving that to be discovered.
+
 ## Consequences
 
 - The reader gains a finalisation pass and a geometry-fingerprint module;
