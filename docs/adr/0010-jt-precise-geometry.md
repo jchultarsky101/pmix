@@ -149,7 +149,55 @@ That is why it is verified against geometry rather than argued from
 structure.
 
 **Points** are not read. They are quantised rather than exact, and
-nothing needs them yet; edges name their vertices by index already.
+nothing needs them yet; edges name their vertices by index already. They
+are stepped over to reach the attributes, and the figure's branch around
+the quantiser covers the coordinates too: a part with nothing written
+explicitly has neither, and its precision follows the flags directly.
+
+### Which faces a callout applies to
+
+An association names a B-rep face by an **index into the PMI CAD tag
+list**, not by a face group number. The specification allows both, but
+every file seen so far uses the tag. So the tag pool after the CAD tag
+indices is read as well (section 10.2.16); the sixty-four bit tags are
+not, because no file has written one, and a tag that was not read names
+nothing rather than the wrong face.
+
+The tags themselves are persistent identifiers from the originating
+system, and the topology table's **attribute section** carries one per
+face. That section is not reached without stepping over the body
+attributes, whose layout is another figures-versus-reality problem: the
+file writes two checksum blocks where the figure shows one, and two
+fields the figure does not show at all. Those two are stepped over
+unnamed rather than guessed at. The landing point is checked instead:
+the face identifier count that follows must equal the face count, and a
+packet of exactly that many distinct values must follow it. Searching
+the same region for anything satisfying those constraints finds the same
+offset on all eight parts, which is what says the walk lands where it
+should.
+
+**The nth tag belongs to the nth face**, because the table already
+stores its faces in face group order. It is worth being explicit about
+what was ruled out. Section 11.13 says a face group numbers a body's
+faces by increasing face identifier, and the table has a Face Identifier
+vector, so ordering the faces by it looks like the rule. It is not: that
+vector is a permutation of the positions and belongs to a different
+numbering. Both readings resolve to a real face of the right part, so
+neither can be told from the other by structure.
+
+Geometry tells them apart. A callout's leader ends on what it points at,
+which the file states in millimetres against a table stated in metres.
+Counting the leaders that land on a face their callout names, over the
+faces where the two readings disagree: by position 74, by identifier 14.
+The reading also has to survive a machinist's reading of the result, and
+does — a callout that says THRU reaches a cylinder, and a counterbore
+callout reaches two cylinders and a plane, at radii that make sense for
+the fastener.
+
+Most of the leaders that land on nothing are not a failure of the
+mapping: their distance is exactly the radius of a cylinder the callout
+names, because a leader to a hole is drawn to the hole's axis rather
+than to its wall. The test allows for that.
 
 ### What the surfaces required
 
@@ -225,7 +273,9 @@ count that is not there consumes the next packet's header.
 - A face can now be fingerprinted: it names its surface, its loops, and
   through them its edges and their curves. That is what ADR 0004's recipe
   needs from the JT side.
+- A JT annotation now reaches the faces it applies to, and each of those
+  faces its surface. Both halves of ADR 0004's recipe are in place on the
+  JT side.
 - Cross-format identity for dimensions and tolerances stays open. What
-  remains is on the PMI side rather than the geometry side: resolving a
-  face group to the faces it names, and fingerprinting those faces to the
-  same recipe the STEP reader uses.
+  remains is fingerprinting those faces to the same recipe the STEP
+  reader uses, and folding the result into the identity key.

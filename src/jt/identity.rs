@@ -303,7 +303,7 @@ mod tests {
     /// Run the whole reader pipeline over one PMI element.
     fn extract(entities: Vec<Entity>) -> PmiDocument {
         let manager = PmiManager {
-            cad_tags: (0..entities.len() as i32).collect(),
+            cad_tag_index: (0..entities.len() as i32).collect(),
             entities,
             ..Default::default()
         };

@@ -288,6 +288,32 @@ impl<'a> Cursor<'a> {
         Ok(self.take(1)?[0])
     }
 
+    /// A plain `U32`, written as it stands rather than in a packet.
+    pub fn word(&mut self) -> Result<u32> {
+        Ok(u32::from_le_bytes(self.take(4)?.try_into().unwrap()))
+    }
+
+    /// Step over `n` bytes, failing rather than running past the end.
+    pub fn skip(&mut self, n: usize) -> Result<()> {
+        self.take(n).map(|_| ())
+    }
+
+    /// A count of things of `each` bytes, refused when the bytes that
+    /// remain could not hold them.
+    pub fn count(&mut self, each: usize) -> Result<usize> {
+        let n = self.i32()?;
+        if n < 0 {
+            return self.err(format!("negative count {n}"));
+        }
+        let remaining = self.data.len().saturating_sub(self.at);
+        if (n as usize).saturating_mul(each) > remaining {
+            return self.err(format!(
+                "{n} things of {each} bytes do not fit in the {remaining} that remain"
+            ));
+        }
+        Ok(n as usize)
+    }
+
     /// A count that must be possible for the bytes that remain.
     fn count_of_values(&mut self) -> Result<usize> {
         let n = self.i32()?;

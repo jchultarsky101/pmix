@@ -171,6 +171,11 @@ pub struct Face {
     pub surface_kind: SurfaceKind,
     /// The surface itself, when the table describes it.
     pub surface: Option<Surface>,
+    /// The tag the originating system knows this face by.
+    ///
+    /// This is what a PMI association names a face with, so it is what
+    /// ties an annotation to the geometry it applies to.
+    pub tag: Option<u32>,
 }
 
 /// One trim loop, a closed circuit of coedges bounding a face.
@@ -356,6 +361,13 @@ pub struct Topology {
     pub stopped: Option<String>,
 }
 
+impl Topology {
+    /// The face a PMI association names, by the tag it names it with.
+    pub fn face_with_tag(&self, tag: u32) -> Option<&Face> {
+        self.faces.iter().find(|f| f.tag == Some(tag))
+    }
+}
+
 /// The compressed vectors of the topology, read but not yet assembled.
 struct Chain {
     start_loop: Vec<u32>,
@@ -509,6 +521,7 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
     out.hash = word(0);
     let mut surfaces = Vec::new();
     let mut curves = Vec::new();
+    let mut face_tags: Vec<u32> = Vec::new();
     if let (Some(s), Some(rs), Some(c), Some(rc), Some(points)) =
         (word(1), word(2), word(3), word(4), word(5))
     {
@@ -527,6 +540,12 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
         }
         if geometry.represented_curves > 0 {
             curves = read_curves(&mut vectors.cursor).unwrap_or_default();
+        }
+        // The attributes come after the geometry, and the face tags in
+        // them are what a PMI callout names, so the points have to be
+        // stepped over to reach them.
+        if skip_points(&mut vectors.cursor).is_ok() {
+            face_tags = read_face_tags(&mut vectors.cursor).unwrap_or_default();
         }
     }
 
@@ -571,6 +590,10 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
                 chain.face_surface_kind.get(k).copied().unwrap_or_default(),
             ),
             surface: None,
+            // The attribute section writes one tag per face group, and
+            // the table stores its faces in that same order, so the two
+            // line up position for position.
+            tag: face_tags.get(k).copied(),
         })
         .collect();
 
@@ -592,6 +615,91 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
 
     out.vectors = vectors.lengths;
     Ok(out)
+}
+
+/// Step over the point geometry, which is quantised rather than exact
+/// and which nothing needs yet (specification figure H.18).
+///
+/// A point is written explicitly only when it cannot be recovered from
+/// the curves that meet there, so the flags say how many follow.
+fn skip_points(cursor: &mut Cursor<'_>) -> Result<()> {
+    let explicit = cursor.packet(Predictor::None)?;
+    // The figure branches only around the quantiser, but the
+    // coordinates go with it: a part with nothing written explicitly
+    // has neither, and its precision follows the flags directly.
+    if explicit.iter().any(|f| *f != 0) {
+        cursor.skip(4 + 4 + 1)?; // the quantiser: a range and a width
+        cursor.packet(Predictor::None)?; // the coordinates
+    }
+    cursor.skip(4)?; // the precision they were quantised to
+    cursor.skip(4)?; // the hash over the whole geometry
+    Ok::<(), SttError>(())
+}
+
+/// A vector written as a plain count and that many fixed-size values.
+fn skip_plain(cursor: &mut Cursor<'_>, each: usize) -> Result<()> {
+    let n = cursor.count(each)?;
+    cursor.skip(n * each).map_err(Into::into)
+}
+
+/// `n` `MbString`s, each a count of UTF-16 units then the units. The
+/// count belongs to the collection around them rather than to the
+/// strings, so it is passed in.
+fn skip_strings(cursor: &mut Cursor<'_>, n: usize) -> Result<()> {
+    for _ in 0..n {
+        skip_plain(cursor, 2)?;
+    }
+    Ok(())
+}
+
+/// Read the tag the originating system gave each face.
+///
+/// The attribute section carries the B-rep attributes the Parasolid data
+/// held (specification figure H.20). The face tags are the first thing
+/// in it that `pmix` needs, and the body attributes before them have to
+/// be stepped over to get there. Every count here is either zero or the
+/// number of entities, which is what makes a wrong offset show up
+/// immediately rather than as plausible numbers.
+fn read_face_tags(cursor: &mut Cursor<'_>) -> Result<Vec<u32>> {
+    // Body attributes, which have to be stepped over to reach the faces.
+    // Two of these fields are not in the specification's figure and are
+    // not named here either; they are stepped over because the file
+    // writes them, and the landing point is checked below.
+    if cursor.word()? > 0 {
+        cursor.packet(Predictor::None)?; // the identifier of each body
+    }
+    // Two checksum blocks, where the figure shows one. Faces have two as
+    // well, an exact one and a relaxed one, so this is most likely the
+    // same pair.
+    for _ in 0..2 {
+        let n = cursor.word()? as usize;
+        if n > 0 {
+            cursor.skip(n * 16)?; // the checksums
+            cursor.packet(Predictor::None)?; // whether each is valid
+        }
+    }
+    cursor.word()?; // unnamed
+    cursor.packet(Predictor::Lag1)?; // where each body's monikers start
+    let n = cursor.word()? as usize;
+    if n > 0 {
+        cursor.skip(n * 4)?; // the identifier of each moniker's GUID
+        cursor.skip(n * 16)?; // the GUIDs
+        skip_strings(cursor, n)?; // the application each came from
+    }
+    let n = cursor.word()? as usize;
+    if n > 0 {
+        cursor.skip(n * 8)?; // a version number per body
+        skip_strings(cursor, n)?;
+    }
+    cursor.packet(Predictor::None)?; // unnamed
+
+    // Face attributes. The identifiers are ordered as face groups are,
+    // so the nth is the tag of the face in face group n.
+    let n = cursor.word()? as usize;
+    if n == 0 {
+        return Ok(Vec::new());
+    }
+    cursor.packet_u32(Predictor::None).map_err(Into::into)
 }
 
 /// Take three values from an array laid end to end.

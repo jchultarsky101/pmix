@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and edges lie on, including the ones with no closed form.
 - Lines, circles, and ellipses are recovered from the curve geometry, as
   the surfaces already were.
+- **A JT annotation now reaches the B-rep faces it applies to.** An
+  association names a face by a tag from the originating system; the
+  topology table's attribute section carries one tag per face, and the
+  PMI element's CAD tag pool is read to resolve it. Every face a callout
+  names in the test file is found, and a through hole callout reaches the
+  cylinder it is about. `pmix inspect` reports how many of a part's faces
+  carry a tag.
 
 ### Fixed
 

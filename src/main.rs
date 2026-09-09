@@ -444,6 +444,15 @@ fn inspect_jt(input: PathBuf, opts: InspectOptions) -> Result<()> {
                                 curves.iter().map(|(k, n)| format!("{n} {k}")).collect();
                             writeln!(out, "      edges on {}", listed.join(", "))?;
                         }
+                        // Without these a PMI callout cannot be tied to
+                        // the geometry it applies to, so say when they
+                        // are missing rather than only when they are not.
+                        let tagged = t.faces.iter().filter(|f| f.tag.is_some()).count();
+                        writeln!(
+                            out,
+                            "      {tagged} of {} faces carry a tag a callout can name",
+                            t.counts.faces
+                        )?;
                     }
                     None => writeln!(
                         out,

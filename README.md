@@ -154,7 +154,7 @@ exception is the smart topology table, which abstracts a part's precise
 geometry and is read in full so that JT dimensions can be anchored on the
 faces they apply to ([ADR 0010](docs/adr/0010-jt-precise-geometry.md)):
 each face with the surface it lies on, its loops, and the edges and
-curves those run along.
+curves those run along, and the tag a PMI callout names it by.
 
 ### Logging
 
@@ -312,6 +312,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] One identity scheme for both formats; datums, datum frames, and views share ids across them (ADR 0004)
 - [x] JT compressed integer packets and the smart topology table (ADR 0010)
 - [x] JT analytic surface and curve geometry, each attached to the face or edge it belongs to (ADR 0010)
+- [x] Resolving a JT callout to the B-rep faces it applies to (ADR 0010)
 - [ ] Cross-format identity for dimensions and tolerances
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 

@@ -457,7 +457,7 @@ mod tests {
                 entity(EntityKind::ModelViewStyle, &[]),
                 entity(EntityKind::Dimension, &[("type", "1")]),
             ],
-            cad_tags: vec![0, 1, 2],
+            cad_tag_index: vec![0, 1, 2],
             ..Default::default()
         };
         let out = build_one(manager);
@@ -503,7 +503,7 @@ mod tests {
         e.texts = vec!["\u{2}".into(), "\u{3}".into()];
         let out = build_one(PmiManager {
             entities: vec![e],
-            cad_tags: vec![0],
+            cad_tag_index: vec![0],
             ..Default::default()
         });
         assert_eq!(out.annotations[0].text, None);
@@ -518,7 +518,7 @@ mod tests {
             model_views: vec![view("Top", true), view("Front", false)],
             entities: vec![dimension, entity(EntityKind::Note, &[])],
             // Views take the first tags, then the entities.
-            cad_tags: vec![10, 11, 12, 13],
+            cad_tag_index: vec![10, 11, 12, 13],
             associations: vec![
                 // The first entity is shown in the first view.
                 Association {
@@ -576,7 +576,7 @@ mod tests {
         e.polylines = vec![vec![[0.0; 3], [1.0, 0.0, 0.0], [1.0, 2.0, 0.0]]];
         let manager = PmiManager {
             entities: vec![e],
-            cad_tags: vec![0],
+            cad_tag_index: vec![0],
             ..Default::default()
         };
         let summary = build_one(manager.clone());
@@ -623,7 +623,7 @@ mod tests {
         );
         let out = build_one(PmiManager {
             entities: vec![e],
-            cad_tags: vec![0],
+            cad_tag_index: vec![0],
             ..Default::default()
         });
         let a = &out.annotations[0];
