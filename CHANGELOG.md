@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-09
+
+A design keys the same way whatever units it states. A fingerprint used
+to use the file's own units, so a plane at one inch and the same plane at
+25.4 millimetres were different faces, and every dimension on them a
+different dimension. Everything keyed on geometry is now stated in
+millimetres and degrees, and `pmix diff` compares a measure in the unit
+it means rather than the unit it is written in.
+
 ### Added
 
 - **Units are normalised.** A design does not change when it is exported
@@ -390,7 +399,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/jchultarsky101/pmix/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jchultarsky101/pmix/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jchultarsky101/pmix/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jchultarsky101/pmix/compare/v0.3.0...v0.4.0
