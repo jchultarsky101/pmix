@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-09
+
+The headline is that a property now says which part states it, on both
+readers. An assembly states the same property names of every component,
+and without the part in the key they were one record with
+content-ordered suffixes: on a 105-component assembly, 3017 of 3117
+properties carried a suffix and the largest group was 106 deep, so
+adding one component reshuffled up to 106 ids.
+
+Property ids change in files that name a part. A file describing one
+unnamed part keys exactly as before, and nothing outside `properties`
+changes.
+
 ### Added
 
 - **A STEP property now says which part states it.** An assembly states
@@ -342,7 +355,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/jchultarsky101/pmix/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jchultarsky101/pmix/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jchultarsky101/pmix/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jchultarsky101/pmix/compare/v0.2.0...v0.2.1
