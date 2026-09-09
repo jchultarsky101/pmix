@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-09
+
+A JT callout now reaches the edges it applies to, not only the faces. A
+length is usually measured between two edges rather than between two
+faces, so this is most of what was still missing: 71 of the test file's
+78 dimensions now reach their geometry rather than 63, and all 16
+tolerances rather than 15.
+
 ### Added
 
 - **A JT callout now reaches the edges it applies to, not only the
@@ -365,7 +373,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/jchultarsky101/pmix/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jchultarsky101/pmix/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/jchultarsky101/pmix/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jchultarsky101/pmix/compare/v0.2.1...v0.3.0
