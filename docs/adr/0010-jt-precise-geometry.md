@@ -176,6 +176,23 @@ the same region for anything satisfying those constraints finds the same
 offset on all eight parts, which is what says the walk lands where it
 should.
 
+**Edges carry tags too**, in the edge attribute section after the faces,
+and a callout names one the same way. Reaching them meant walking past
+the face checksums and what the figure calls the face moniker table.
+What the file writes there is not that table: a count of faces, a packet
+of one more value than there are faces, a word per face, and two more
+packets. Those are stepped over unnamed rather than guessed at, and the
+landing point is checked instead — searching the region for an edge
+identifier count followed by that many distinct values finds exactly the
+same offset on all eight parts. Every edge then carries a distinct tag,
+and every edge a callout names is an edge some part has, all 75 of them.
+
+An edge is fingerprinted as its curve kind and its two ends, sorted, by
+the same shared recipe the STEP reader uses. That matters because a
+length is often measured between two edges rather than between two
+faces: anchoring edges took the test file from 63 of 78 dimensions
+reaching their geometry to 71, and tolerances from 15 of 16 to all 16.
+
 **The nth tag belongs to the nth face**, because the table already
 stores its faces in face group order. It is worth being explicit about
 what was ruled out. Section 11.13 says a face group numbers a body's
@@ -273,9 +290,9 @@ count that is not there consumes the next packet's header.
 - A face can now be fingerprinted: it names its surface, its loops, and
   through them its edges and their curves. That is what ADR 0004's recipe
   needs from the JT side.
-- A JT annotation reaches the faces it applies to, each of those faces
-  its surface, and each face a fingerprint by the recipe the STEP reader
-  uses. A JT dimension, tolerance, and datum is anchored on the geometry
+- A JT annotation reaches the faces and edges it applies to, each face
+  its surface, each edge its curve, and each of them a fingerprint by the
+  recipe the STEP reader uses. A JT dimension, tolerance, and datum is anchored on the geometry
   it is about rather than on where it is drawn.
 - The point geometry stays unread. Vertices come from the curves instead,
   which is exact where the quantised points would not be.

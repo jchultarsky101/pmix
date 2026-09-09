@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A JT callout now reaches the edges it applies to, not only the
+  faces.** An edge carries a tag in the topology table's attribute
+  section just as a face does, and is fingerprinted as its curve kind
+  and its two ends by the same shared recipe the STEP reader uses. A
+  length is often measured between two edges, so this matters: 71 of the
+  test file's 78 dimensions now reach their geometry rather than 63, and
+  all 16 tolerances rather than 15. Every edge a callout names is found.
+
 ## [0.5.0] - 2026-09-09
 
 The headline is that a property now says which part states it, on both

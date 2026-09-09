@@ -147,6 +147,32 @@ fn a_fingerprint_tells_the_faces_of_a_part_apart() {
     );
 }
 
+/// Every edge is fingerprinted, and an edge is the same edge whichever
+/// way round the file states it.
+#[test]
+fn every_edge_is_fingerprinted_by_its_curve_and_its_ends() {
+    let (mut edges, mut distinct) = (0usize, 0usize);
+    for t in tables() {
+        let keys: Vec<String> = t
+            .edges
+            .iter()
+            .filter_map(|e| t.edge_fingerprint(e, 1000.0))
+            .collect();
+        assert_eq!(keys.len(), t.counts.edges, "every edge is fingerprinted");
+        assert!(keys.iter().all(|k| k.starts_with("edge/")), "{keys:?}");
+        edges += keys.len();
+        distinct += keys.iter().collect::<BTreeSet<&String>>().len();
+    }
+    assert!(edges > 2000, "only {edges} edges checked");
+    // Nearly all are told apart. Two arcs between the same pair of
+    // points share a key, which this recipe cannot separate and the
+    // STEP reader cannot either, so a handful is expected.
+    assert!(
+        distinct * 100 >= edges * 99,
+        "only {distinct} of {edges} edges are told apart"
+    );
+}
+
 /// The fingerprint is of the design, not of the file: it is stated in
 /// model units, so the same face measured in millimetres and in metres
 /// is not the same face.

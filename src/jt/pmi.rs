@@ -499,22 +499,34 @@ impl PmiManager {
     ///
     /// `entity` is a position in [`PmiManager::entities`].
     pub fn faces_of(&self, entity: usize) -> Vec<u32> {
+        self.brep_of(entity, EndPoint::FACE)
+    }
+
+    /// The edges of a part's B-rep that `entity` is associated with.
+    ///
+    /// A callout attaches to an edge as readily as to a face — a length
+    /// is often measured between two of them — so both are resolved.
+    pub fn edges_of(&self, entity: usize) -> Vec<u32> {
+        self.brep_of(entity, EndPoint::EDGE)
+    }
+
+    fn brep_of(&self, entity: usize, kind: u8) -> Vec<u32> {
         let mut found: Vec<u32> = self
             .associations
             .iter()
             .filter_map(|a| {
-                let (named, face) = match (a.source.kind, a.destination.kind) {
-                    (EndPoint::GENERIC, EndPoint::FACE) => (a.source, a.destination),
-                    (EndPoint::FACE, EndPoint::GENERIC) => (a.destination, a.source),
+                let (named, geometry) = match (a.source.kind, a.destination.kind) {
+                    (EndPoint::GENERIC, k) if k == kind => (a.source, a.destination),
+                    (k, EndPoint::GENERIC) if k == kind => (a.destination, a.source),
                     _ => return None,
                 };
                 if self.resolve(named.index as i32) != Some(Tagged::Entity(entity)) {
                     return None;
                 }
                 // A tag is written as 32 bits in every file seen so far,
-                // and a face tag that did not fit would name the wrong
-                // face rather than none, so it is dropped.
-                u32::try_from(self.tag_of(face)?).ok()
+                // and one that did not fit would name the wrong entity
+                // rather than none, so it is dropped.
+                u32::try_from(self.tag_of(geometry)?).ok()
             })
             .collect();
         found.sort_unstable();
