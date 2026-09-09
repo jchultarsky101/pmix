@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-09
+
+A datum feature or datum target the file gives no geometry is now
+anchored on the datum it establishes, the way a drawing names it. Across
+the NIST corpus that takes the features with nothing to anchor on from 46
+to 18, and the 18 that remain now say plainly in a diagnostic that their
+ids will not survive a re-export.
+
 ### Fixed
 
 - **A datum feature or datum target the file gives no geometry is now
@@ -412,7 +420,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/jchultarsky101/pmix/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jchultarsky101/pmix/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jchultarsky101/pmix/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/jchultarsky101/pmix/compare/v0.4.0...v0.5.0
