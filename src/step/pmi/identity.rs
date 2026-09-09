@@ -5,13 +5,16 @@ use std::collections::{BTreeMap, HashMap};
 
 use super::Ctx;
 use super::fingerprint::identity_quantum;
-use crate::identity::{assign, hash_content, is_readable, num, remap, remap_all};
+use crate::identity::{assign, hash_content, is_readable, remap, remap_all};
 use crate::model::{Meta, content_hash};
 
 /// Assign final ids to every record in `ctx`.
 pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
-    let q = identity_quantum(ctx.ex);
-    let coarse = q * 100.0;
+    // Annotations are located by where they sit rather than by what
+    // they are on, so they round more coarsely; the coordinates are put
+    // into millimetres first, as everything keyed on geometry is.
+    let scale = ctx.scale;
+    let coarse = identity_quantum() * 100.0;
     let mut map: HashMap<String, String> = HashMap::new();
 
     // 1. Features, members first.
@@ -276,14 +279,7 @@ pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
             let plane = a
                 .plane
                 .as_ref()
-                .map(|p| {
-                    format!(
-                        "{},{},{}",
-                        num(p.origin[0], coarse),
-                        num(p.origin[1], coarse),
-                        num(p.origin[2], coarse)
-                    )
-                })
+                .map(|p| crate::identity::triple(scale.point(p.origin), coarse))
                 .unwrap_or_default();
             let bbox = a
                 .geometry
@@ -291,13 +287,9 @@ pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
                 .as_ref()
                 .map(|b| {
                     format!(
-                        "{},{},{}/{},{},{}",
-                        num(b.min[0], coarse),
-                        num(b.min[1], coarse),
-                        num(b.min[2], coarse),
-                        num(b.max[0], coarse),
-                        num(b.max[1], coarse),
-                        num(b.max[2], coarse)
+                        "{}/{}",
+                        crate::identity::triple(scale.point(b.min), coarse),
+                        crate::identity::triple(scale.point(b.max), coarse)
                     )
                 })
                 .unwrap_or_default();

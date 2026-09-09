@@ -12,13 +12,51 @@
 //! its format states them, in model units.
 
 use crate::identity::{QUANTUM, num, triple};
+use crate::units;
 
 /// Directions are rounded more coarsely than positions: a unit vector's
 /// components are of order one, so the same tolerance would demand far
 /// more agreement of a direction than of a coordinate.
 const DIRECTION_QUANTUM: f64 = 1e-3;
 
-/// An analytic surface, in model units.
+/// How to put a reader's numbers into the units a fingerprint is stated
+/// in, which are millimetres and degrees.
+///
+/// A design does not change when it is exported in inches rather than
+/// millimetres, so its fingerprints must not either. Each reader says
+/// what its own numbers are in, and the conversion happens here, once.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Scale {
+    /// Millimetres per unit of length the numbers are in.
+    pub length: f64,
+    /// Degrees per unit of angle the numbers are in.
+    pub angle: f64,
+}
+
+impl Scale {
+    /// Numbers already in millimetres and degrees.
+    pub const NONE: Self = Self {
+        length: 1.0,
+        angle: 1.0,
+    };
+
+    /// What a file declaring these units needs. A unit that is not
+    /// recognised leaves the numbers alone, because moving them by a
+    /// guess would be worse than not moving them.
+    pub fn of(length: Option<&str>, angle: Option<&str>) -> Self {
+        Self {
+            length: units::scale_to_millimetres(length),
+            angle: angle.and_then(units::degrees).unwrap_or(1.0),
+        }
+    }
+
+    /// `p` put into the units a fingerprint is stated in.
+    pub fn point(&self, p: [f64; 3]) -> [f64; 3] {
+        [p[0] * self.length, p[1] * self.length, p[2] * self.length]
+    }
+}
+
+/// An analytic surface, in whatever unit its reader states.
 ///
 /// Only the kinds with a closed form are described. A face on anything
 /// else is [`Surface::Other`], named by its kind, which keeps such faces
@@ -60,15 +98,16 @@ pub enum Surface {
 const REVOLVED: [&str; 3] = ["cylinder", "cone", "torus"];
 
 /// The key for the surface alone, without the part of it a face covers.
-pub fn surface_key(s: &Surface, q: f64) -> String {
-    let dq = DIRECTION_QUANTUM;
+pub fn surface_key(s: &Surface, scale: Scale) -> String {
+    let (q, dq) = (QUANTUM, DIRECTION_QUANTUM);
     match s {
         // A plane is fixed by its normal and its distance from the model
         // origin, so two exports that place it on different points of
         // the same plane still agree.
         Surface::Plane { origin, axis } => {
             let n = sign_normalise(normalise(*axis));
-            format!("plane/{}/{}", triple(n, dq), num(dot(n, *origin), q))
+            let d = dot(n, scale.point(*origin));
+            format!("plane/{}/{}", triple(n, dq), num(d, q))
         }
         Surface::Cylinder {
             origin,
@@ -76,12 +115,12 @@ pub fn surface_key(s: &Surface, q: f64) -> String {
             radius,
         } => {
             let a = sign_normalise(normalise(*axis));
-            let c = closest_on_axis(*origin, a);
+            let c = closest_on_axis(scale.point(*origin), a);
             format!(
                 "cylinder/{}/{}/{}",
                 triple(a, dq),
                 triple(c, q),
-                num(*radius, q)
+                num(*radius * scale.length, q)
             )
         }
         // A cone's radius is stated at its origin, so the axis keeps its
@@ -93,17 +132,21 @@ pub fn surface_key(s: &Surface, q: f64) -> String {
             semi_angle,
         } => {
             let a = normalise(*axis);
-            let c = closest_on_axis(*origin, a);
+            let c = closest_on_axis(scale.point(*origin), a);
             format!(
                 "cone/{}/{}/{}/{}",
                 triple(a, dq),
                 triple(c, q),
-                num(*radius, q),
-                num(*semi_angle, dq)
+                num(*radius * scale.length, q),
+                num(*semi_angle * scale.angle, dq)
             )
         }
         Surface::Sphere { origin, radius } => {
-            format!("sphere/{}/{}", triple(*origin, q), num(*radius, q))
+            format!(
+                "sphere/{}/{}",
+                triple(scale.point(*origin), q),
+                num(*radius * scale.length, q)
+            )
         }
         Surface::Torus {
             origin,
@@ -114,10 +157,10 @@ pub fn surface_key(s: &Surface, q: f64) -> String {
             let a = sign_normalise(normalise(*axis));
             format!(
                 "torus/{}/{}/{}/{}",
-                triple(*origin, q),
+                triple(scale.point(*origin), q),
                 triple(a, dq),
-                num(*major_radius, q),
-                num(*minor_radius, q)
+                num(*major_radius * scale.length, q),
+                num(*minor_radius * scale.length, q)
             )
         }
         Surface::Other(name) => name.clone(),
@@ -131,12 +174,17 @@ pub fn surface_key(s: &Surface, q: f64) -> String {
 /// extent along the axis for a surface of revolution, because a cylinder
 /// re-cut at a new seam still runs the same length; nothing at all for a
 /// sphere; the box the vertices fill otherwise.
-pub fn face_key(s: &Surface, vertices: &[[f64; 3]], q: f64) -> String {
-    let key = surface_key(s, q);
+pub fn face_key(s: &Surface, vertices: &[[f64; 3]], scale: Scale) -> String {
+    let q = QUANTUM;
+    let key = surface_key(s, scale);
+    let vertices: Vec<[f64; 3]> = vertices.iter().map(|v| scale.point(*v)).collect();
+    let vertices = vertices.as_slice();
     let span = match s {
         Surface::Cylinder { origin, axis, .. }
         | Surface::Cone { origin, axis, .. }
-        | Surface::Torus { origin, axis, .. } => axial_extent(*origin, *axis, vertices, q),
+        | Surface::Torus { origin, axis, .. } => {
+            axial_extent(scale.point(*origin), *axis, vertices, q)
+        }
         Surface::Sphere { .. } => String::new(),
         // An unlocated surface of revolution has no axis to measure
         // along, so it contributes no span rather than a misleading box.
@@ -171,8 +219,11 @@ pub fn single_feature_key(geometry_key: &str) -> String {
 ///
 /// The ends are sorted, because an edge is the same edge whichever way
 /// round a file states it.
-pub fn edge_key(curve: &str, ends: &[[f64; 3]], q: f64) -> String {
-    let mut ends: Vec<String> = ends.iter().map(|p| triple(*p, q)).collect();
+pub fn edge_key(curve: &str, ends: &[[f64; 3]], scale: Scale) -> String {
+    let mut ends: Vec<String> = ends
+        .iter()
+        .map(|p| triple(scale.point(*p), QUANTUM))
+        .collect();
     ends.sort();
     format!("edge/{curve}/{}", ends.join("/"))
 }
@@ -247,7 +298,7 @@ pub fn bbox(pts: &[[f64; 3]]) -> Option<([f64; 3], [f64; 3])> {
     Some((lo, hi))
 }
 
-/// The quantum a fingerprint rounds with, in model units.
+/// The quantum a fingerprint rounds with, in millimetres.
 pub fn identity_quantum() -> f64 {
     QUANTUM
 }
@@ -256,7 +307,7 @@ pub fn identity_quantum() -> f64 {
 mod tests {
     use super::*;
 
-    const Q: f64 = QUANTUM;
+    const Q: Scale = Scale::NONE;
 
     #[test]
     fn a_plane_is_its_normal_and_its_distance() {

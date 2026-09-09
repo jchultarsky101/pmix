@@ -44,6 +44,10 @@ fn offer<K: std::hash::Hash + Eq>(map: &mut HashMap<K, String>, key: K, id: &str
 
 /// Assign final ids to every record in `doc`.
 pub fn finalise(doc: &mut PmiDocument, keys: &Keys) {
+    // An annotation is located by where it sits, in the unit the model
+    // declares, so its coordinates go into millimetres like everything
+    // else that is keyed on geometry.
+    let mm = crate::units::scale_to_millimetres(doc.units.length.as_deref());
     let mut map: HashMap<String, String> = HashMap::new();
     // A record whose key the walker did not record keeps its temporary
     // id as the key, which is a content hash: distinct, but not stable.
@@ -173,7 +177,7 @@ pub fn finalise(doc: &mut PmiDocument, keys: &Keys) {
         remap_all(&mut a.semantic, &map);
         batch.push((
             i,
-            annotation_key(a),
+            annotation_key(a, mm),
             hash_content(&a, &["id", "source_refs", "views"]),
         ));
     }
@@ -256,14 +260,15 @@ fn element_of(source_refs: &[String]) -> String {
 /// something, and by where it sits when it does not. This is the STEP
 /// reader's recipe, so an annotation linked to records that both formats
 /// name the same way is itself named the same way.
-fn annotation_key(a: &Annotation) -> String {
+fn annotation_key(a: &Annotation, mm: f64) -> String {
+    let at = |p: [f64; 3]| [p[0] * mm, p[1] * mm, p[2] * mm];
     if !a.semantic.is_empty() {
         return format!("{}|{}", a.semantic.join(","), a.kind.as_str());
     }
     let plane = a
         .plane
         .as_ref()
-        .map(|p| triple(p.origin, COARSE_QUANTUM))
+        .map(|p| triple(at(p.origin), COARSE_QUANTUM))
         .unwrap_or_default();
     let bbox = a
         .geometry
@@ -272,8 +277,8 @@ fn annotation_key(a: &Annotation) -> String {
         .map(|b| {
             format!(
                 "{}/{}",
-                triple(b.min, COARSE_QUANTUM),
-                triple(b.max, COARSE_QUANTUM)
+                triple(at(b.min), COARSE_QUANTUM),
+                triple(at(b.max), COARSE_QUANTUM)
             )
         })
         .unwrap_or_default();

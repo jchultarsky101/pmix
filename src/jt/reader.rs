@@ -184,8 +184,7 @@ impl Reader for JtReader {
                 }
             }
         }
-        let per_metre = length.and_then(property::per_metre).unwrap_or(1.0);
-        let anchors = features::build(&managers, &topologies, per_metre);
+        let anchors = features::build(&managers, &topologies);
         tracing::debug!(
             parts = topologies.len(),
             features = anchors.features.len(),

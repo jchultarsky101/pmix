@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Units are normalised.** A design does not change when it is exported
+  in inches rather than millimetres, so its ids no longer do either.
+  Everything keyed on geometry — surfaces, edges, vertices, annotation
+  planes and bounding boxes — is stated in millimetres and degrees
+  whatever the file declares, and `pmix diff` compares a measure in the
+  unit it means rather than the unit it is written in, so 1 inch and
+  25.4 mm are not a change. Five of the seventeen NIST fixtures state
+  inches, so this was not hypothetical.
+
+### Changed
+
+- Records in a file stating anything but millimetres and degrees change
+  id, which is the point: they now agree with the same design stated in
+  millimetres. Files already in millimetres are unaffected.
+
 ## [0.6.0] - 2026-09-09
 
 A JT callout now reaches the edges it applies to, not only the faces. A

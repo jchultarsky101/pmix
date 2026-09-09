@@ -24,8 +24,10 @@ components changed material?" without opening a CAD package.
 > semantic records; saved views), and the **metadata** each file carries
 > as named properties. It extracts every such entity in the NIST test
 > corpus, and `pmix diff` compares two or more models by identity. A JT
-> dimension is anchored on the B-rep faces it applies to, by the same
-> recipe the STEP reader uses. See the [roadmap](#roadmap).
+> dimension is anchored on the B-rep faces and edges it applies to, by
+> the same recipe the STEP reader uses, and in millimetres whatever unit
+> the file states, so one design keys the same way however it was
+> exported. See the [roadmap](#roadmap).
 
 ## What pmix extracts
 
@@ -324,6 +326,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] JT analytic surface and curve geometry, each attached to the face or edge it belongs to (ADR 0010)
 - [x] Resolving a JT callout to the B-rep faces it applies to (ADR 0010)
 - [x] One fingerprint recipe for both readers, anchoring a dimension on the faces it is about (ADR 0004)
+- [x] Units normalised: one design keys the same way whether it states millimetres or inches (ADR 0004)
 - [ ] Confirming a JT and a STEP fingerprint agree, which needs a model published in both formats
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 

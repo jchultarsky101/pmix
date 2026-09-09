@@ -80,10 +80,7 @@ fn one(
 }
 
 /// Work out which faces and edges each callout applies to.
-///
-/// `per_metre` converts the topology table's metres into the unit the
-/// model declares, because a fingerprint is in model units.
-pub fn build(managers: &[PmiManager], topologies: &[Topology], per_metre: f64) -> Anchors {
+pub fn build(managers: &[PmiManager], topologies: &[Topology]) -> Anchors {
     // A tag names a face across the whole file, which is what lets an
     // assembly-level callout reach into a part. A tag two parts both
     // claim names neither: resolving it would be a guess.
@@ -118,7 +115,7 @@ pub fn build(managers: &[PmiManager], topologies: &[Topology], per_metre: f64) -
                 };
                 let topology = &topologies[t];
                 let face = &topology.faces[f];
-                let Some(key) = topology.fingerprint(face, per_metre) else {
+                let Some(key) = topology.fingerprint(face) else {
                     continue;
                 };
                 let id = feature_id(&key);
@@ -139,7 +136,7 @@ pub fn build(managers: &[PmiManager], topologies: &[Topology], per_metre: f64) -
                 };
                 let topology = &topologies[t];
                 let edge = &topology.edges[x];
-                let Some(key) = topology.edge_fingerprint(edge, per_metre) else {
+                let Some(key) = topology.edge_fingerprint(edge) else {
                     continue;
                 };
                 let id = feature_id(&key);

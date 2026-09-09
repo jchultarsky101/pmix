@@ -8,16 +8,17 @@
 use std::collections::HashSet;
 
 use super::datums::placement;
-use crate::fingerprint::{self, identity_quantum as shared_quantum};
+use crate::fingerprint::{self, Scale};
 use crate::identity::triple;
 use crate::model::Placement;
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
-/// The identity quantum: a fixed 1e-3 model units. It is deliberately not
-/// derived from the file's uncertainty, which differs between exports of
-/// the same design and would make ids depend on export settings.
-pub(crate) fn identity_quantum(_ex: &Exchange) -> f64 {
-    shared_quantum()
+/// The identity quantum: a fixed thousandth of a millimetre. It is
+/// deliberately not derived from the file's uncertainty, which differs
+/// between exports of the same design and would make ids depend on
+/// export settings.
+pub(crate) fn identity_quantum() -> f64 {
+    fingerprint::identity_quantum()
 }
 
 fn axis_of(p: &Placement) -> [f64; 3] {
@@ -48,9 +49,9 @@ pub(crate) struct Fingerprint {
 }
 
 /// Fingerprint of a geometry item referenced by a feature.
-pub(crate) fn of_item(ex: &Exchange, item: &Instance, q: f64) -> Fingerprint {
+pub(crate) fn of_item(ex: &Exchange, item: &Instance, scale: Scale) -> Fingerprint {
     if item.has_type("ADVANCED_FACE") || item.has_type("FACE_SURFACE") || item.has_type("FACE") {
-        return face(ex, item, q);
+        return face(ex, item, scale);
     }
     if item.has_type("ORIENTED_EDGE") {
         if let Some(e) = item
@@ -59,7 +60,7 @@ pub(crate) fn of_item(ex: &Exchange, item: &Instance, q: f64) -> Fingerprint {
             .and_then(Parameter::as_ref)
             .and_then(|i| ex.get(i))
         {
-            return of_item(ex, e, q);
+            return of_item(ex, e, scale);
         }
     }
     if item.has_type("EDGE_CURVE") {
@@ -80,7 +81,7 @@ pub(crate) fn of_item(ex: &Exchange, item: &Instance, q: f64) -> Fingerprint {
             .filter_map(|v| vertex_point(ex, v))
             .collect();
         return Fingerprint {
-            key: fingerprint::edge_key(&curve_kind, &pts, q),
+            key: fingerprint::edge_key(&curve_kind, &pts, scale),
             points: pts,
         };
     }
@@ -88,7 +89,7 @@ pub(crate) fn of_item(ex: &Exchange, item: &Instance, q: f64) -> Fingerprint {
         let pt = vertex_point(ex, item);
         return Fingerprint {
             key: pt
-                .map(|pt| format!("vertex/{}", triple(pt, q)))
+                .map(|pt| format!("vertex/{}", triple(scale.point(pt), identity_quantum())))
                 .unwrap_or_else(|| "vertex".into()),
             points: pt.into_iter().collect(),
         };
@@ -97,7 +98,7 @@ pub(crate) fn of_item(ex: &Exchange, item: &Instance, q: f64) -> Fingerprint {
         let pt = point(item);
         return Fingerprint {
             key: pt
-                .map(|pt| format!("point/{}", triple(pt, q)))
+                .map(|pt| format!("point/{}", triple(scale.point(pt), identity_quantum())))
                 .unwrap_or_else(|| "point".into()),
             points: pt.into_iter().collect(),
         };
@@ -106,7 +107,11 @@ pub(crate) fn of_item(ex: &Exchange, item: &Instance, q: f64) -> Fingerprint {
     // trimmed curves on one basis stay distinct.
     if let Some(pl) = super::presentation::sample_curve(ex, item) {
         if let (Some(first), Some(last)) = (pl.first(), pl.last()) {
-            let mut ends = [triple(*first, q), triple(*last, q)];
+            let q = identity_quantum();
+            let mut ends = [
+                triple(scale.point(*first), q),
+                triple(scale.point(*last), q),
+            ];
             ends.sort();
             return Fingerprint {
                 key: format!(
@@ -134,7 +139,7 @@ fn vertex_point(ex: &Exchange, v: &Instance) -> Option<[f64; 3]> {
     point(pt)
 }
 
-fn face(ex: &Exchange, f: &Instance, q: f64) -> Fingerprint {
+fn face(ex: &Exchange, f: &Instance, scale: Scale) -> Fingerprint {
     let p = f.parameters();
     let surface = p.get(2).and_then(Parameter::as_ref).and_then(|i| ex.get(i));
     // Vertices reachable through bounds -> loop -> edges -> vertices.
@@ -184,7 +189,7 @@ fn face(ex: &Exchange, f: &Instance, q: f64) -> Fingerprint {
         .map(|s| surface_of(ex, s))
         .unwrap_or_else(|| fingerprint::Surface::Other("face".into()));
     Fingerprint {
-        key: fingerprint::face_key(&carrier, &verts, q),
+        key: fingerprint::face_key(&carrier, &verts, scale),
         points: verts,
     }
 }
