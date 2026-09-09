@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-09
+
+`pmix features` now recognises the blends as well as the holes. A fillet
+fills an inside corner and a round breaks an outside one, a chamfer cuts
+a corner off where a cone can prove it, and each states the measurement
+it is actually called by. Across the NIST corpus this takes the share of
+faces that go into some feature from about a tenth to a third.
+
 ### Added
 
 - **Fillets, rounds, and chamfers** in `pmix features` (ADR 0011). A
@@ -487,7 +495,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/jchultarsky101/pmix/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/jchultarsky101/pmix/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jchultarsky101/pmix/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jchultarsky101/pmix/compare/v0.6.0...v0.7.0

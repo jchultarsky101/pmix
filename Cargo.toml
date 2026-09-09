@@ -1,6 +1,6 @@
 [package]
 name = "pmix"
-version = "0.9.0"
+version = "0.10.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Extract Product Manufacturing Information (PMI) from STEP and JT files into JSON, and compare it across models"
