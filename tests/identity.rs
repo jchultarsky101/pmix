@@ -49,9 +49,15 @@ const PAIRS: &[(&str, &str, f64, f64)] = &[
         1.0,
         1.0,
     ),
-    // A genuine re-export from a newer CAD version that split faces and
-    // added hole features; the fractions are the recorded baseline
-    // (53/63 semantic, 27/58 annotations on 2026-09-07).
+    // A genuine re-export from a newer CAD version. The two editions
+    // differ in what they model, not only in how they write it: the
+    // newer one splits faces, and states as a distance between two
+    // features what the older stated as a size on one. So the records
+    // that do not pair are mostly not paired because they are not the
+    // same records. Recorded baseline 51/63 semantic and 25/58
+    // annotations on 2026-09-09; of the 33 annotations that do not pair,
+    // 30 are linked to semantic records, so they follow those rather
+    // than failing on their own account.
     (
         "previous/nist_stc_09_asme1_ap242-e3.stp",
         "nist_stc_09_asme1_ap242-e4.stp",
