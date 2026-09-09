@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "source": {
+    "file_name": "assembly_properties.stp",
+    "format": "STEP",
+    "schema": "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF",
+    "writer": "pmix synthetic",
+    "time_stamp": "2026-09-09T00:00:00"
+  },
+  "units": {
+    "length": "mm",
+    "angle": "rad"
+  },
+  "properties": [
+    {
+      "id": "prop:624e38676d973cba",
+      "name": "Mass (g)",
+      "category": "Component Metadata",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 2.75
+      },
+      "part": "pin_lower",
+      "unmapped": [],
+      "source_refs": [
+        "#84",
+        "#87",
+        "#86",
+        "#85"
+      ]
+    },
+    {
+      "id": "prop:937ec9ad03852a64",
+      "name": "Component Count",
+      "category": "Assembly Metadata",
+      "kind": "user",
+      "value": {
+        "type": "integer",
+        "value": 3
+      },
+      "part": "synthetic_assembly",
+      "unmapped": [],
+      "source_refs": [
+        "#50",
+        "#53",
+        "#52",
+        "#51"
+      ]
+    },
+    {
+      "id": "prop:9dbd22f8d6ab5235",
+      "name": "Mass (g)",
+      "category": "Component Metadata",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 2.75
+      },
+      "part": "pin_upper",
+      "unmapped": [],
+      "source_refs": [
+        "#74",
+        "#77",
+        "#76",
+        "#75"
+      ]
+    },
+    {
+      "id": "prop:b199248d31684323",
+      "name": "Mass (g)",
+      "category": "Component Metadata",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 41.5
+      },
+      "part": "bracket_left",
+      "unmapped": [],
+      "source_refs": [
+        "#64",
+        "#67",
+        "#66",
+        "#65"
+      ]
+    },
+    {
+      "id": "prop:bracket_left.Material",
+      "name": "Material",
+      "category": "Component Metadata",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "SYN-ALLOY-17"
+      },
+      "part": "bracket_left",
+      "unmapped": [],
+      "source_refs": [
+        "#60",
+        "#63",
+        "#62",
+        "#61"
+      ]
+    },
+    {
+      "id": "prop:pin_lower.Material",
+      "name": "Material",
+      "category": "Component Metadata",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "SYN-STEEL-4"
+      },
+      "part": "pin_lower",
+      "unmapped": [],
+      "source_refs": [
+        "#80",
+        "#83",
+        "#82",
+        "#81"
+      ]
+    },
+    {
+      "id": "prop:pin_upper.Material",
+      "name": "Material",
+      "category": "Component Metadata",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "SYN-STEEL-4"
+      },
+      "part": "pin_upper",
+      "unmapped": [],
+      "source_refs": [
+        "#70",
+        "#73",
+        "#72",
+        "#71"
+      ]
+    }
+  ],
+  "semantic": {
+    "features": [],
+    "datums": [],
+    "datum_systems": [],
+    "dimensions": [],
+    "tolerances": [],
+    "notes": [],
+    "other": []
+  },
+  "presentation": {
+    "annotations": [],
+    "views": []
+  },
+  "unknown": [],
+  "diagnostics": []
+}

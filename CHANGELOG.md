@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A STEP property now says which part states it.** An assembly states
+  the same property names of every component, so without the part they
+  were one record with content-ordered suffixes: on a 105-component
+  assembly, 3017 of 3117 properties carried a suffix and the largest
+  group was 106 deep, so adding one component reshuffled up to 106 ids.
+  A property attached to an assembly occurrence is named by that
+  occurrence, which is what tells two uses of one product apart. The JT
+  reader already worked this way.
+- `pmix diff` pairs properties by name where no id pairs them, for the
+  case where two readers state a property's group differently. Such a
+  pairing is reported as `matched: "name"` and rendered as
+  `(matched by name)`; it never changes an id.
+
+### Fixed
+
+- **A JT property key's trailing `::` is no longer part of its name.**
+  The specification defines it as marking the property visible to a
+  viewer, so keeping it made the same property two records and put a JT
+  decoration in a name a STEP file also states.
+
+### Changed
+
+- A STEP property id reads as `prop:core.Part_Number` where the part and
+  the name both allow it, and is hashed otherwise. Property ids change
+  in files that name a part; a file describing one unnamed part keys
+  exactly as before.
+
 ## [0.4.0] - 2026-09-08
 
 The headline is that a JT dimension or tolerance is now anchored on the

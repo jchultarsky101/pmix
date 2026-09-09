@@ -328,31 +328,43 @@ pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
         if let Some(a) = &mut prop.applies_to {
             remap(a, &map);
         }
-        let key = [
+        // The part belongs in the key: an assembly states the same
+        // property of every component, and without it they are one
+        // record with a hundred content-ordered suffixes. A file that
+        // names no part leaves the field out rather than empty, so that
+        // describing one part keys exactly as it always did.
+        let mut fields = Vec::new();
+        if let Some(part) = prop.part.as_deref() {
+            fields.push(part);
+        }
+        fields.extend([
             prop.category.as_deref().unwrap_or(""),
             prop.name.as_str(),
             prop.applies_to.as_deref().unwrap_or(""),
-        ]
-        .join("|");
+        ]);
+        let key = fields.join("|");
         let content = hash_content(&prop, &["id", "source_refs"]);
         if prop.applies_to.is_none() {
-            // Readable as `prop:Part_Number` when the name allows it.
-            product_level.push((i, prop.name.clone(), content, key));
+            // Readable as `prop:Part_Number`, or `prop:core.Part_Number`
+            // where a part states it, since an assembly states the same
+            // property of every component and the name alone would not
+            // say which. A name or a part that will not read plainly
+            // falls back to the hashed key.
+            let readable = match &prop.part {
+                Some(part) => format!("{part}.{}", prop.name),
+                None => prop.name.clone(),
+            };
+            let base = if is_readable(&readable) {
+                readable
+            } else {
+                key
+            };
+            product_level.push((i, base, content));
         } else {
             attached.push((i, key, content));
         }
     }
-    // Product-level properties key on all three parts but are named by the
-    // property alone, so a name shared by two categories collides and takes
-    // the usual content-ordered suffix.
-    let readable: Vec<(usize, String, String)> = product_level
-        .into_iter()
-        .map(|(i, name, content, key)| {
-            let base = if is_readable(&name) { name } else { key };
-            (i, base, content)
-        })
-        .collect();
-    for (i, id) in assign(readable, "prop", true) {
+    for (i, id) in assign(product_level, "prop", true) {
         map.insert(ctx.properties[i].id.clone(), id.clone());
         ctx.properties[i].id = id;
     }

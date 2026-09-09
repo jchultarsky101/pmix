@@ -205,6 +205,13 @@ impl Reader for JtReader {
             std::collections::HashSet::new();
         let mut add =
             |name: &str, value: PropertyValue, text: &str, part: Option<String>, source: String| {
+                // A key ending in a double colon is marked visible to a
+                // viewing application, and one without it hidden; the
+                // marker is a display hint rather than part of the name
+                // (specification 11.9.1.2). Keeping it would make the
+                // same property in two files two records, and would put
+                // a JT decoration in a name a STEP file also states.
+                let name = name.strip_suffix("::").unwrap_or(name);
                 // One part saying a thing twice adds nothing; two parts
                 // saying the same thing are two facts.
                 let owner = part.clone().unwrap_or_default();

@@ -8,39 +8,48 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
 **pmix** is a command-line tool that reads a 3D model file (STEP or JT),
-extracts the Product Manufacturing Information (PMI) embedded in it, and
-writes that information to a JSON file in a stable, comparable form.
+extracts the Product Manufacturing Information (PMI) and the metadata
+embedded in it, and writes both to a JSON file in a stable, comparable
+form.
 
 Run it on two or more models and `pmix diff` answers questions like "did
-the tolerances change between revision B and revision C?" without opening a
-CAD package.
+the tolerances change between revision B and revision C?" or "which
+components changed material?" without opening a CAD package.
 
-> **Status: 0.1.0.** `pmix extract` reads STEP AP242 files and emits both
-> layers of the model: the semantic layer (units, features, dimensions with
-> tolerances, geometric tolerances with zones, modifiers and composites,
-> datums with targets, datum reference frames) and the presentation layer
-> (annotations with text, plane, leaders, style, geometry summary and links
-> to the semantic records; saved views). It extracts every such entity in
-> the NIST test corpus, and `pmix diff` compares two or more models by
-> identity. Named property values such as part numbers and revisions are
-> extracted too. JT gives both layers as well, so dimensions, geometric
-> tolerances, datums, annotations, and saved views come out of either
-> format in the same shape. See the [roadmap](#roadmap).
+> **Status: 0.4.0.** `pmix extract` reads STEP AP242 and JT files and
+> emits the semantic layer (units, features, dimensions with tolerances,
+> geometric tolerances with zones, modifiers and composites, datums with
+> targets, datum reference frames), the presentation layer (annotations
+> with text, plane, leaders, style, geometry summary and links to the
+> semantic records; saved views), and the **metadata** each file carries
+> as named properties. It extracts every such entity in the NIST test
+> corpus, and `pmix diff` compares two or more models by identity. A JT
+> dimension is anchored on the B-rep faces it applies to, by the same
+> recipe the STEP reader uses. See the [roadmap](#roadmap).
 
-## What is PMI?
+## What pmix extracts
 
-PMI is the set of annotations that turn a bare geometric model into a
+**PMI** is the set of annotations that turn a bare geometric model into a
 manufacturing specification: dimensions and their tolerances, geometric
-dimensioning and tolerancing (GD&T) feature control frames, datums, surface
-finish symbols, and notes. In a model-based definition (MBD) workflow this
-data lives inside the 3D file rather than on a 2D drawing.
+dimensioning and tolerancing (GD&T) feature control frames, datums,
+surface finish symbols, and notes.
+
+**Metadata** is everything else a CAD file records about the design as
+named values: part numbers and revisions, material, mass and volume, the
+system that wrote the file, and whatever else the modeller chose to
+attach. A file often carries far more of this than it carries PMI, and
+`pmix` extracts it all. A property says which part states it, so an
+assembly's components stay apart rather than collapsing into one record.
+
+In a model-based definition (MBD) workflow both live inside the 3D file
+rather than on a 2D drawing.
 
 ## Supported formats
 
 | Format | Standard | Extensions | Status |
 | ------ | -------- | ---------- | ------ |
 | STEP | ISO 10303 (AP242) | `.stp`, `.step`, `.p21` | Extraction and comparison |
-| JT | ISO 14306 | `.jt` | Extraction and comparison |
+| JT | ISO 14306 (9 and 10) | `.jt` | Extraction and comparison |
 
 ## Installation
 

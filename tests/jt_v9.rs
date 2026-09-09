@@ -163,6 +163,38 @@ fn a_jt_9_property_atom_states_its_versions_in_two_bytes_each() {
     assert!(property::read(&data, 10).by_element.is_empty());
 }
 
+/// A key ending in a double colon is marked visible to a viewer; the
+/// marker is a display hint, not part of the name (specification
+/// 11.9.1.2). Keeping it would make one property two records across two
+/// files, and would put a JT decoration in a name a STEP file also
+/// states.
+#[test]
+fn the_visible_marker_is_not_part_of_a_property_name() {
+    use pmix::{ExtractOptions, Reader};
+    let bytes = jt9(&[("PART_NUMBER::", "SYN-004-REV-A"), ("SUBNODE", "1")]);
+    let doc = pmix::jt::JtReader
+        .read(&bytes, "synthetic.jt", &ExtractOptions::default())
+        .unwrap();
+    let names: Vec<&str> = doc.properties.iter().map(|p| p.name.as_str()).collect();
+    assert!(names.contains(&"PART_NUMBER"), "{names:?}");
+    assert!(
+        !names.iter().any(|n| n.ends_with("::")),
+        "the marker reached a name: {names:?}"
+    );
+    // Marked or not, it is the same property, so it is the same record.
+    let plain = jt9(&[("PART_NUMBER", "SYN-004-REV-A"), ("SUBNODE", "1")]);
+    let other = pmix::jt::JtReader
+        .read(&plain, "synthetic.jt", &ExtractOptions::default())
+        .unwrap();
+    let id = |d: &pmix::PmiDocument| {
+        d.properties
+            .iter()
+            .find(|p| p.name == "PART_NUMBER")
+            .map(|p| p.id.clone())
+    };
+    assert_eq!(id(&doc), id(&other));
+}
+
 #[test]
 fn a_whole_jt_9_file_extracts_its_properties() {
     use pmix::{ExtractOptions, Reader};

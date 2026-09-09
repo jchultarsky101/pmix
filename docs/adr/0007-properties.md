@@ -88,6 +88,47 @@ always emitted, empty when the file has no properties, so a consumer can
 tell an old document from a new one with no properties by the key's
 presence.
 
+### The part that states a property belongs to its identity
+
+Added 2026-09-09. An assembly states the same property names of every
+component — `Material`, `Mass (g)`, `Bbox Xmax (mm)` — so without the
+part in the key they are one record with content-ordered suffixes. On a
+105-component assembly, 3017 of 3117 properties carried such a suffix,
+the largest group being 106 deep, which meant adding one component
+reshuffled up to 106 ids.
+
+A STEP property reaches its part two ways. One attached to a product
+definition is about that product. One attached to a
+`next_assembly_usage_occurrence` is about that component **as used
+here**, and the occurrence's own name is what names it: two uses of one
+product state the same values, so only the occurrence tells them apart.
+The JT reader already scoped properties this way.
+
+The field is left out of the key entirely when no part is named, so a
+file describing one part keys exactly as it always did. An id reads
+plainly as `prop:core.Part_Number` where both the part and the name
+allow, and falls back to a hash where they do not.
+
+### A JT key's trailing double colon is not part of the name
+
+The specification (11.9.1.2) defines a trailing `::` as marking a
+property **visible** to a viewing application, and its absence as
+marking it hidden — a display hint, and explicitly not a security or
+content distinction. It is stripped, so that marking a property visible
+does not make it a different record, and so that a name a STEP file also
+states is not carried with a JT decoration on it.
+
+Keys are **case-sensitive** (11.9.1.3), so nothing is case-folded.
+
+### What is deliberately not normalised
+
+A JT writer may group keys with a prefix, as HOOPS Exchange does with
+`Assembly Metadata/Analysis Software` where a STEP file puts the group
+in `category`. The specification documents no such separator: it is one
+converter's convention. Folding it into identity would let a converter's
+naming habit silently change an id, so it is handled at comparison time
+instead ([ADR 0005](0005-diff.md)) and never in a key.
+
 ## Alternatives considered
 
 - **A `properties` map on every record.** Natural for the NIST validation
