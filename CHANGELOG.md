@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Fillets, rounds, and chamfers** in `pmix features` (ADR 0011). A
+  blend is decided at the join rather than on the face: where a surface
+  carries on smoothly through it, it is a blend, and where it leaves a
+  corner, it is not. Which side the material is on then separates a
+  **fillet**, filling an inside corner, from a **round**, breaking an
+  outside one — the same distinction that separates a bore from a shaft.
+  A cone that is tangent to neither of the faces it sits between is a
+  **chamfer**; beside a bore the same cone is a countersink, and only
+  what it opens into tells the two apart.
+
+  Each feature now states the measurement it is actually called by. A
+  blend has a `radius` and a `length`, a bore a `diameter` and a
+  `depth`, and neither states the other's. A blend runs along an edge
+  rather than into the material, so it no longer answers whether it goes
+  through.
+
+  Deciding this needed the normal of a surface at a point, which
+  identity never did (`features::surface`).
+
+  Across the NIST corpus this takes the share of faces that go into some
+  feature from about a tenth to a third. It does **not** recognise a
+  chamfer on a straight edge: that is a plane, not a cone, and no local
+  rule separates a narrow planar strip from a narrow face that was
+  always meant to be there. Those stay listed as unassigned.
+
 ## [0.9.0] - 2026-09-09
 
 `pmix features` reads a model's geometry and describes what the part

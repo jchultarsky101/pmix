@@ -129,6 +129,16 @@ pub enum Kind {
     Countersink,
     /// A cylindrical wall with material inside it: a shaft, pin, or pad.
     Boss,
+    /// A blend filling an inside corner, leaving the surface smooth
+    /// where two faces would otherwise meet at an edge.
+    Fillet,
+    /// The same blend on an outside corner, rounding the edge off.
+    /// Machinists call this a round, and it is worth telling from a
+    /// fillet because the two look nothing alike on the part.
+    Round,
+    /// A cone cutting the corner off where two faces meet, leaving an
+    /// edge rather than a smooth join.
+    Chamfer,
 }
 
 impl Kind {
@@ -139,6 +149,9 @@ impl Kind {
             Self::Counterbore => "counterbore",
             Self::Countersink => "countersink",
             Self::Boss => "boss",
+            Self::Fillet => "fillet",
+            Self::Round => "round",
+            Self::Chamfer => "chamfer",
         }
     }
 }
@@ -153,12 +166,21 @@ impl Kind {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Shape {
     /// Diameter in millimetres. Two of these are what makes "Ø4.5 became
-    /// Ø5.0" sayable.
+    /// Ø5.0" sayable. Bores, shafts, and chamfers state one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub diameter: Option<f64>,
-    /// How far it runs along its axis, in millimetres.
+    /// Blend radius in millimetres. A fillet is always called by its
+    /// radius and never by a diameter, so it states this instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub radius: Option<f64>,
+    /// How deep a bore goes, in millimetres.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub depth: Option<f64>,
+    /// How far a blend runs, in millimetres. A fillet has a length, not
+    /// a depth: it travels along an edge rather than into the material,
+    /// and calling that a depth would invite the wrong comparison.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub length: Option<f64>,
     /// Whether it opens at both ends. `None` when the rule could not
     /// tell, which is stated rather than defaulted to either answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]

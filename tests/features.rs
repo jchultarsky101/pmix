@@ -153,6 +153,78 @@ fn a_bore_cut_into_halves_is_one_hole_with_one_id() {
     assert_eq!(whole.bodies[0].unassigned, split.bodies[0].unassigned);
 }
 
+/// A blend is decided at the join, not on the face: the surface carries
+/// on smoothly through it. Which side the material is on is what makes
+/// the same R5 cylinder a round on an outside corner and a fillet on an
+/// inside one, and the two look nothing alike on the part.
+#[test]
+fn a_blend_is_a_round_outside_and_a_fillet_inside() {
+    let outside = read("synthetic/plate_corner_round.stp");
+    let inside = read("synthetic/plate_inside_fillet.stp");
+    let (r, f) = (only_feature(&outside), only_feature(&inside));
+
+    assert_eq!(r.kind, Kind::Round);
+    assert_eq!(f.kind, Kind::Fillet);
+    // The same blend radius either way, so nothing but the side it is
+    // on separates them.
+    assert_eq!(r.shape.radius, Some(5.0));
+    assert_eq!(f.shape.radius, Some(5.0));
+    assert_eq!(r.shape.length, Some(10.0));
+    assert_eq!(f.shape.length, Some(10.0));
+    // The corner it rounds, and the corner it fills.
+    assert_eq!(r.shape.position, Some([5.0, 5.0, 0.0]));
+    assert_eq!(f.shape.position, Some([20.0, 20.0, 0.0]));
+
+    // The flat faces around them are not blends and say so.
+    assert_eq!(outside.bodies[0].unassigned.len(), 6);
+    assert_eq!(inside.bodies[0].unassigned.len(), 8);
+}
+
+/// A cone meeting a bore is a countersink; the same cone meeting a shaft
+/// is a chamfer. Nothing about the cone itself separates them — only
+/// what it opens into does.
+#[test]
+fn a_cone_beside_a_shaft_is_a_chamfer_not_a_countersink() {
+    let doc = read("synthetic/shaft_chamfered.stp");
+    let body = &doc.bodies[0];
+    let kinds: Vec<Kind> = body.features.iter().map(|f| f.kind).collect();
+    assert!(kinds.contains(&Kind::Chamfer), "{kinds:?}");
+    assert!(kinds.contains(&Kind::Boss), "{kinds:?}");
+    assert!(!kinds.contains(&Kind::Countersink), "{kinds:?}");
+
+    let chamfer = body
+        .features
+        .iter()
+        .find(|f| f.kind == Kind::Chamfer)
+        .unwrap();
+    // The full angle at the apex, as a countersink states one: a
+    // chamfer cut at forty-five degrees a side is ninety included.
+    assert_eq!(chamfer.shape.angle, Some(90.0));
+    assert_eq!(chamfer.shape.diameter, Some(20.0));
+    assert_eq!(chamfer.shape.extent, Some([25.0, 30.0]));
+}
+
+/// Each feature states the measurement it is actually called by, and
+/// leaves the others out rather than filling them in with something a
+/// reader would then compare against the wrong thing.
+#[test]
+fn a_blend_states_a_radius_and_a_bore_a_diameter() {
+    let hole = only_feature(&read("synthetic/plate_one_hole.stp"))
+        .shape
+        .clone();
+    assert!(hole.diameter.is_some() && hole.depth.is_some() && hole.through.is_some());
+    assert!(hole.radius.is_none() && hole.length.is_none());
+
+    let round = only_feature(&read("synthetic/plate_corner_round.stp"))
+        .shape
+        .clone();
+    assert!(round.radius.is_some() && round.length.is_some());
+    // A blend runs along an edge rather than into the material, so it
+    // has neither a depth nor an answer to whether it goes through.
+    assert!(round.diameter.is_none() && round.depth.is_none());
+    assert!(round.through.is_none());
+}
+
 #[test]
 fn reading_the_same_file_twice_gives_the_same_document() {
     assert_eq!(
