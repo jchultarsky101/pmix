@@ -9,7 +9,7 @@
 use super::units::unit_name;
 use super::{Ctx, PropertyRepr, source_ref};
 use crate::model::{Property, PropertyKind, PropertyValue, Unmapped};
-use crate::step::p21::{Id, Instance, Parameter};
+use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
 /// Property definition names whose values describe how the PMI was
 /// written rather than what the design is (CAx-IF validation properties).
@@ -28,6 +28,28 @@ const PRODUCT_LEVEL: &[&str] = &[
     "PRODUCT",
 ];
 
+/// Assembly occurrences. A property on one is about that component as
+/// it is used here, which in an assembly is the part that states it.
+const OCCURRENCE: &[&str] = &[
+    "NEXT_ASSEMBLY_USAGE_OCCURRENCE",
+    "ASSEMBLY_COMPONENT_USAGE",
+    "PRODUCT_DEFINITION_RELATIONSHIP",
+];
+
+/// What a property is about: a record of the model, a part of the
+/// assembly, or neither.
+#[derive(Debug, Default, Clone)]
+struct Target {
+    /// The record the property is a property of.
+    applies_to: Option<String>,
+    /// The part that states it, when the property is about a part rather
+    /// than about a record.
+    part: Option<String>,
+    /// What the property attached to, when it is something the model has
+    /// no record for.
+    note: Option<String>,
+}
+
 /// Build a [`Property`] for every value item of every property definition.
 pub(crate) fn walk(ctx: &mut Ctx<'_>) {
     let targets: Vec<(Id, Vec<PropertyRepr>)> = ctx
@@ -38,7 +60,11 @@ pub(crate) fn walk(ctx: &mut Ctx<'_>) {
     tracing::debug!(count = targets.len(), "property definition targets");
 
     for (target, reprs) in targets {
-        let (applies_to, target_note) = resolve_target(ctx, target);
+        let Target {
+            applies_to,
+            part,
+            note: target_note,
+        } = resolve_target(ctx, target);
         for (pd_id, pdr_id, rep_id) in reprs {
             let ex = ctx.ex;
             let (Some(pd), Some(rep)) = (ex.get(pd_id), ex.get(rep_id)) else {
@@ -105,6 +131,7 @@ pub(crate) fn walk(ctx: &mut Ctx<'_>) {
                 let id = ctx.ids.make(
                     "prop",
                     &[
+                        part.as_deref().unwrap_or(""),
                         category.as_deref().unwrap_or(""),
                         &name,
                         applies_to.as_deref().unwrap_or(""),
@@ -118,8 +145,7 @@ pub(crate) fn walk(ctx: &mut Ctx<'_>) {
                     name,
                     category,
                     kind,
-                    // A STEP file the reader handles describes one part.
-                    part: None,
+                    part: part.clone(),
                     value,
                     applies_to: applies_to.clone(),
                     unmapped,
@@ -141,14 +167,45 @@ pub(crate) fn walk(ctx: &mut Ctx<'_>) {
     }
 }
 
-/// The record a property is about: `None` for the whole part, plus a note
-/// when the target is something the model has no record for.
-fn resolve_target(ctx: &mut Ctx<'_>, target: Id) -> (Option<String>, Option<String>) {
+/// What a property is about.
+///
+/// A property attached to a product is about that product, which in an
+/// assembly is one part among several, so the part is named rather than
+/// left out. Anything else is about a record of the model, and a target
+/// the model has no record for leaves a note instead.
+fn resolve_target(ctx: &mut Ctx<'_>, target: Id) -> Target {
     let Some(inst) = ctx.ex.get(target) else {
-        return (None, Some(format!("undefined {}", source_ref(target))));
+        return Target {
+            note: Some(format!("undefined {}", source_ref(target))),
+            ..Target::default()
+        };
     };
     if inst.type_names().any(|t| PRODUCT_LEVEL.contains(&t)) {
-        return (None, None);
+        return Target {
+            part: product_of(ctx.ex, target),
+            ..Target::default()
+        };
+    }
+    // An assembly states the same properties of every component, so the
+    // component has to be named or they are all one record.
+    if let Some(keyword) = OCCURRENCE.iter().find(|t| inst.has_type(t)) {
+        let named = inst
+            .attr(keyword, 1)
+            .and_then(Parameter::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned);
+        return Target {
+            // The occurrence's own name tells two uses of one product
+            // apart; where a writer leaves it empty, the product it uses
+            // is the best that can be said.
+            part: named.or_else(|| {
+                inst.attr(keyword, 4)
+                    .and_then(Parameter::as_ref)
+                    .and_then(|r| product_of(ctx.ex, r))
+            }),
+            ..Target::default()
+        };
     }
     let found = ctx
         .tolerance_ids
@@ -160,12 +217,42 @@ fn resolve_target(ctx: &mut Ctx<'_>, target: Id) -> (Option<String>, Option<Stri
         .or_else(|| ctx.datum_system_ids.get(&target).cloned().flatten())
         .or_else(|| ctx.feature_ids.get(&target).cloned().flatten());
     match found {
-        Some(id) => (Some(id), None),
-        None => (
-            None,
-            Some(format!("{} ({})", source_ref(target), inst.type_key())),
-        ),
+        Some(id) => Target {
+            applies_to: Some(id),
+            ..Target::default()
+        },
+        None => Target {
+            note: Some(format!("{} ({})", source_ref(target), inst.type_key())),
+            ..Target::default()
+        },
     }
+}
+
+/// The name of the product a product-level target belongs to.
+///
+/// A shape names its definition, a definition names its formation, and a
+/// formation names its product, so following the one reference that is
+/// itself product-level arrives at the product in at most three steps.
+fn product_of(ex: &Exchange, target: Id) -> Option<String> {
+    let mut at = target;
+    for _ in 0..PRODUCT_LEVEL.len() {
+        let inst = ex.get(at)?;
+        if inst.has_type("PRODUCT") {
+            // The name, or the identifier when a writer leaves it empty.
+            return [1usize, 0]
+                .into_iter()
+                .filter_map(|i| inst.attr("PRODUCT", i))
+                .filter_map(Parameter::as_str)
+                .map(str::trim)
+                .find(|s| !s.is_empty())
+                .map(str::to_owned);
+        }
+        at = inst.references().into_iter().find(|r| {
+            ex.get(*r)
+                .is_some_and(|i| i.type_names().any(|t| PRODUCT_LEVEL.contains(&t)))
+        })?;
+    }
+    None
 }
 
 /// The name and typed value of a representation item, if it carries one.

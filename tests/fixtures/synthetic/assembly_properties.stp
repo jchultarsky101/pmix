@@ -1,0 +1,65 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('pmix synthetic fixture: an assembly whose components state the same property names'),'2;1');
+FILE_NAME('assembly_properties.stp','2026-09-09T00:00:00',('pmix'),('pmix'),'pmix synthetic','pmix','');
+FILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }'));
+ENDSEC;
+DATA;
+/* units */
+#1=(LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.));
+#2=(NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.));
+#3=(GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNIT_ASSIGNED_CONTEXT((#1,#2)) REPRESENTATION_CONTEXT('','3D'));
+#4=APPLICATION_CONTEXT('managed model based 3d engineering');
+#5=PRODUCT_DEFINITION_CONTEXT('part definition',#4,'design');
+#6=PRODUCT_CONTEXT('',#4,'mechanical');
+/* the assembly */
+#10=PRODUCT('SYN-ASM','synthetic_assembly','',(#6));
+#11=PRODUCT_DEFINITION_FORMATION('','',#10);
+#12=PRODUCT_DEFINITION('design','',#11,#5);
+/* two components, both of the same product, so only the occurrence
+   names tell them apart */
+#20=PRODUCT('SYN-BRACKET','bracket','',(#6));
+#21=PRODUCT_DEFINITION_FORMATION('','',#20);
+#22=PRODUCT_DEFINITION('design','',#21,#5);
+#30=PRODUCT('SYN-PIN','pin','',(#6));
+#31=PRODUCT_DEFINITION_FORMATION('','',#30);
+#32=PRODUCT_DEFINITION('design','',#31,#5);
+/* three occurrences: the pin is used twice */
+#40=NEXT_ASSEMBLY_USAGE_OCCURRENCE('1','bracket_left','',#12,#22,$);
+#41=NEXT_ASSEMBLY_USAGE_OCCURRENCE('2','pin_upper','',#12,#32,$);
+#42=NEXT_ASSEMBLY_USAGE_OCCURRENCE('3','pin_lower','',#12,#32,$);
+/* the assembly states its own property */
+#50=PROPERTY_DEFINITION('Assembly Metadata','',#12);
+#51=DESCRIPTIVE_REPRESENTATION_ITEM('Component Count','3');
+#52=REPRESENTATION('Component Count',(#51),#3);
+#53=PROPERTY_DEFINITION_REPRESENTATION(#50,#52);
+/* every component states the same two property names with different
+   values, which is what collides when the part is left out of the key */
+#60=PROPERTY_DEFINITION('Component Metadata','',#40);
+#61=DESCRIPTIVE_REPRESENTATION_ITEM('Material','SYN-ALLOY-17');
+#62=REPRESENTATION('Material',(#61),#3);
+#63=PROPERTY_DEFINITION_REPRESENTATION(#60,#62);
+#64=PROPERTY_DEFINITION('Component Metadata','',#40);
+#65=DESCRIPTIVE_REPRESENTATION_ITEM('Mass (g)','41.5');
+#66=REPRESENTATION('Mass (g)',(#65),#3);
+#67=PROPERTY_DEFINITION_REPRESENTATION(#64,#66);
+#70=PROPERTY_DEFINITION('Component Metadata','',#41);
+#71=DESCRIPTIVE_REPRESENTATION_ITEM('Material','SYN-STEEL-4');
+#72=REPRESENTATION('Material',(#71),#3);
+#73=PROPERTY_DEFINITION_REPRESENTATION(#70,#72);
+#74=PROPERTY_DEFINITION('Component Metadata','',#41);
+#75=DESCRIPTIVE_REPRESENTATION_ITEM('Mass (g)','2.75');
+#76=REPRESENTATION('Mass (g)',(#75),#3);
+#77=PROPERTY_DEFINITION_REPRESENTATION(#74,#76);
+/* the second pin is the same product as the first and states the same
+   values, so only its occurrence name keeps the two apart */
+#80=PROPERTY_DEFINITION('Component Metadata','',#42);
+#81=DESCRIPTIVE_REPRESENTATION_ITEM('Material','SYN-STEEL-4');
+#82=REPRESENTATION('Material',(#81),#3);
+#83=PROPERTY_DEFINITION_REPRESENTATION(#80,#82);
+#84=PROPERTY_DEFINITION('Component Metadata','',#42);
+#85=DESCRIPTIVE_REPRESENTATION_ITEM('Mass (g)','2.75');
+#86=REPRESENTATION('Mass (g)',(#85),#3);
+#87=PROPERTY_DEFINITION_REPRESENTATION(#84,#86);
+ENDSEC;
+END-ISO-10303-21;

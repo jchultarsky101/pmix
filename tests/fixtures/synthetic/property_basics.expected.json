@@ -13,7 +13,7 @@
   },
   "properties": [
     {
-      "id": "prop:607b46832bf01548",
+      "id": "prop:0e23cc956624ec8a",
       "name": "volume measure",
       "category": "geometric validation property",
       "kind": "validation",
@@ -22,12 +22,103 @@
         "value": 1234.5,
         "unit": "mm3"
       },
+      "part": "pmix synthetic part",
       "unmapped": [],
       "source_refs": [
         "#60",
         "#63",
         "#62",
         "#61"
+      ]
+    },
+    {
+      "id": "prop:362d831043c0d214",
+      "name": "Batch_Size",
+      "category": "PLM__Batch_Size",
+      "kind": "user",
+      "value": {
+        "type": "integer",
+        "value": 250
+      },
+      "part": "pmix synthetic part",
+      "unmapped": [],
+      "source_refs": [
+        "#44",
+        "#47",
+        "#46",
+        "#45"
+      ]
+    },
+    {
+      "id": "prop:3ab409bf9dcd4a49",
+      "name": "Nominal_Mass_kg",
+      "category": "TECH__Nominal_Mass_kg",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 2.5
+      },
+      "part": "pmix synthetic part",
+      "unmapped": [],
+      "source_refs": [
+        "#84",
+        "#87",
+        "#86",
+        "#85"
+      ]
+    },
+    {
+      "id": "prop:429ff3f3cb94b374",
+      "name": "Part_Number",
+      "category": "PLM__Part_Number",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "SYN-004-REV-A"
+      },
+      "part": "pmix synthetic part",
+      "unmapped": [],
+      "source_refs": [
+        "#40",
+        "#43",
+        "#42",
+        "#41"
+      ]
+    },
+    {
+      "id": "prop:4964e9f0992e0071",
+      "name": "Bbox_X_mm",
+      "category": "TECH__Bbox_X_mm",
+      "kind": "user",
+      "value": {
+        "type": "number",
+        "value": 64.0
+      },
+      "part": "pmix synthetic part",
+      "unmapped": [],
+      "source_refs": [
+        "#96",
+        "#99",
+        "#98",
+        "#97"
+      ]
+    },
+    {
+      "id": "prop:4b238cf921222784",
+      "name": "Serial_Number",
+      "category": "PLM__Serial_Number",
+      "kind": "user",
+      "value": {
+        "type": "text",
+        "value": "007"
+      },
+      "part": "pmix synthetic part",
+      "unmapped": [],
+      "source_refs": [
+        "#88",
+        "#91",
+        "#90",
+        "#89"
       ]
     },
     {
@@ -49,41 +140,25 @@
       ]
     },
     {
-      "id": "prop:Batch_Size",
-      "name": "Batch_Size",
-      "category": "PLM__Batch_Size",
-      "kind": "user",
-      "value": {
-        "type": "integer",
-        "value": 250
-      },
-      "unmapped": [],
-      "source_refs": [
-        "#44",
-        "#47",
-        "#46",
-        "#45"
-      ]
-    },
-    {
-      "id": "prop:Bbox_X_mm",
-      "name": "Bbox_X_mm",
-      "category": "TECH__Bbox_X_mm",
+      "id": "prop:7a70a8bdb7c073f4",
+      "name": "Unit_Price",
+      "category": "PLM__Unit_Price",
       "kind": "user",
       "value": {
         "type": "number",
-        "value": 64.0
+        "value": 18.75
       },
+      "part": "pmix synthetic part",
       "unmapped": [],
       "source_refs": [
-        "#96",
-        "#99",
-        "#98",
-        "#97"
+        "#48",
+        "#51",
+        "#50",
+        "#49"
       ]
     },
     {
-      "id": "prop:Legacy_Code",
+      "id": "prop:a14ae047241f4178",
       "name": "Legacy_Code",
       "category": "PLM__Legacy_Code",
       "kind": "user",
@@ -91,6 +166,7 @@
         "type": "text",
         "value": "1e5"
       },
+      "part": "pmix synthetic part",
       "unmapped": [],
       "source_refs": [
         "#92",
@@ -100,58 +176,7 @@
       ]
     },
     {
-      "id": "prop:Nominal_Mass_kg",
-      "name": "Nominal_Mass_kg",
-      "category": "TECH__Nominal_Mass_kg",
-      "kind": "user",
-      "value": {
-        "type": "number",
-        "value": 2.5
-      },
-      "unmapped": [],
-      "source_refs": [
-        "#84",
-        "#87",
-        "#86",
-        "#85"
-      ]
-    },
-    {
-      "id": "prop:Part_Count",
-      "name": "Part_Count",
-      "category": "TECH__Part_Count",
-      "kind": "user",
-      "value": {
-        "type": "integer",
-        "value": 12
-      },
-      "unmapped": [],
-      "source_refs": [
-        "#80",
-        "#83",
-        "#82",
-        "#81"
-      ]
-    },
-    {
-      "id": "prop:Part_Number",
-      "name": "Part_Number",
-      "category": "PLM__Part_Number",
-      "kind": "user",
-      "value": {
-        "type": "text",
-        "value": "SYN-004-REV-A"
-      },
-      "unmapped": [],
-      "source_refs": [
-        "#40",
-        "#43",
-        "#42",
-        "#41"
-      ]
-    },
-    {
-      "id": "prop:Release_Approved",
+      "id": "prop:af183f945253a59a",
       "name": "Release_Approved",
       "category": "PLM__Release_Approved",
       "kind": "user",
@@ -159,46 +184,13 @@
         "type": "boolean",
         "value": true
       },
+      "part": "pmix synthetic part",
       "unmapped": [],
       "source_refs": [
         "#52",
         "#55",
         "#54",
         "#53"
-      ]
-    },
-    {
-      "id": "prop:Serial_Number",
-      "name": "Serial_Number",
-      "category": "PLM__Serial_Number",
-      "kind": "user",
-      "value": {
-        "type": "text",
-        "value": "007"
-      },
-      "unmapped": [],
-      "source_refs": [
-        "#88",
-        "#91",
-        "#90",
-        "#89"
-      ]
-    },
-    {
-      "id": "prop:Unit_Price",
-      "name": "Unit_Price",
-      "category": "PLM__Unit_Price",
-      "kind": "user",
-      "value": {
-        "type": "number",
-        "value": 18.75
-      },
-      "unmapped": [],
-      "source_refs": [
-        "#48",
-        "#51",
-        "#50",
-        "#49"
       ]
     },
     {
@@ -218,6 +210,24 @@
         "#74",
         "#73",
         "#72"
+      ]
+    },
+    {
+      "id": "prop:d766825d3502d043",
+      "name": "Part_Count",
+      "category": "TECH__Part_Count",
+      "kind": "user",
+      "value": {
+        "type": "integer",
+        "value": 12
+      },
+      "part": "pmix synthetic part",
+      "unmapped": [],
+      "source_refs": [
+        "#80",
+        "#83",
+        "#82",
+        "#81"
       ]
     }
   ],

@@ -26,6 +26,65 @@ fn check(name: &str) {
 }
 
 #[test]
+fn assembly_properties() {
+    check("assembly_properties");
+}
+
+/// An assembly states the same property names of every component, so the
+/// part that states one belongs to its identity. Without it they are one
+/// record with content-ordered suffixes, and adding a component
+/// reshuffles the rest.
+#[test]
+fn assembly_properties_are_kept_apart_by_the_component_that_states_them() {
+    use std::collections::BTreeSet;
+    let doc = pmix::extract(&synthetic_dir().join("assembly_properties.stp")).expect("extracts");
+    let ids: BTreeSet<&str> = doc.properties.iter().map(|p| p.id.as_str()).collect();
+    assert_eq!(ids.len(), doc.properties.len(), "no two share an id");
+    assert!(
+        ids.iter().all(|id| !id.contains('-')),
+        "no id needed a collision suffix: {ids:?}"
+    );
+
+    let named = |name: &str| -> Vec<&str> {
+        let mut parts: Vec<&str> = doc
+            .properties
+            .iter()
+            .filter(|p| p.name == name)
+            .filter_map(|p| p.part.as_deref())
+            .collect();
+        parts.sort();
+        parts
+    };
+    assert_eq!(
+        named("Material"),
+        ["bracket_left", "pin_lower", "pin_upper"]
+    );
+    assert_eq!(
+        named("Mass (g)"),
+        ["bracket_left", "pin_lower", "pin_upper"]
+    );
+
+    // The two pins are the same product stating the same value, so only
+    // the name of each occurrence tells them apart.
+    let pins: Vec<&pmix::model::Property> = doc
+        .properties
+        .iter()
+        .filter(|p| p.name == "Material" && p.part.as_deref() != Some("bracket_left"))
+        .collect();
+    assert_eq!(pins.len(), 2);
+    assert_eq!(pins[0].value, pins[1].value);
+    assert_ne!(pins[0].id, pins[1].id);
+
+    // A part whose name reads plainly says so in the id.
+    assert!(
+        doc.properties
+            .iter()
+            .any(|p| p.id == "prop:pin_upper.Material"),
+        "{ids:?}"
+    );
+}
+
+#[test]
 fn dimension_basics() {
     check("dimension_basics");
 }
@@ -336,15 +395,32 @@ fn property_basics_semantics() {
     // validation representations.
     assert_eq!(doc.properties.len(), 12);
 
-    let by_id = |id: &str| {
+    let by_name = |name: &str| {
         doc.properties
             .iter()
-            .find(|p| p.id == id)
-            .unwrap_or_else(|| panic!("no property {id}"))
+            .find(|p| p.name == name)
+            .unwrap_or_else(|| panic!("no property named {name}"))
     };
+    // A property about the part says which part, so an assembly's
+    // components do not collapse into one record. One about a PMI
+    // record is about that record rather than about a part.
+    assert!(
+        doc.properties
+            .iter()
+            .filter(|p| p.applies_to.is_none())
+            .all(|p| p.part.as_deref() == Some("pmix synthetic part")),
+        "a product-level property names its part"
+    );
+    assert!(
+        doc.properties
+            .iter()
+            .filter(|p| p.applies_to.is_some())
+            .all(|p| p.part.is_none()),
+        "a property about a record names no part"
+    );
 
-    // Product-level user properties get readable ids, one per value type.
-    let part = by_id("prop:Part_Number");
+    // Product-level user properties, one per value type.
+    let part = by_name("Part_Number");
     assert_eq!(part.kind, PropertyKind::User);
     assert_eq!(part.category.as_deref(), Some("PLM__Part_Number"));
     assert!(part.applies_to.is_none());
@@ -355,15 +431,15 @@ fn property_basics_semantics() {
         }
     );
     assert_eq!(
-        by_id("prop:Batch_Size").value,
+        by_name("Batch_Size").value,
         PropertyValue::Integer { value: 250 }
     );
     assert_eq!(
-        by_id("prop:Unit_Price").value,
+        by_name("Unit_Price").value,
         PropertyValue::Number { value: 18.75 }
     );
     assert_eq!(
-        by_id("prop:Release_Approved").value,
+        by_name("Release_Approved").value,
         PropertyValue::Boolean { value: true }
     );
 
@@ -395,28 +471,28 @@ fn property_basics_semantics() {
     // Descriptive values that are exactly a number's own rendering are
     // read as numbers; formatting that a number would drop stays text.
     assert_eq!(
-        by_id("prop:Part_Count").value,
+        by_name("Part_Count").value,
         PropertyValue::Integer { value: 12 }
     );
     assert_eq!(
-        by_id("prop:Nominal_Mass_kg").value,
+        by_name("Nominal_Mass_kg").value,
         PropertyValue::Number { value: 2.5 }
     );
     assert_eq!(
-        by_id("prop:Serial_Number").value,
+        by_name("Serial_Number").value,
         PropertyValue::Text {
             value: "007".into()
         },
         "a leading zero is part of the serial, not a count"
     );
     assert_eq!(
-        by_id("prop:Legacy_Code").value,
+        by_name("Legacy_Code").value,
         PropertyValue::Text {
             value: "1e5".into()
         }
     );
     assert_eq!(
-        by_id("prop:Bbox_X_mm").value,
+        by_name("Bbox_X_mm").value,
         PropertyValue::Number { value: 64.0 },
         "a whole measurement is still a number, so the field's type is stable"
     );
