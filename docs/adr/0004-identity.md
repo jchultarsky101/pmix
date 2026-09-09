@@ -218,6 +218,37 @@ assembly support.
   unlinked annotations, but a designer who drags a callout would see it
   reported as replaced.
 
+## The fingerprint recipe is shared, not duplicated
+
+Added 2026-09-08. The recipe lives in `src/fingerprint.rs` and both
+readers call it. Each supplies a surface and the vertices bounding the
+face, in model units, however its format states them; the string is built
+in one place. Two readers that agreed by having been written to the same
+description would drift; two that call the same function cannot.
+
+The JT reader reaches a face through the PMI association that names it
+and the smart topology table that describes it (ADR 0010). Its vertices
+are not read from JT's point geometry, which is quantised to about ten
+microns and so would move a corner by more than the identity quantum.
+They are recovered instead by evaluating each edge's curve over the
+stretch of it that the edge covers, which is exact. Several edges meet at
+every vertex and are evaluated independently, and they agree on where it
+is to within a micron, which is what says the recovery is right.
+
+**What is not claimed.** No model is published as both a STEP file and a
+JT file, so no JT fingerprint has ever been compared with the STEP
+fingerprint of the same face. The two readers are arranged to agree, and
+that arrangement is untested. Until a matched pair turns up, a JT
+dimension and a STEP dimension sharing an id would be evidence, and their
+not sharing one is not evidence of a bug.
+
+**A known limit, in both readers.** A face on a surface of revolution is
+measured by its extent along the axis, so that a cylinder re-cut at a new
+seam keeps its key. The cost is that faces differing only in the sector
+they cover are one key: the six facets of a hex socket on one cone
+fingerprint alike. That is the trade this ADR already made for STEP, and
+the JT reader inherits it rather than diverging.
+
 ## Consequences
 
 - The reader gains a finalisation pass and a geometry-fingerprint module;
@@ -236,3 +267,5 @@ assembly support.
 - Users can read datum, datum system, and view ids directly in the JSON;
   the hashed ids remain opaque, and the `source_refs` field remains the
   way back to the file.
+- JT records anchored on geometry changed id when the fingerprint
+  arrived, so saved JT output has to be re-extracted rather than reused.

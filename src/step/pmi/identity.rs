@@ -74,7 +74,7 @@ pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
                 "face" | "edge" | "vertex" | "composite" | "composite_group" | "mixed" => "",
                 other => other,
             };
-            let mut parts = vec![kind.to_owned(), keys.join(";"), span];
+            let mut parts = vec![crate::fingerprint::feature_key(kind, &keys, &span)];
             if keys.is_empty() && f.members.is_empty() {
                 // Nothing to anchor on: the name, or failing that the
                 // source entity, which keeps distinct unresolved features

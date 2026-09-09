@@ -25,6 +25,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and edges lie on, including the ones with no closed form.
 - Lines, circles, and ellipses are recovered from the curve geometry, as
   the surfaces already were.
+- **A JT dimension, tolerance, and datum is now anchored on the geometry
+  it is about.** The faces a callout names are fingerprinted by the same
+  recipe the STEP reader uses, which now lives in one place rather than
+  two, and each becomes a `feature` record in the output. A callout whose
+  faces the file does not give still falls back to where it attaches to
+  the part. Note that JT ids change as a result: re-extract rather than
+  reusing saved JSON. Whether a JT fingerprint equals the STEP
+  fingerprint of the same face is still unchecked, because no model is
+  published in both formats.
+- The vertices a fingerprint spans are recovered by evaluating each
+  edge's curve over the stretch of it that edge covers, rather than read
+  from JT's point geometry, which is quantised. Every edge meeting at a
+  vertex agrees on where it is to within a micron.
 - **A JT annotation now reaches the B-rep faces it applies to.** An
   association names a face by a tag from the originating system; the
   topology table's attribute section carries one tag per face, and the

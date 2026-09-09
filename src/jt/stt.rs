@@ -212,6 +212,8 @@ pub struct Edge {
     pub curve_kind: CurveKind,
     /// The curve itself, when the table describes it.
     pub curve: Option<Curve>,
+    /// The stretch of the curve this edge is, as parameter bounds.
+    pub domain: Option<[f64; 2]>,
 }
 
 /// An analytic surface a face lies on.
@@ -286,6 +288,11 @@ impl Surface {
 }
 
 /// An analytic curve an edge lies on.
+///
+/// A curve carries the direction its parameter is measured from as well
+/// as the axis it turns about, because an edge's ends are recovered by
+/// evaluating the curve over its parametric domain rather than read from
+/// the point geometry, which is quantised.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Curve {
     Line {
@@ -295,14 +302,63 @@ pub enum Curve {
     Circle {
         centre: [f64; 3],
         axis: [f64; 3],
+        reference: [f64; 3],
         radius: f64,
     },
     Ellipse {
         centre: [f64; 3],
         axis: [f64; 3],
+        reference: [f64; 3],
         major_radius: f64,
         minor_radius: f64,
     },
+}
+
+impl Curve {
+    /// Where the curve is at parameter `t`.
+    ///
+    /// A line is parameterised by distance along its direction and the
+    /// closed curves by angle about their axis, measured from the
+    /// reference direction.
+    pub fn at(&self, t: f64) -> [f64; 3] {
+        let turn = |centre: [f64; 3], axis: [f64; 3], reference: [f64; 3], a: f64, b: f64| {
+            let up = cross(axis, reference);
+            let (c, s) = (t.cos() * a, t.sin() * b);
+            [
+                centre[0] + reference[0] * c + up[0] * s,
+                centre[1] + reference[1] * c + up[1] * s,
+                centre[2] + reference[2] * c + up[2] * s,
+            ]
+        };
+        match self {
+            Self::Line { point, direction } => [
+                point[0] + direction[0] * t,
+                point[1] + direction[1] * t,
+                point[2] + direction[2] * t,
+            ],
+            Self::Circle {
+                centre,
+                axis,
+                reference,
+                radius,
+            } => turn(*centre, *axis, *reference, *radius, *radius),
+            Self::Ellipse {
+                centre,
+                axis,
+                reference,
+                major_radius,
+                minor_radius,
+            } => turn(*centre, *axis, *reference, *major_radius, *minor_radius),
+        }
+    }
+}
+
+fn cross(a: [f64; 3], b: [f64; 3]) -> [f64; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
 }
 
 impl Curve {
@@ -357,8 +413,27 @@ pub struct Topology {
     /// table writes them. Reading the whole chain is what shows the
     /// table is understood.
     pub vectors: Vec<usize>,
+    /// Where each vertex is, in metres, recovered from the curves that
+    /// meet there rather than from the point geometry, which is
+    /// quantised. A vertex only spline edges reach is not found.
+    pub vertices: Vec<Option<[f64; 3]>>,
     /// Why reading stopped, when it stopped early.
     pub stopped: Option<String>,
+}
+
+/// The vertices bounding one face.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Boundary {
+    /// Where the face's corners are, in metres.
+    pub vertices: Vec<[f64; 3]>,
+    /// Whether every edge of the face gave up both its ends.
+    ///
+    /// An edge on a curve the table does not describe cannot say where
+    /// it starts or stops, so the vertices are then only some of the
+    /// boundary. A span taken from part of a boundary looks like a
+    /// smaller face rather than an unknown one, which is why this has to
+    /// be checked rather than assumed.
+    pub complete: bool,
 }
 
 impl Topology {
@@ -366,6 +441,133 @@ impl Topology {
     pub fn face_with_tag(&self, tag: u32) -> Option<&Face> {
         self.faces.iter().find(|f| f.tag == Some(tag))
     }
+
+    /// The vertices bounding `face`, walking its loops to their edges.
+    pub fn boundary(&self, face: &Face) -> Boundary {
+        let mut vertices = Vec::new();
+        let mut complete = true;
+        for l in face.loops.clone() {
+            let Some(lp) = self.loops.get(l) else {
+                complete = false;
+                continue;
+            };
+            for c in lp.coedges.clone() {
+                let Some(edge) = self.coedges.get(c).and_then(|c| self.edges.get(c.edge)) else {
+                    complete = false;
+                    continue;
+                };
+                for v in [edge.start_vertex, edge.end_vertex] {
+                    match self.vertices.get(v as usize).copied().flatten() {
+                        Some(p) => vertices.push(p),
+                        None => complete = false,
+                    }
+                }
+            }
+        }
+        Boundary { vertices, complete }
+    }
+
+    /// The fingerprint of `face`, in model units (ADR 0004).
+    ///
+    /// `per_metre` converts the table's metres into the unit the model
+    /// declares, because a fingerprint has to mean the same thing as the
+    /// one the STEP reader builds, and STEP states its geometry in model
+    /// units.
+    ///
+    /// A face whose boundary is incomplete gets no fingerprint. Its span
+    /// would be the span of the edges that happened to decode, which is
+    /// indistinguishable from a smaller face and would match the wrong
+    /// thing rather than nothing.
+    pub fn fingerprint(&self, face: &Face, per_metre: f64) -> Option<String> {
+        let boundary = self.boundary(face);
+        if !boundary.complete {
+            return None;
+        }
+        let surface = self.surface_of(face, per_metre)?;
+        let vertices: Vec<[f64; 3]> = boundary
+            .vertices
+            .iter()
+            .map(|v| scale(*v, per_metre))
+            .collect();
+        Some(crate::fingerprint::face_key(
+            &surface,
+            &vertices,
+            crate::fingerprint::identity_quantum(),
+        ))
+    }
+
+    /// What `face` lies on, in model units, as the shared recipe wants.
+    fn surface_of(&self, face: &Face, per_metre: f64) -> Option<crate::fingerprint::Surface> {
+        use crate::fingerprint::Surface as Key;
+        let Some(surface) = face.surface else {
+            // A face on a surface the table does not describe is named
+            // by its kind, which keeps it apart from other kinds but not
+            // from another face of the same kind.
+            return Some(Key::Other(face.surface_kind.name().to_owned()));
+        };
+        let origin = scale(surface.location(), per_metre);
+        let axis = surface.axis();
+        Some(match surface {
+            Surface::Plane { .. } => Key::Plane { origin, axis },
+            Surface::Cylinder { radius, .. } => Key::Cylinder {
+                origin,
+                axis,
+                radius: radius * per_metre,
+            },
+            Surface::Cone {
+                radius, semi_angle, ..
+            } => Key::Cone {
+                origin,
+                axis,
+                radius: radius * per_metre,
+                semi_angle,
+            },
+            Surface::Sphere { radius, .. } => Key::Sphere {
+                origin,
+                radius: radius * per_metre,
+            },
+            Surface::Torus {
+                major_radius,
+                minor_radius,
+                ..
+            } => Key::Torus {
+                origin,
+                axis,
+                major_radius: major_radius * per_metre,
+                minor_radius: minor_radius * per_metre,
+            },
+        })
+    }
+}
+
+/// A point in metres, in the unit the model declares.
+fn scale(p: [f64; 3], per_metre: f64) -> [f64; 3] {
+    [p[0] * per_metre, p[1] * per_metre, p[2] * per_metre]
+}
+
+/// Where each vertex is, from the curves of the edges that meet there.
+///
+/// An edge states the stretch of its curve it covers as parameter
+/// bounds, and whether it runs the same way as that curve; where it does
+/// not, its start is at the far bound. Nothing else in the table says
+/// where a vertex is without going through the quantised point
+/// geometry, and every edge that names a vertex agrees on where it is,
+/// which is what says this is right.
+fn vertices_of(edges: &[Edge], points: usize) -> Vec<Option<[f64; 3]>> {
+    let mut out = vec![None; points];
+    for edge in edges {
+        let (Some(curve), Some(domain)) = (edge.curve, edge.domain) else {
+            continue;
+        };
+        let (from, to) = (curve.at(domain[0]), curve.at(domain[1]));
+        let (start, end) = if edge.forward { (from, to) } else { (to, from) };
+        for (v, at) in [(edge.start_vertex, start), (edge.end_vertex, end)] {
+            if let Some(slot) = out.get_mut(v as usize) {
+                slot.get_or_insert(at);
+            }
+        }
+    }
+    out
 }
 
 /// The compressed vectors of the topology, read but not yet assembled.
@@ -576,6 +778,7 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
                 chain.edge_curve_kind.get(k).copied().unwrap_or_default(),
             ),
             curve: None,
+            domain: None,
         })
         .collect();
 
@@ -607,12 +810,14 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
             face.surface = Some(surface);
         }
     }
-    for (at, curve) in curves {
+    for (at, curve, domain) in curves {
         if let Some(edge) = out.edges.get_mut(at) {
             edge.curve = Some(curve);
+            edge.domain = Some(domain);
         }
     }
 
+    out.vertices = vertices_of(&out.edges, out.geometry.map_or(0, |g| g.points));
     out.vectors = vectors.lengths;
     Ok(out)
 }
@@ -808,7 +1013,8 @@ fn read_surfaces(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Surface)>> {
 ///
 /// A line takes one direction where a circle and an ellipse take two, so
 /// the axis array is not a fixed stride per curve.
-fn read_curves(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Curve)>> {
+#[allow(clippy::type_complexity)]
+fn read_curves(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Curve, [f64; 2])>> {
     let index = cursor.packet_u32(Predictor::Lag1)?;
     // As with the surfaces the written values are not the documented
     // ones, and here they are not even a constant apart: a line is 1, a
@@ -819,8 +1025,9 @@ fn read_curves(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Curve)>> {
     let coordinates = cursor.floats()?;
     let axes = cursor.floats()?;
     let radii = cursor.floats()?;
-    // The parametric domain bounds the curve rather than shaping it.
-    let _domain = cursor.floats()?;
+    // The parametric domain says which stretch of the curve the edge is,
+    // two bounds per curve, which is what recovers its end points.
+    let domain = cursor.floats()?;
 
     let (mut coordinate, mut axis, mut radius) = (0, 0, 0);
     let mut out = Vec::with_capacity(kinds.len().min(1 << 16));
@@ -836,6 +1043,10 @@ fn read_curves(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Curve)>> {
             radius += 1;
             v
         };
+        // A closed curve states the direction its angle is measured
+        // from after the axis it turns about; a line states only the way
+        // it runs.
+        let reference = triple(&axes, axis + 3);
         let curve = match kind {
             1 => {
                 axis += 3;
@@ -846,30 +1057,43 @@ fn read_curves(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Curve)>> {
             }
             2 => {
                 axis += 6;
-                let Some(r) = take_radius() else { break };
+                let (Some(r), Some(reference)) = (take_radius(), reference) else {
+                    break;
+                };
                 Curve::Circle {
                     centre: location,
                     axis: direction,
+                    reference,
                     radius: r,
                 }
             }
             4 => {
                 axis += 6;
-                let (Some(major), Some(minor)) = (take_radius(), take_radius()) else {
+                let (Some(major), Some(minor), Some(reference)) =
+                    (take_radius(), take_radius(), reference)
+                else {
                     break;
                 };
                 Curve::Ellipse {
                     centre: location,
                     axis: direction,
+                    reference,
                     major_radius: major,
                     minor_radius: minor,
                 }
             }
             _ => break,
         };
+        let (Some(from), Some(to)) = (
+            domain.get(position * 2).copied(),
+            domain.get(position * 2 + 1).copied(),
+        ) else {
+            break;
+        };
         out.push((
             index.get(position).copied().unwrap_or(position as u32) as usize,
             curve,
+            [from, to],
         ));
     }
     Ok(out)

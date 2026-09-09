@@ -1,12 +1,15 @@
-//! Geometry fingerprints: the anchor for feature identity (ADR 0004).
+//! Reading a STEP geometry item as a fingerprint (ADR 0004).
 //!
-//! A fingerprint is a string built from the numbers that fix a B-rep
-//! entity in model space, rounded to the identity quantum, so that the
-//! same face in two exports of the same design yields the same string.
+//! The recipe itself lives in [`crate::fingerprint`], because the JT
+//! reader has to produce the same string for the same face. What this
+//! module does is turn a STEP instance into what that recipe wants: a
+//! surface, and the vertices of the face on it.
 
 use std::collections::HashSet;
 
 use super::datums::placement;
+use crate::fingerprint::{self, identity_quantum as shared_quantum};
+use crate::identity::triple;
 use crate::model::Placement;
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
@@ -14,65 +17,14 @@ use crate::step::p21::{Exchange, Id, Instance, Parameter};
 /// derived from the file's uncertainty, which differs between exports of
 /// the same design and would make ids depend on export settings.
 pub(crate) fn identity_quantum(_ex: &Exchange) -> f64 {
-    1e-3
-}
-
-/// Round `v` to a multiple of `q` and print it stably.
-///
-/// The value is first snapped to a 1e-5 grid: re-exports print the same
-/// coordinate with different precision (`-2.0315` against `-2.03149999`),
-/// and without the snap such pairs would round to different multiples of
-/// `q` whenever the true value sits on a rounding boundary, which
-/// engineering values in round fractions of an inch often do.
-pub(crate) fn num(v: f64, q: f64) -> String {
-    let snapped = (v * 1e5).round() / 1e5;
-    let r = (snapped / q).round() * q;
-    let r = if r == 0.0 { 0.0 } else { r };
-    format!("{r:.4}")
-}
-
-pub(crate) fn triple(p: [f64; 3], q: f64) -> String {
-    format!("{},{},{}", num(p[0], q), num(p[1], q), num(p[2], q))
-}
-
-fn normalise(v: [f64; 3]) -> [f64; 3] {
-    let n = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
-    if n == 0.0 {
-        v
-    } else {
-        [v[0] / n, v[1] / n, v[2] / n]
-    }
-}
-
-/// Flip a direction so its first non-negligible component is positive.
-fn sign_normalise(d: [f64; 3]) -> [f64; 3] {
-    for c in d {
-        if c.abs() > 1e-9 {
-            return if c < 0.0 { [-d[0], -d[1], -d[2]] } else { d };
-        }
-    }
-    d
-}
-
-fn dot(a: [f64; 3], b: [f64; 3]) -> f64 {
-    a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    shared_quantum()
 }
 
 fn axis_of(p: &Placement) -> [f64; 3] {
     p.axis
         .as_ref()
-        .map(|d| normalise([d.x, d.y, d.z]))
+        .map(|d| fingerprint::normalise([d.x, d.y, d.z]))
         .unwrap_or([0.0, 0.0, 1.0])
-}
-
-/// Point on the axis through `origin` closest to the model origin.
-fn closest_on_axis(origin: [f64; 3], axis: [f64; 3]) -> [f64; 3] {
-    let t = dot(origin, axis);
-    [
-        origin[0] - t * axis[0],
-        origin[1] - t * axis[1],
-        origin[2] - t * axis[2],
-    ]
 }
 
 fn point(inst: &Instance) -> Option<[f64; 3]> {
@@ -187,9 +139,6 @@ fn vertex_point(ex: &Exchange, v: &Instance) -> Option<[f64; 3]> {
 fn face(ex: &Exchange, f: &Instance, q: f64) -> Fingerprint {
     let p = f.parameters();
     let surface = p.get(2).and_then(Parameter::as_ref).and_then(|i| ex.get(i));
-    let key = surface
-        .map(|s| surface_key(ex, s, q))
-        .unwrap_or_else(|| "face".into());
     // Vertices reachable through bounds -> loop -> edges -> vertices.
     let mut verts: Vec<[f64; 3]> = Vec::new();
     let mut bounds = Vec::new();
@@ -233,137 +182,78 @@ fn face(ex: &Exchange, f: &Instance, q: f64) -> Fingerprint {
             }
         }
     }
-    // The span of the face along its surface, chosen so that a face split
-    // by a re-export (a cylinder cut at a new seam, a plane cut in two)
-    // keeps the same span: axial extent for surfaces of revolution,
-    // nothing for spheres, the vertex box otherwise.
-    let span = match surface {
-        Some(s)
-            if s.has_type("CYLINDRICAL_SURFACE")
-                || s.has_type("CONICAL_SURFACE")
-                || s.has_type("TOROIDAL_SURFACE")
-                || s.has_type("DEGENERATE_TOROIDAL_SURFACE") =>
-        {
-            axial_extent(ex, s, &verts, q)
-        }
-        Some(s) if s.has_type("SPHERICAL_SURFACE") => String::new(),
-        _ => bbox(&verts)
-            .map(|(lo, hi)| format!("/{}/{}", triple(lo, q), triple(hi, q)))
-            .unwrap_or_default(),
-    };
+    let carrier = surface
+        .map(|s| surface_of(ex, s))
+        .unwrap_or_else(|| fingerprint::Surface::Other("face".into()));
     Fingerprint {
-        key: format!("{key}{span}"),
+        key: fingerprint::face_key(&carrier, &verts, q),
         points: verts,
     }
 }
 
-/// `[min, max]` of the vertices projected onto the surface's axis.
-fn axial_extent(ex: &Exchange, s: &Instance, verts: &[[f64; 3]], q: f64) -> String {
-    let Some(pl) = s
-        .parameters()
-        .get(1)
-        .and_then(Parameter::as_ref)
-        .and_then(|i| ex.get(i))
-        .and_then(|i| placement(ex, i))
-    else {
-        return String::new();
-    };
-    let a = sign_normalise(axis_of(&pl));
-    let c = closest_on_axis(pl.origin, a);
-    let ts: Vec<f64> = verts
-        .iter()
-        .map(|v| dot([v[0] - c[0], v[1] - c[1], v[2] - c[2]], a))
-        .collect();
-    match (
-        ts.iter().cloned().reduce(f64::min),
-        ts.iter().cloned().reduce(f64::max),
-    ) {
-        (Some(lo), Some(hi)) => format!("/t{}..{}", num(lo, q), num(hi, q)),
-        _ => String::new(),
-    }
-}
-
-fn surface_key(ex: &Exchange, s: &Instance, q: f64) -> String {
+/// The surface a STEP instance describes, as the shared recipe wants it.
+///
+/// A surface whose kind is known but whose placement the file leaves out
+/// is named without being located, which keeps such a face apart from
+/// other kinds without pretending to know where it is.
+fn surface_of(ex: &Exchange, s: &Instance) -> fingerprint::Surface {
     let p = s.parameters();
     let pl = p
         .get(1)
         .and_then(Parameter::as_ref)
         .and_then(|i| ex.get(i))
         .and_then(|i| placement(ex, i));
-    let dq = 1e-3;
-    if s.has_type("PLANE") {
-        if let Some(pl) = pl {
-            let n = sign_normalise(axis_of(&pl));
-            let d = dot(n, pl.origin);
-            return format!("plane/{}/{}", triple(n, dq), num(d, q));
+    let number = |at: usize| p.get(at).and_then(Parameter::as_f64).unwrap_or(0.0);
+    let is = |t: &str| s.has_type(t);
+    match pl {
+        Some(pl) if is("PLANE") => fingerprint::Surface::Plane {
+            origin: pl.origin,
+            axis: axis_of(&pl),
+        },
+        Some(pl) if is("CYLINDRICAL_SURFACE") => fingerprint::Surface::Cylinder {
+            origin: pl.origin,
+            axis: axis_of(&pl),
+            radius: number(2),
+        },
+        Some(pl) if is("CONICAL_SURFACE") => fingerprint::Surface::Cone {
+            origin: pl.origin,
+            axis: axis_of(&pl),
+            radius: number(2),
+            semi_angle: number(3),
+        },
+        Some(pl) if is("SPHERICAL_SURFACE") => fingerprint::Surface::Sphere {
+            origin: pl.origin,
+            radius: number(2),
+        },
+        Some(pl) if is("TOROIDAL_SURFACE") || is("DEGENERATE_TOROIDAL_SURFACE") => {
+            fingerprint::Surface::Torus {
+                origin: pl.origin,
+                axis: axis_of(&pl),
+                major_radius: number(2),
+                minor_radius: number(3),
+            }
         }
-        return "plane".into();
+        _ => fingerprint::Surface::Other(named(s)),
     }
-    if s.has_type("CYLINDRICAL_SURFACE") {
-        if let Some(pl) = pl {
-            let a = sign_normalise(axis_of(&pl));
-            let c = closest_on_axis(pl.origin, a);
-            let r = p.get(2).and_then(Parameter::as_f64).unwrap_or(0.0);
-            return format!("cylinder/{}/{}/{}", triple(a, dq), triple(c, q), num(r, q));
+}
+
+/// What a surface is called when it is not located, or not one of the
+/// kinds the recipe has a closed form for.
+fn named(s: &Instance) -> String {
+    for (t, name) in [
+        ("PLANE", "plane"),
+        ("CYLINDRICAL_SURFACE", "cylinder"),
+        ("CONICAL_SURFACE", "cone"),
+        ("SPHERICAL_SURFACE", "sphere"),
+        ("TOROIDAL_SURFACE", "torus"),
+        ("DEGENERATE_TOROIDAL_SURFACE", "torus"),
+    ] {
+        if s.has_type(t) {
+            return name.into();
         }
-        return "cylinder".into();
-    }
-    if s.has_type("CONICAL_SURFACE") {
-        if let Some(pl) = pl {
-            let a = axis_of(&pl);
-            let c = closest_on_axis(pl.origin, a);
-            let r = p.get(2).and_then(Parameter::as_f64).unwrap_or(0.0);
-            let ang = p.get(3).and_then(Parameter::as_f64).unwrap_or(0.0);
-            return format!(
-                "cone/{}/{}/{}/{}",
-                triple(a, dq),
-                triple(c, q),
-                num(r, q),
-                num(ang, dq)
-            );
-        }
-        return "cone".into();
-    }
-    if s.has_type("SPHERICAL_SURFACE") {
-        if let Some(pl) = pl {
-            let r = p.get(2).and_then(Parameter::as_f64).unwrap_or(0.0);
-            return format!("sphere/{}/{}", triple(pl.origin, q), num(r, q));
-        }
-        return "sphere".into();
-    }
-    if s.has_type("TOROIDAL_SURFACE") || s.has_type("DEGENERATE_TOROIDAL_SURFACE") {
-        if let Some(pl) = pl {
-            let a = sign_normalise(axis_of(&pl));
-            let r1 = p.get(2).and_then(Parameter::as_f64).unwrap_or(0.0);
-            let r2 = p.get(3).and_then(Parameter::as_f64).unwrap_or(0.0);
-            return format!(
-                "torus/{}/{}/{}/{}",
-                triple(pl.origin, q),
-                triple(a, dq),
-                num(r1, q),
-                num(r2, q)
-            );
-        }
-        return "torus".into();
     }
     s.type_key().to_ascii_lowercase()
 }
-
-pub(crate) fn bbox(pts: &[[f64; 3]]) -> Option<([f64; 3], [f64; 3])> {
-    if pts.is_empty() {
-        return None;
-    }
-    let mut lo = [f64::INFINITY; 3];
-    let mut hi = [f64::NEG_INFINITY; 3];
-    for p in pts {
-        for i in 0..3 {
-            lo[i] = lo[i].min(p[i]);
-            hi[i] = hi[i].max(p[i]);
-        }
-    }
-    Some((lo, hi))
-}
-
 fn collect_points(
     ex: &Exchange,
     id: Id,

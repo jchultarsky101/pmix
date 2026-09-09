@@ -8,7 +8,7 @@ use crate::{ExtractOptions, Reader, Result};
 
 use super::element::Elements;
 use super::file::{Guid, Jt, SegmentKind};
-use super::{identity, meta, pmi, presentation, property, semantic};
+use super::{features, identity, meta, pmi, presentation, property, semantic, stt};
 
 /// Reader for JT files (ADR 0009).
 #[derive(Debug, Clone, Copy, Default)]
@@ -136,9 +136,44 @@ impl Reader for JtReader {
             "read JT structure"
         );
 
-        let built = semantic::build(&managers, length, &mut unknown);
+        // The smart topology table says which faces a callout applies
+        // to and what they lie on, which is what anchors a dimension on
+        // the geometry rather than on where it is drawn (ADR 0010).
+        let mut topologies = Vec::new();
+        for segment in jt.segments().iter().filter(|s| s.kind == SegmentKind::Stt) {
+            let Ok(data) = jt.segment_data(segment) else {
+                diagnostics.push(Diagnostic {
+                    message: "topology table segment could not be read".into(),
+                    source_ref: Some(segment.id.to_string()),
+                });
+                continue;
+            };
+            for element in Elements::new(&data) {
+                if element.object_type != stt::STT_ELEMENT {
+                    continue;
+                }
+                match stt::parse(element.data) {
+                    Ok(topology) => topologies.push(topology),
+                    Err(e) => diagnostics.push(Diagnostic {
+                        message: format!("topology table could not be read: {e}"),
+                        source_ref: Some(segment.id.to_string()),
+                    }),
+                }
+            }
+        }
+        let per_metre = length.and_then(property::per_metre).unwrap_or(1.0);
+        let anchors = features::build(&managers, &topologies, per_metre);
+        tracing::debug!(
+            parts = topologies.len(),
+            features = anchors.features.len(),
+            anchored = anchors.by_entity.len(),
+            "read JT precise geometry"
+        );
+
+        let built = semantic::build(&managers, length, &anchors, &mut unknown);
         let presentation = presentation::build(&managers, length, &built.links, options);
-        let semantic = built.semantic;
+        let mut semantic = built.semantic;
+        semantic.features = anchors.features;
 
         // Scene-graph properties become the document's properties.
         let mut ids = ContentId::new();

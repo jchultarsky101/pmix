@@ -273,9 +273,11 @@ count that is not there consumes the next packet's header.
 - A face can now be fingerprinted: it names its surface, its loops, and
   through them its edges and their curves. That is what ADR 0004's recipe
   needs from the JT side.
-- A JT annotation now reaches the faces it applies to, and each of those
-  faces its surface. Both halves of ADR 0004's recipe are in place on the
-  JT side.
-- Cross-format identity for dimensions and tolerances stays open. What
-  remains is fingerprinting those faces to the same recipe the STEP
-  reader uses, and folding the result into the identity key.
+- A JT annotation reaches the faces it applies to, each of those faces
+  its surface, and each face a fingerprint by the recipe the STEP reader
+  uses. A JT dimension, tolerance, and datum is anchored on the geometry
+  it is about rather than on where it is drawn.
+- The point geometry stays unread. Vertices come from the curves instead,
+  which is exact where the quantised points would not be.
+- What remains for cross-format identity is a model published in both
+  formats. Everything either reader can do without one is done.

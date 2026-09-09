@@ -25,6 +25,7 @@
 //! saved views, get the same id from either format.
 
 pub mod diff;
+pub mod fingerprint;
 pub mod format;
 pub mod geometry;
 pub mod identity;

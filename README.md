@@ -313,7 +313,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] JT compressed integer packets and the smart topology table (ADR 0010)
 - [x] JT analytic surface and curve geometry, each attached to the face or edge it belongs to (ADR 0010)
 - [x] Resolving a JT callout to the B-rep faces it applies to (ADR 0010)
-- [ ] Cross-format identity for dimensions and tolerances
+- [x] One fingerprint recipe for both readers, anchoring a dimension on the faces it is about (ADR 0004)
+- [ ] Confirming a JT and a STEP fingerprint agree, which needs a model published in both formats
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design
