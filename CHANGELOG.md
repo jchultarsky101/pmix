@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-09
+
+`pmix features` reads a model's geometry and describes what the part
+*is*, rather than what its file *says*: the holes, counterbores,
+countersinks and bosses it is made of, with their diameters, depths and
+positions. It is the base data for answering the question people
+actually bring to two CAD files — not whether they differ, but how.
+
 ### Added
 
 - **`pmix features`**, a new command that recognises manufacturing
@@ -452,7 +460,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/jchultarsky101/pmix/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jchultarsky101/pmix/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/jchultarsky101/pmix/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/jchultarsky101/pmix/compare/v0.5.0...v0.6.0
