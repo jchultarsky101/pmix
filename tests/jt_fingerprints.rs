@@ -112,7 +112,7 @@ fn a_fingerprint_tells_the_faces_of_a_part_apart() {
     for t in tables() {
         let mut by_key: BTreeMap<String, Vec<usize>> = BTreeMap::new();
         for (i, f) in t.faces.iter().enumerate() {
-            let Some(key) = t.fingerprint(f, 1000.0) else {
+            let Some(key) = t.fingerprint(f) else {
                 panic!("a face of a fully read part has no fingerprint")
             };
             by_key.entry(key).or_default().push(i);
@@ -156,7 +156,7 @@ fn every_edge_is_fingerprinted_by_its_curve_and_its_ends() {
         let keys: Vec<String> = t
             .edges
             .iter()
-            .filter_map(|e| t.edge_fingerprint(e, 1000.0))
+            .filter_map(|e| t.edge_fingerprint(e))
             .collect();
         assert_eq!(keys.len(), t.counts.edges, "every edge is fingerprinted");
         assert!(keys.iter().all(|k| k.starts_with("edge/")), "{keys:?}");
@@ -173,18 +173,29 @@ fn every_edge_is_fingerprinted_by_its_curve_and_its_ends() {
     );
 }
 
-/// The fingerprint is of the design, not of the file: it is stated in
-/// model units, so the same face measured in millimetres and in metres
-/// is not the same face.
+/// A fingerprint is stated in millimetres, whatever unit the file used.
+/// The topology table is always in metres, so the reader converts.
 #[test]
-fn a_fingerprint_is_in_model_units() {
+fn a_fingerprint_is_in_millimetres() {
     let t = tables().into_iter().next().unwrap();
-    let face = t.faces.first().unwrap();
-    let mm = t.fingerprint(face, 1000.0).unwrap();
-    let m = t.fingerprint(face, 1.0).unwrap();
-    assert_ne!(mm, m);
+    let face = t
+        .faces
+        .iter()
+        .find(|f| matches!(f.surface, Some(stt::Surface::Cylinder { .. })))
+        .expect("a cylindrical face");
+    let Some(stt::Surface::Cylinder { radius, .. }) = face.surface else {
+        unreachable!()
+    };
+    let key = t.fingerprint(face).unwrap();
+    // The table states the radius in metres; the key states it in
+    // millimetres, so it is a thousand times larger.
+    let stated = key.split("/t").next().unwrap().rsplit('/').next().unwrap();
+    assert_eq!(
+        stated,
+        pmix::identity::num(radius * 1000.0, pmix::identity::QUANTUM)
+    );
     // And reading it twice says the same thing.
-    assert_eq!(mm, t.fingerprint(face, 1000.0).unwrap());
+    assert_eq!(key, t.fingerprint(face).unwrap());
 }
 
 /// A cylindrical face's fingerprint states the radius the file states,
@@ -197,9 +208,10 @@ fn a_cylinder_fingerprints_with_the_radius_it_has() {
             let Some(stt::Surface::Cylinder { radius, .. }) = face.surface else {
                 continue;
             };
-            let key = t.fingerprint(face, 1000.0).unwrap();
+            let key = t.fingerprint(face).unwrap();
             assert!(key.starts_with("cylinder/"), "{key}");
-            // The radius is the last field before the axial span.
+            // The radius is the last field before the axial span, in
+            // millimetres where the table states metres.
             let stated = key.split("/t").next().unwrap().rsplit('/').next().unwrap();
             let want = pmix::identity::num(radius * 1000.0, pmix::identity::QUANTUM);
             assert_eq!(stated, want, "in {key}");

@@ -25,6 +25,55 @@ fn check(name: &str) {
     }
 }
 
+/// The same design stated in inches and in millimetres is one design,
+/// so it must key the same way. Everything keyed on geometry is put into
+/// millimetres first; without that, a fingerprint of a plane at x=1 inch
+/// and of the same plane at x=25.4 mm are different faces, and every
+/// dimension on them a different dimension.
+#[test]
+fn a_design_keys_the_same_way_in_inches_as_in_millimetres() {
+    use std::collections::BTreeSet;
+    let dir = synthetic_dir();
+    let mm = pmix::extract(&dir.join("dimension_basics.stp")).expect("extracts");
+    let inches = pmix::extract(&dir.join("dimension_basics_inches.stp")).expect("extracts");
+    assert_eq!(mm.units.length.as_deref(), Some("mm"));
+    assert_eq!(inches.units.length.as_deref(), Some("in"));
+
+    let ids = |d: &pmix::PmiDocument| -> (BTreeSet<String>, BTreeSet<String>) {
+        (
+            d.semantic
+                .features
+                .iter()
+                .map(|f| f.meta.id.clone())
+                .collect(),
+            d.semantic
+                .dimensions
+                .iter()
+                .map(|x| x.meta.id.clone())
+                .collect(),
+        )
+    };
+    let (fa, da) = ids(&mm);
+    let (fb, db) = ids(&inches);
+    assert!(!fa.is_empty() && !da.is_empty());
+    assert_eq!(fa, fb, "the same faces");
+    assert_eq!(da, db, "the same dimensions");
+
+    // And a measure means the same thing in either unit, so no field
+    // where both sides state one is reported as a change. (The file's
+    // own display text does differ — it writes 12.50 where the other
+    // writes 0.49 — and so does the units record itself.)
+    let report = pmix::diff::diff(&mm, &inches);
+    let measured: Vec<&str> = report
+        .changes
+        .iter()
+        .flat_map(|c| c.fields.iter())
+        .filter(|f| f.left.get("unit").is_some() && f.right.get("unit").is_some())
+        .map(|f| f.path.as_str())
+        .collect();
+    assert!(measured.is_empty(), "a measure differed: {measured:?}");
+}
+
 #[test]
 fn assembly_properties() {
     check("assembly_properties");

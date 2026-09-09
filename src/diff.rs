@@ -450,9 +450,21 @@ fn join(path: &str, key: &str) -> String {
 fn diff_value(path: &str, l: &Value, r: &Value, collection: &str, out: &mut Vec<FieldChange>) {
     match (l, r) {
         (Value::Object(lo), Value::Object(ro)) => {
+            // A length is the same length in inches and in millimetres.
+            // Where the two sides agree once converted, neither the
+            // number nor the unit is a change; where they do not, both
+            // are reported as they stand, which reads better than a
+            // converted number the file never contained.
+            let same = matches!(
+                (measure(lo), measure(ro)),
+                (Some(a), Some(b)) if same_measure(a, b)
+            );
             let keys: BTreeSet<&String> = lo.keys().chain(ro.keys()).collect();
             for key in keys {
                 if key == "id" && path.is_empty() {
+                    continue;
+                }
+                if same && (key == "value" || key == "unit") {
                     continue;
                 }
                 if excluded(key, collection) {
@@ -522,6 +534,22 @@ fn diff_value(path: &str, l: &Value, r: &Value, collection: &str, out: &mut Vec<
             }
         }
     }
+}
+
+/// A number and the unit it is in, when an object states both.
+///
+/// This covers a `Measure` and a property whose value is one, which
+/// carry the same two fields whatever else they carry.
+fn measure(o: &serde_json::Map<String, Value>) -> Option<(f64, &str)> {
+    Some((o.get("value")?.as_f64()?, o.get("unit")?.as_str()?))
+}
+
+/// Whether two measures are the same measure, whatever units they are
+/// stated in.
+fn same_measure(a: (f64, &str), b: (f64, &str)) -> bool {
+    let (av, au) = crate::units::canonical(a.0, a.1);
+    let (bv, bu) = crate::units::canonical(b.0, b.1);
+    au == bu && values_equal(&av.into(), &bv.into())
 }
 
 /// Numbers are equal within 1e-6 relative (1e-6 absolute near zero):
@@ -680,6 +708,45 @@ mod tests {
         diff_value("", &a, &b, "tolerances", &mut out);
         let paths: Vec<&str> = out.iter().map(|c| c.path.as_str()).collect();
         assert_eq!(paths, ["modifiers", "value.value"]);
+    }
+
+    #[test]
+    fn a_measure_is_the_same_measure_in_another_unit() {
+        let mut out = Vec::new();
+        let a = serde_json::json!({"id":"x","value":{"value":1.0,"unit":"in"}});
+        let b = serde_json::json!({"id":"x","value":{"value":25.4,"unit":"mm"}});
+        diff_value("", &a, &b, "dimensions", &mut out);
+        assert!(out.is_empty(), "{out:?}");
+
+        // A real change is still reported, in the terms the files use
+        // rather than in converted numbers neither of them contained.
+        let c = serde_json::json!({"id":"x","value":{"value":26.0,"unit":"mm"}});
+        out.clear();
+        diff_value("", &a, &c, "dimensions", &mut out);
+        let paths: Vec<&str> = out.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(paths, ["value.unit", "value.value"]);
+        assert_eq!(out[1].left, 1.0);
+
+        // Angles too.
+        out.clear();
+        let r = serde_json::json!({"value":{"value":std::f64::consts::PI,"unit":"rad"}});
+        let d = serde_json::json!({"value":{"value":180.0,"unit":"deg"}});
+        diff_value("", &r, &d, "dimensions", &mut out);
+        assert!(out.is_empty(), "{out:?}");
+    }
+
+    #[test]
+    fn a_unit_with_no_conversion_still_compares_with_itself() {
+        // A volume in cubic millimetres is not a length; it is compared
+        // as it stands rather than converted by a guess.
+        let mut out = Vec::new();
+        let a = serde_json::json!({"value":{"value":4.0,"unit":"mm3"}});
+        let b = serde_json::json!({"value":{"value":4.0,"unit":"mm3"}});
+        diff_value("", &a, &b, "properties", &mut out);
+        assert!(out.is_empty(), "{out:?}");
+        let c = serde_json::json!({"value":{"value":4.0,"unit":"cm3"}});
+        diff_value("", &a, &c, "properties", &mut out);
+        assert_eq!(out.len(), 1);
     }
 
     #[test]

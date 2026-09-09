@@ -249,6 +249,31 @@ they cover are one key: the six facets of a hex socket on one cone
 fingerprint alike. That is the trade this ADR already made for STEP, and
 the JT reader inherits it rather than diverging.
 
+### Everything keyed on geometry is stated in millimetres
+
+Added 2026-09-09. A design does not change when it is exported in inches
+rather than millimetres, so its ids must not either. Before this, a
+fingerprint used the file's own units: a plane at `x = 1` in an inch file
+and the same plane at `x = 25.4` in a millimetre file were different
+faces, and so every dimension on them was a different dimension.
+
+Both readers now say what their numbers are in — `Scale`, carrying
+millimetres per unit of length and degrees per unit of angle — and the
+shared recipe converts. The identity quantum is a thousandth of a
+millimetre rather than a thousandth of a model unit. Annotation planes
+and bounding boxes, which are keyed coarsely by where they sit, are
+converted the same way.
+
+Millimetres and degrees are the canonical units because that is what the
+overwhelming majority of mechanical CAD states, so the choice leaves most
+files' numbers untouched. A unit neither reader recognises is left alone:
+moving a number by a guess would be worse than not moving it.
+
+**The check.** `dimension_basics_inches.stp` is the same design as
+`dimension_basics.stp` with every length divided by 25.4 and the unit
+declared as inches. Both give the same face ids and the same dimension
+ids. Without the conversion they share none.
+
 ## Consequences
 
 - The reader gains a finalisation pass and a geometry-fingerprint module;
@@ -269,3 +294,6 @@ the JT reader inherits it rather than diverging.
   way back to the file.
 - JT records anchored on geometry changed id when the fingerprint
   arrived, so saved JT output has to be re-extracted rather than reused.
+- Records in a file that states inches changed id when units were
+  normalised, which is the point: they now agree with the same design
+  stated in millimetres.

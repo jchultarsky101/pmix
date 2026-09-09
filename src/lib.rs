@@ -33,6 +33,7 @@ pub mod jt;
 pub mod model;
 pub mod reader;
 pub mod step;
+pub mod units;
 
 pub use format::Format;
 pub use model::PmiDocument;

@@ -580,17 +580,18 @@ pub struct Built {
 /// Both are model-space geometry, so both survive a re-export of the
 /// same design and both change if the design is remodelled, which is the
 /// same bargain the STEP fingerprint makes.
-pub fn anchor(entity: &Entity, per_metre: f64) -> String {
+pub fn anchor(entity: &Entity) -> String {
     let mut points: Vec<String> = entity
         .ending_with(".terminator")
         .iter()
         .filter_map(|(_, v)| point(v, 1.0))
         .collect();
     if points.is_empty() {
-        // The display plane's origin is written in metres.
+        // The display plane's origin is written in metres, where a
+        // leader terminator is written in millimetres.
         if let Some(p) = entity
             .property("DisplayPlane.origin")
-            .and_then(|v| point(v, per_metre))
+            .and_then(|v| point(v, 1000.0))
         {
             return format!("@{p}");
         }
@@ -601,7 +602,8 @@ pub fn anchor(entity: &Entity, per_metre: f64) -> String {
     points.join(";")
 }
 
-/// Read three numbers, scale them, and round them for an identity key.
+/// Read three numbers, put them into millimetres, and round them for an
+/// identity key.
 fn point(text: &str, scale: f64) -> Option<String> {
     let v: Vec<f64> = text
         .split_whitespace()
@@ -632,9 +634,6 @@ pub fn build(
     anchors: &super::features::Anchors,
     unknown: &mut Vec<Unknown>,
 ) -> Built {
-    let per_metre = length
-        .and_then(crate::jt::property::per_metre)
-        .unwrap_or(1.0);
     let mut out = Semantic::default();
     let mut links = Links::new();
     let mut keys = Keys::new();
@@ -647,7 +646,7 @@ pub fn build(
         for (e, entity) in manager.entities.iter().enumerate() {
             let mut made: Vec<String> = Vec::new();
             let kind = entity.kind.as_str();
-            let anchor = anchor(entity, per_metre);
+            let anchor = anchor(entity);
             // The faces the B-rep says this callout applies to, which
             // anchor it better than where it happens to be drawn.
             let features: &[String] = anchors

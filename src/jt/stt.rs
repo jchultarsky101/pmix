@@ -480,47 +480,36 @@ impl Topology {
         Boundary { vertices, complete }
     }
 
-    /// The fingerprint of `face`, in model units (ADR 0004).
-    ///
-    /// `per_metre` converts the table's metres into the unit the model
-    /// declares, because a fingerprint has to mean the same thing as the
-    /// one the STEP reader builds, and STEP states its geometry in model
-    /// units.
+    /// The fingerprint of `face` (ADR 0004).
     ///
     /// A face whose boundary is incomplete gets no fingerprint. Its span
     /// would be the span of the edges that happened to decode, which is
     /// indistinguishable from a smaller face and would match the wrong
     /// thing rather than nothing.
-    pub fn fingerprint(&self, face: &Face, per_metre: f64) -> Option<String> {
+    pub fn fingerprint(&self, face: &Face) -> Option<String> {
         let boundary = self.boundary(face);
         if !boundary.complete {
             return None;
         }
-        let surface = self.surface_of(face, per_metre)?;
-        let vertices: Vec<[f64; 3]> = boundary
-            .vertices
-            .iter()
-            .map(|v| scale(*v, per_metre))
-            .collect();
         Some(crate::fingerprint::face_key(
-            &surface,
-            &vertices,
-            crate::fingerprint::identity_quantum(),
+            &self.surface_of(face)?,
+            &boundary.vertices,
+            SCALE,
         ))
     }
 
-    /// The fingerprint of `edge`, in model units (ADR 0004).
+    /// The fingerprint of `edge` (ADR 0004).
     ///
     /// An edge is its curve and its two ends, so an edge whose ends are
     /// not known gets no fingerprint rather than a shorter key that
     /// another edge could also produce.
-    pub fn edge_fingerprint(&self, edge: &Edge, per_metre: f64) -> Option<String> {
+    pub fn edge_fingerprint(&self, edge: &Edge) -> Option<String> {
         let at = |v: u32| self.vertices.get(v as usize).copied().flatten();
         let (from, to) = (at(edge.start_vertex)?, at(edge.end_vertex)?);
         Some(crate::fingerprint::edge_key(
             edge.curve_kind.name(),
-            &[scale(from, per_metre), scale(to, per_metre)],
-            crate::fingerprint::identity_quantum(),
+            &[from, to],
+            SCALE,
         ))
     }
 
@@ -529,8 +518,8 @@ impl Topology {
         self.edges.iter().find(|e| e.tag == Some(tag))
     }
 
-    /// What `face` lies on, in model units, as the shared recipe wants.
-    fn surface_of(&self, face: &Face, per_metre: f64) -> Option<crate::fingerprint::Surface> {
+    /// What `face` lies on, as the shared recipe wants it.
+    fn surface_of(&self, face: &Face) -> Option<crate::fingerprint::Surface> {
         use crate::fingerprint::Surface as Key;
         let Some(surface) = face.surface else {
             // A face on a surface the table does not describe is named
@@ -538,27 +527,24 @@ impl Topology {
             // from another face of the same kind.
             return Some(Key::Other(face.surface_kind.name().to_owned()));
         };
-        let origin = scale(surface.location(), per_metre);
+        let origin = surface.location();
         let axis = surface.axis();
         Some(match surface {
             Surface::Plane { .. } => Key::Plane { origin, axis },
             Surface::Cylinder { radius, .. } => Key::Cylinder {
                 origin,
                 axis,
-                radius: radius * per_metre,
+                radius,
             },
             Surface::Cone {
                 radius, semi_angle, ..
             } => Key::Cone {
                 origin,
                 axis,
-                radius: radius * per_metre,
+                radius,
                 semi_angle,
             },
-            Surface::Sphere { radius, .. } => Key::Sphere {
-                origin,
-                radius: radius * per_metre,
-            },
+            Surface::Sphere { radius, .. } => Key::Sphere { origin, radius },
             Surface::Torus {
                 major_radius,
                 minor_radius,
@@ -566,17 +552,19 @@ impl Topology {
             } => Key::Torus {
                 origin,
                 axis,
-                major_radius: major_radius * per_metre,
-                minor_radius: minor_radius * per_metre,
+                major_radius,
+                minor_radius,
             },
         })
     }
 }
 
-/// A point in metres, in the unit the model declares.
-fn scale(p: [f64; 3], per_metre: f64) -> [f64; 3] {
-    [p[0] * per_metre, p[1] * per_metre, p[2] * per_metre]
-}
+/// The topology table states its lengths in metres and its angles in
+/// radians, whatever the model declares for itself.
+const SCALE: crate::fingerprint::Scale = crate::fingerprint::Scale {
+    length: 1000.0,
+    angle: 180.0 / std::f64::consts::PI,
+};
 
 /// Where each vertex is, from the curves of the edges that meet there.
 ///

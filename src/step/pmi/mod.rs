@@ -45,6 +45,10 @@ pub fn extract(ex: &Exchange, file_name: &str, options: &ExtractOptions) -> PmiD
     }
     let mut ctx = phase!("ctx", Ctx::new(ex));
     let units = phase!("units", units::document_units(&mut ctx));
+    // Everything keyed on geometry is stated in millimetres and degrees,
+    // whatever the file declares, so that one design exported in two
+    // unit systems keys the same way.
+    ctx.scale = crate::fingerprint::Scale::of(units.length.as_deref(), units.angle.as_deref());
     phase!("datums", datums::walk(&mut ctx));
     phase!("dimensions", dimensions::walk(&mut ctx));
     phase!("tolerances", tolerances::walk(&mut ctx));
@@ -222,6 +226,9 @@ pub(crate) type PropertyRepr = (Id, Id, Id);
 /// Shared state for the walkers.
 pub(crate) struct Ctx<'a> {
     pub ex: &'a Exchange,
+    /// What the file's numbers have to be multiplied by to reach the
+    /// units a fingerprint is stated in.
+    pub scale: crate::fingerprint::Scale,
     pub ids: ContentId,
     pub consumed: HashSet<Id>,
     pub diagnostics: Vec<Diagnostic>,
@@ -279,6 +286,7 @@ impl<'a> Ctx<'a> {
     fn new(ex: &'a Exchange) -> Self {
         let mut ctx = Self {
             ex,
+            scale: crate::fingerprint::Scale::NONE,
             ids: ContentId::new(),
             consumed: HashSet::new(),
             diagnostics: Vec::new(),
