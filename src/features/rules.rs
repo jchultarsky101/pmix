@@ -1,0 +1,531 @@
+//! Recognising features from local rules (ADR 0011).
+//!
+//! Every rule here is decided by a surface kind, the curves bounding a
+//! face, which faces meet across those curves, and which way a face
+//! looks. Nothing needs a global view of the solid, and nothing chooses
+//! between two readings of the same material: where a rule cannot settle
+//! something, the output says so instead of guessing.
+
+use std::collections::BTreeMap;
+
+use crate::fingerprint::{self, Scale, Surface};
+use crate::identity::{num, triple};
+use crate::model::ContentId;
+
+use super::brep::{CurveKind, Solid};
+use super::model::{Body, FaceCounts, Feature, Kind, Shape, UnassignedFace};
+
+/// How close two numbers must be to count as the same. The identity
+/// quantum (ADR 0004): a fixed thousandth of a millimetre, so that what
+/// counts as coaxial does not depend on export settings.
+fn tolerance() -> f64 {
+    fingerprint::identity_quantum()
+}
+
+/// A bore or a shaft that a rule might claim, before the rules run.
+///
+/// It is a *set* of faces, not one: exporters routinely cut a cylinder
+/// into halves meeting along two straight edges, and a rule that asks
+/// what bounds a bore has to ask it of the whole bore. Every face here
+/// lies on one surface, so the group is a face of that surface however
+/// the file happened to divide it.
+#[derive(Debug, Clone)]
+struct Candidate {
+    /// The faces the group is made of, sorted.
+    faces: Vec<usize>,
+    /// The edges bounding the group: those not shared with another face
+    /// of the same group, and not a seam.
+    boundary: Vec<usize>,
+    /// The line the surface turns about, as a canonical key, so that
+    /// coaxial surfaces group by string equality rather than by a
+    /// pairwise distance test.
+    axis_key: String,
+    axis: [f64; 3],
+    position: [f64; 3],
+    radius: f64,
+    /// Half the apex angle in radians, for a cone.
+    semi_angle: Option<f64>,
+    /// The largest circle bounding the face. A cylinder's circles are
+    /// all its own radius; a cone's differ, and the wider one is what a
+    /// countersink is called by.
+    major_radius: f64,
+    /// The stretch of the axis the face occupies.
+    extent: [f64; 2],
+    /// Whether the face looks away from its axis: a shaft rather than a
+    /// bore.
+    outward: bool,
+}
+
+/// The axis of a surface, in the fixed sign and with the canonical point
+/// on it, so that two exports of one design describe one line one way.
+fn axis_of(axis: [f64; 3], origin: [f64; 3]) -> ([f64; 3], [f64; 3]) {
+    let a = fingerprint::sign_normalise(fingerprint::normalise(axis));
+    (a, fingerprint::closest_on_axis(origin, a))
+}
+
+/// How far along `axis` a point lies.
+fn along(axis: [f64; 3], p: [f64; 3]) -> f64 {
+    fingerprint::dot(axis, p)
+}
+
+/// The stretch of `axis` covered by the edges in `edges`.
+fn extent_of(solid: &Solid, edges: &[usize], axis: [f64; 3]) -> Option<[f64; 2]> {
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    let mut any = false;
+    for e in edges.iter().copied() {
+        let edge = &solid.edges[e];
+        let points: Vec<[f64; 3]> = match edge.centre {
+            Some(c) => vec![c],
+            None => edge.ends.clone(),
+        };
+        for p in points {
+            let t = along(axis, p);
+            lo = lo.min(t);
+            hi = hi.max(t);
+            any = true;
+        }
+    }
+    any.then_some([lo, hi])
+}
+
+/// Whether `face` closes off a bore rather than continuing it.
+///
+/// A plane bounded by the circle closes it: that is the bottom of a
+/// blind hole and the floor of a counterbore. The plate face a through
+/// hole opens onto is also a plane, but there the circle is a hole cut
+/// in it rather than its boundary, which is the difference both formats
+/// state. A cone closes it only when it converges to a point, as a drill
+/// tip does; a cone with a circle at each end is a chamfer or a
+/// countersink, and the bore continues past it.
+fn closes(solid: &Solid, face: usize, edge: usize) -> bool {
+    let f = &solid.faces[face];
+    if !f.is_outer(edge) {
+        return false;
+    }
+    match &f.surface {
+        Some(Surface::Plane { .. }) => true,
+        Some(Surface::Cone { .. }) => {
+            f.edges()
+                .filter(|e| solid.edges[*e].curve == CurveKind::Circle)
+                .count()
+                == 1
+        }
+        _ => false,
+    }
+}
+
+/// The face closing the end of `c` at `t` along its axis, if any.
+fn cap_at(solid: &Solid, c: &Candidate, t: f64) -> Option<usize> {
+    let tol = tolerance();
+    for e in c.boundary.iter().copied() {
+        let edge = &solid.edges[e];
+        if edge.curve != CurveKind::Circle {
+            continue;
+        }
+        let Some(centre) = edge.centre else { continue };
+        if (along(c.axis, centre) - t).abs() > tol {
+            continue;
+        }
+        for other in solid.across.get(&e).into_iter().flatten() {
+            if !c.faces.contains(other) && closes(solid, *other, e) {
+                return Some(*other);
+            }
+        }
+    }
+    None
+}
+
+/// How a face is grouped with the others on its surface: the line it
+/// turns about, its radius, and its taper. Faces agreeing on all three
+/// and touching each other are one surface the file cut up.
+fn surface_group(axis_key: &str, radius: f64, semi_angle: Option<f64>) -> String {
+    let q = tolerance();
+    format!(
+        "{axis_key}|{}|{}",
+        num(radius, q),
+        semi_angle.map(|a| num(a, q)).unwrap_or_default()
+    )
+}
+
+/// The surfaces a rule could claim, each as the whole set of faces the
+/// file cut it into.
+fn candidates(solid: &Solid) -> Vec<Candidate> {
+    // Every cylindrical or conical face, with what identifies the
+    // surface it lies on.
+    struct Part {
+        face: usize,
+        axis_key: String,
+        axis: [f64; 3],
+        position: [f64; 3],
+        radius: f64,
+        semi_angle: Option<f64>,
+    }
+    let mut parts: Vec<Part> = Vec::new();
+    for (i, f) in solid.faces.iter().enumerate() {
+        let (axis, origin, radius, semi_angle) = match &f.surface {
+            Some(Surface::Cylinder {
+                origin,
+                axis,
+                radius,
+            }) => (*axis, *origin, *radius, None),
+            Some(Surface::Cone {
+                origin,
+                axis,
+                radius,
+                semi_angle,
+            }) => (*axis, *origin, *radius, Some(*semi_angle)),
+            _ => continue,
+        };
+        let (axis, position) = axis_of(axis, origin);
+        let q = tolerance();
+        parts.push(Part {
+            face: i,
+            axis_key: format!("{}|{}", triple(axis, q), triple(position, q)),
+            axis,
+            position,
+            radius,
+            semi_angle,
+        });
+    }
+
+    // Faces on one surface that touch each other are one face of it.
+    // Two separate bores of the same size on one axis stay separate,
+    // because nothing joins them.
+    let mut groups: Vec<Vec<usize>> = Vec::new();
+    let mut by_surface: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+    for (n, p) in parts.iter().enumerate() {
+        by_surface
+            .entry(surface_group(&p.axis_key, p.radius, p.semi_angle))
+            .or_default()
+            .push(n);
+    }
+    for members in by_surface.values() {
+        let faces: Vec<usize> = members.iter().map(|n| parts[*n].face).collect();
+        // Union by shared edges, repeated until nothing more joins.
+        let mut merged: Vec<Vec<usize>> = faces.iter().map(|f| vec![*f]).collect();
+        let mut changed = true;
+        while changed {
+            changed = false;
+            'outer: for a in 0..merged.len() {
+                for b in (a + 1)..merged.len() {
+                    let touching = merged[a].iter().any(|x| {
+                        merged[b].iter().any(|y| {
+                            solid.faces[*x]
+                                .edges()
+                                .any(|e| solid.faces[*y].is_bounded_by(e))
+                        })
+                    });
+                    if touching {
+                        let moved = merged.remove(b);
+                        merged[a].extend(moved);
+                        changed = true;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        for mut g in merged {
+            g.sort_unstable();
+            groups.push(g);
+        }
+    }
+
+    let mut out = Vec::new();
+    for group in groups {
+        let first = group[0];
+        let Some(p) = parts.iter().find(|p| p.face == first) else {
+            continue;
+        };
+        // What bounds the group: everything not shared with another face
+        // of it, and not the seam of a face that closes on itself.
+        let mut boundary: Vec<usize> = Vec::new();
+        for f in &group {
+            for e in solid.faces[*f].edges() {
+                if solid.is_seam(*f, e) || boundary.contains(&e) {
+                    continue;
+                }
+                let inside = solid
+                    .across
+                    .get(&e)
+                    .map(|at| at.iter().all(|x| group.contains(x)))
+                    .unwrap_or(false);
+                if !inside {
+                    boundary.push(e);
+                }
+            }
+        }
+        boundary.sort_unstable();
+        if boundary.is_empty()
+            || boundary
+                .iter()
+                .any(|e| solid.edges[*e].curve != CurveKind::Circle)
+        {
+            continue;
+        }
+        let Some(extent) = extent_of(solid, &boundary, p.axis) else {
+            continue;
+        };
+        let major = boundary
+            .iter()
+            .filter_map(|e| solid.edges[*e].radius)
+            .fold(p.radius, f64::max);
+        out.push(Candidate {
+            faces: group.clone(),
+            boundary,
+            axis_key: p.axis_key.clone(),
+            axis: p.axis,
+            position: p.position,
+            radius: p.radius,
+            semi_angle: p.semi_angle,
+            major_radius: major,
+            extent,
+            // A surface of revolution's own normal points away from its
+            // axis, and a solid's faces point away from its material.
+            outward: solid.faces[first].same_sense,
+        });
+    }
+    out
+}
+
+/// Whether two stretches of one axis meet end to end.
+fn adjacent(a: [f64; 2], b: [f64; 2]) -> bool {
+    let tol = tolerance();
+    (a[1] - b[0]).abs() <= tol || (b[1] - a[0]).abs() <= tol
+}
+
+/// Everything recognised in one solid, and everything not.
+pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
+    let face_ids = face_ids(solid, ids);
+    let cands = candidates(solid);
+
+    let mut by_axis: BTreeMap<&str, Vec<usize>> = BTreeMap::new();
+    for (n, c) in cands.iter().enumerate() {
+        by_axis.entry(&c.axis_key).or_default().push(n);
+    }
+
+    // A cylindrical bore or shaft is settled by which way it looks. A
+    // cone is not a feature on its own: it is a countersink only where
+    // it opens into a bore, which is decided next.
+    let mut kinds: BTreeMap<usize, Kind> = BTreeMap::new();
+    for (n, c) in cands.iter().enumerate() {
+        if c.semi_angle.is_none() {
+            kinds.insert(n, if c.outward { Kind::Boss } else { Kind::Hole });
+        }
+    }
+
+    // A bore wider than the one it meets end to end is that one's
+    // counterbore; a cone meeting a bore is its countersink.
+    let mut coaxial: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+    for (n, c) in cands.iter().enumerate() {
+        if c.outward {
+            continue;
+        }
+        for other in by_axis.get(c.axis_key.as_str()).into_iter().flatten() {
+            let o = &cands[*other];
+            if *other == n || o.outward || o.semi_angle.is_some() || !adjacent(c.extent, o.extent) {
+                continue;
+            }
+            coaxial.entry(n).or_default().push(*other);
+            if c.semi_angle.is_some() {
+                kinds.insert(n, Kind::Countersink);
+            } else if c.radius > o.radius + tolerance() {
+                kinds.insert(n, Kind::Counterbore);
+            }
+        }
+    }
+
+    // Faces closing the end of a bore belong to it, so that they are not
+    // also reported as unclaimed.
+    let mut caps: BTreeMap<usize, usize> = BTreeMap::new();
+    for (n, c) in cands.iter().enumerate() {
+        if c.outward || !kinds.contains_key(&n) {
+            continue;
+        }
+        for t in [c.extent[0], c.extent[1]] {
+            if let Some(cap) = cap_at(solid, c, t) {
+                caps.entry(cap).or_insert(n);
+            }
+        }
+    }
+
+    // A cone that closes a bore is the tip the drill left, so it is part
+    // of that hole rather than a feature beside it. Without this it
+    // would be reported twice: once as the hole's bottom and once as a
+    // countersink of no depth, at the far end from any countersink.
+    let capping: Vec<usize> = kinds
+        .keys()
+        .copied()
+        .filter(|n| cands[*n].faces.iter().any(|f| caps.contains_key(f)))
+        .collect();
+    for n in capping {
+        kinds.remove(&n);
+    }
+
+    let id_of = |n: usize| feature_id(solid, &cands[n], kinds.get(&n).copied());
+
+    let mut features: Vec<Feature> = Vec::new();
+    for (n, c) in cands.iter().enumerate() {
+        let Some(kind) = kinds.get(&n).copied() else {
+            continue;
+        };
+        let mut faces: Vec<String> = c.faces.iter().map(|f| face_ids[*f].clone()).collect();
+        for (cap, owner) in &caps {
+            if *owner == n {
+                faces.push(face_ids[*cap].clone());
+            }
+        }
+        faces.sort();
+        faces.dedup();
+        let lo = cap_at(solid, c, c.extent[0]).is_some();
+        let hi = cap_at(solid, c, c.extent[1]).is_some();
+        let mut with: Vec<String> = coaxial
+            .get(&n)
+            .into_iter()
+            .flatten()
+            .filter(|o| kinds.contains_key(o))
+            .map(|o| id_of(*o))
+            .collect();
+        with.sort();
+        with.dedup();
+        features.push(Feature {
+            id: id_of(n),
+            kind,
+            faces,
+            shape: Shape {
+                diameter: Some(round(c.major_radius * 2.0)),
+                depth: Some(round(c.extent[1] - c.extent[0])),
+                // Only a bore is open or closed at its ends. A shaft has
+                // no inside, and a cone at the mouth of a hole is open
+                // at both ends by construction, so neither is asked, and
+                // neither gets a misleading `true`.
+                through: (!c.outward && c.semi_angle.is_none()).then_some(!lo && !hi),
+                axis: Some(rounded(c.axis)),
+                position: Some(rounded(c.position)),
+                extent: Some([round(c.extent[0]), round(c.extent[1])]),
+                angle: c.semi_angle.map(|a| round(a.to_degrees() * 2.0)),
+            },
+            overlaps: Vec::new(),
+            coaxial_with: with,
+        });
+    }
+    features.sort_by(|a, b| a.id.cmp(&b.id));
+
+    let claimed: std::collections::BTreeSet<&String> =
+        features.iter().flat_map(|f| f.faces.iter()).collect();
+    let mut unassigned: Vec<UnassignedFace> = solid
+        .faces
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !claimed.contains(&face_ids[*i]))
+        .map(|(i, f)| UnassignedFace {
+            id: face_ids[i].clone(),
+            surface: f.kind.clone(),
+        })
+        .collect();
+    unassigned.sort_by(|a, b| a.id.cmp(&b.id));
+
+    Body {
+        id: body_id(&face_ids, ids),
+        name: solid.name.clone(),
+        faces: FaceCounts {
+            total: solid.faces.len(),
+            in_features: claimed.len(),
+            unassigned: unassigned.len(),
+        },
+        features,
+        unassigned,
+    }
+}
+
+/// Ids for every face, by the shared recipe (ADR 0004).
+fn face_ids(solid: &Solid, ids: &mut ContentId) -> Vec<String> {
+    solid
+        .faces
+        .iter()
+        .map(|f| {
+            let mut verts: Vec<[f64; 3]> = Vec::new();
+            for e in f.edges() {
+                verts.extend(solid.edges[e].ends.iter().copied());
+                if solid.edges[e].ends.is_empty() {
+                    verts.extend(solid.edges[e].centre);
+                }
+            }
+            let surface = f
+                .surface
+                .clone()
+                .unwrap_or_else(|| Surface::Other(f.kind.clone()));
+            let key = fingerprint::face_key(&surface, &verts, Scale::NONE);
+            ids.make("face", &[&key])
+        })
+        .collect()
+}
+
+/// The id of a feature: what kind it is, and the surface it is the wall
+/// of, taken as one whether or not the file cut that surface up.
+///
+/// Deliberately not built from the ids of its faces. A bore written as
+/// one cylindrical face and the same bore written as two halves are the
+/// same bore, and so are a JT file's and a STEP file's, so the key is
+/// the geometry the shared recipe states for it (ADR 0004): the line it
+/// turns about, its size, and the stretch of that line it occupies. The
+/// faces capping it are left out, so that a blind hole which gains a
+/// chamfer is still the same hole.
+fn feature_id(solid: &Solid, c: &Candidate, kind: Option<Kind>) -> String {
+    let surface = match c.semi_angle {
+        Some(semi_angle) => Surface::Cone {
+            origin: c.position,
+            axis: c.axis,
+            radius: c.radius,
+            semi_angle,
+        },
+        None => Surface::Cylinder {
+            origin: c.position,
+            axis: c.axis,
+            radius: c.radius,
+        },
+    };
+    let points: Vec<[f64; 3]> = c
+        .boundary
+        .iter()
+        .flat_map(|e| {
+            let edge = &solid.edges[*e];
+            edge.centre.into_iter().chain(edge.ends.iter().copied())
+        })
+        .collect();
+    let geometry = fingerprint::face_key(&surface, &points, Scale::NONE);
+    let key = fingerprint::feature_key(
+        kind.map(Kind::name).unwrap_or_default(),
+        std::slice::from_ref(&geometry),
+        "",
+    );
+    format!("feat:{}", crate::model::content_hash([key]))
+}
+
+/// The id of a body: the distinct surfaces it is made of.
+///
+/// Distinct, because a cylinder an exporter cut into halves is still one
+/// surface and both halves key the same way, differing only in the
+/// ordinal a collision gets. Counting them would make the same design
+/// two bodies to anything comparing the two documents, and pairing them
+/// is the first thing such a reader has to do.
+fn body_id(face_ids: &[String], ids: &mut ContentId) -> String {
+    let mut distinct: Vec<&str> = face_ids
+        .iter()
+        .map(|id| id.split_once('-').map_or(id.as_str(), |(base, _)| base))
+        .collect();
+    distinct.sort_unstable();
+    distinct.dedup();
+    let key = distinct.join(";");
+    ids.make("body", &[&key])
+}
+
+/// Numbers are reported at the identity quantum, so that a value read
+/// from two exports of one design reads the same in both.
+fn round(v: f64) -> f64 {
+    let q = tolerance();
+    num(v, q).parse().unwrap_or(v)
+}
+
+fn rounded(p: [f64; 3]) -> [f64; 3] {
+    [round(p[0]), round(p[1]), round(p[2])]
+}

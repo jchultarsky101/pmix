@@ -94,6 +94,60 @@ pub enum Surface {
     Other(String),
 }
 
+impl Surface {
+    /// The same surface with its lengths in the units `scale` converts
+    /// to. Angles are not lengths and are left alone.
+    ///
+    /// Used where a surface has to leave its reader's own units behind,
+    /// as it does on the way into a feature document, whose numbers are
+    /// stated in millimetres whatever the file declared.
+    pub fn scaled(&self, scale: Scale) -> Self {
+        let k = scale.length;
+        match self {
+            Self::Plane { origin, axis } => Self::Plane {
+                origin: scale.point(*origin),
+                axis: *axis,
+            },
+            Self::Cylinder {
+                origin,
+                axis,
+                radius,
+            } => Self::Cylinder {
+                origin: scale.point(*origin),
+                axis: *axis,
+                radius: radius * k,
+            },
+            Self::Cone {
+                origin,
+                axis,
+                radius,
+                semi_angle,
+            } => Self::Cone {
+                origin: scale.point(*origin),
+                axis: *axis,
+                radius: radius * k,
+                semi_angle: *semi_angle,
+            },
+            Self::Sphere { origin, radius } => Self::Sphere {
+                origin: scale.point(*origin),
+                radius: radius * k,
+            },
+            Self::Torus {
+                origin,
+                axis,
+                major_radius,
+                minor_radius,
+            } => Self::Torus {
+                origin: scale.point(*origin),
+                axis: *axis,
+                major_radius: major_radius * k,
+                minor_radius: minor_radius * k,
+            },
+            Self::Other(name) => Self::Other(name.clone()),
+        }
+    }
+}
+
 /// Surfaces of revolution, whose faces span an extent along an axis.
 const REVOLVED: [&str; 3] = ["cylinder", "cone", "torus"];
 
