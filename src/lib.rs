@@ -6,6 +6,7 @@
 //! for anyone who wants to embed PMI extraction in their own tooling.
 //!
 //! - [`model`] is the JSON data model (ADR 0002, 0003, 0004).
+//! - [`features`] recognises manufacturing features from geometry (ADR 0011).
 //! - [`geometry`] summarises what an annotation draws, for either format.
 //! - [`identity`] turns identity keys into ids, for either format (ADR 0004).
 //! - [`step`] reads STEP AP242 files: a Part 21 parser plus PMI walkers.
@@ -25,6 +26,7 @@
 //! saved views, get the same id from either format.
 
 pub mod diff;
+pub mod features;
 pub mod fingerprint;
 pub mod format;
 pub mod geometry;

@@ -134,7 +134,7 @@ pub(crate) fn of_item(ex: &Exchange, item: &Instance, scale: Scale) -> Fingerpri
     }
 }
 
-fn vertex_point(ex: &Exchange, v: &Instance) -> Option<[f64; 3]> {
+pub(crate) fn vertex_point(ex: &Exchange, v: &Instance) -> Option<[f64; 3]> {
     let pt = ex.get(v.parameters().get(1)?.as_ref()?)?;
     point(pt)
 }
@@ -199,7 +199,7 @@ fn face(ex: &Exchange, f: &Instance, scale: Scale) -> Fingerprint {
 /// A surface whose kind is known but whose placement the file leaves out
 /// is named without being located, which keeps such a face apart from
 /// other kinds without pretending to know where it is.
-fn surface_of(ex: &Exchange, s: &Instance) -> fingerprint::Surface {
+pub(crate) fn surface_of(ex: &Exchange, s: &Instance) -> fingerprint::Surface {
     let p = s.parameters();
     let pl = p
         .get(1)

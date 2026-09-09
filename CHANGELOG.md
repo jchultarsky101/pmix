@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`pmix features`**, a new command that recognises manufacturing
+  features from a model's geometry and writes them as its own document
+  (ADR 0011). It reads holes (through and blind), counterbores,
+  countersinks, and bosses from the B-rep of either format, and states
+  each one's diameter, depth, axis, position, and the stretch of that
+  axis it occupies, in millimetres and degrees whatever the file
+  declared.
+
+  This is not PMI. Nothing in the file states it, so it is a separate
+  command with its own output and its own schema version, and
+  `pmix extract` is unchanged.
+
+  Every face is accounted for: those no rule claimed are listed in the
+  output rather than passed over, so that *not recognised* cannot be
+  mistaken for *not there*. A file with no B-rep says so in a diagnostic
+  instead of reporting an empty result.
+
+  The point of the document is comparison (ADR 0012). A feature states
+  its parameters and not only its identity, because "Ø4.5 became Ø5.0"
+  cannot be recovered from two fingerprints; and the same design bored
+  wider differs from its baseline in one field, moved differs in one
+  field, and restated in inches does not differ at all. What `pmix`
+  deliberately does not do is decide whether a hole moved or was removed
+  and another added: that is not decidable from geometry, so both are
+  described and the judgment is left to the reader of the document.
+
+  A feature is identified by the surface it is the wall of, not by the
+  faces it is made of, so a bore written as one cylindrical face and the
+  same bore written as two halves are one feature with one id.
+
 ## [0.8.0] - 2026-09-09
 
 A datum feature or datum target the file gives no geometry is now

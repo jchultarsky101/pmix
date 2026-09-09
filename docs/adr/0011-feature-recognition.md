@@ -109,10 +109,20 @@ units. Identity says whether two things are the same; only the
 parameters say how they differ, and describing the difference is what
 this is for (ADR 0012).
 
-**Reuse identity.** A recognised feature is also fingerprinted by the
-shared recipe (ADR 0004), over the faces it is made of, so two exports of
-one design name the same hole the same way, and whatever agrees exactly
-needs no further judgment.
+**Reuse identity, over the surface rather than the faces.** A recognised
+feature is also fingerprinted by the shared recipe (ADR 0004), applied to
+the surface it is the wall of: the line it turns about, its size, and the
+stretch of that line it occupies. Not the faces it is made of, because
+how many of those there are is an exporter's choice and not the design's.
+Most systems cut a bore into two half-cylinders meeting along two
+straight edges, where JT's topology table writes one face; keying on the
+faces would make those two different holes. So a bore written either way,
+in either format, gets one id, and whatever agrees exactly needs no
+further judgment.
+
+The same reasoning applies one level up: a body is keyed by the distinct
+surfaces it is made of, so that a re-export which splits a face does not
+produce a body that pairs with nothing.
 
 ### What this is not
 
@@ -145,6 +155,12 @@ the output records which reader it came from.
   independent of the PMI document's.
 - The STEP reader needs a face adjacency graph, which it does not
   currently keep; the JT reader's topology table already provides one.
+- Rules have to be written against what exporters actually write, not
+  against the idealised solid: a bore split across faces, and the seam
+  edge where a closed face meets itself, are both the normal case in
+  STEP and absent from JT. A rule that asks what bounds a face has to
+  pass over the seam and take the split faces together, or it matches
+  nothing in real files while passing on a hand-built one.
 - Ralph's two hundred models become a test corpus for something.
 - The recognised feature set is a claim about a shape, so it needs
   checking against shapes whose answer is known. The synthetic fixtures
