@@ -6,13 +6,20 @@
 //! topology, and analytic geometry. That is what `pmix` needs: the
 //! surfaces a PMI callout applies to, without a Parasolid reader.
 //!
-//! This reads the counts that head the table, the faces, and the counts
-//! that head the geometry after it. The face section holds five vectors
-//! where the specification's figure shows four; three of the five are
-//! identified from what they contain, and the other two are left unnamed
-//! rather than guessed at. The geometry itself is not read yet.
+//! The whole table is read: the counts that head it, the chain of
+//! compressed vectors that ties bodies down to edges, and the analytic
+//! surfaces and curves after it. Walking the chain is what proves the
+//! reading, because it lands on exactly the counts the header declared:
+//! every loop is reached from one face, every coedge from one loop, and
+//! every edge from two coedges.
+//!
+//! Two sections hold one vector more than the specification's figures
+//! show. Both extra vectors turned out to be the kind of geometry the
+//! entity lies on, written for every face and every edge rather than
+//! only for the ones the table goes on to describe.
 
 use std::fmt;
+use std::ops::Range;
 
 use super::codec::{CodecError, Cursor, Predictor};
 use super::file::Guid;
@@ -55,10 +62,8 @@ type Result<T> = std::result::Result<T, SttError>;
 
 /// How many of each thing a part's B-rep contains.
 ///
-/// These counts head the table as plain integers, so they are certain in
-/// a way the compressed vectors after them are not yet: the per-face
-/// fields are read but not yet named, because this file's element writes
-/// five vectors per face where the specification's figure shows four.
+/// These counts head the table as plain integers, and every section
+/// after them holds one value per entity counted here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Counts {
     pub bodies: usize,
@@ -70,28 +75,138 @@ pub struct Counts {
     pub edges: usize,
 }
 
-/// One face of a part's B-rep.
+/// The kind of surface a face lies on.
+///
+/// This is stated for every face, including the ones whose surface the
+/// table does not go on to describe, so a face can be told apart from
+/// its neighbours even when its geometry is a spline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SurfaceKind {
+    Plane,
+    Cylinder,
+    Cone,
+    Sphere,
+    Torus,
+    /// Anything the table has no closed form for.
+    Other(u32),
+}
+
+impl SurfaceKind {
+    fn from_face(value: u32) -> Self {
+        match value {
+            0 => Self::Plane,
+            1 => Self::Cylinder,
+            2 => Self::Cone,
+            3 => Self::Sphere,
+            4 => Self::Torus,
+            other => Self::Other(other),
+        }
+    }
+
+    /// The name this reader uses for the kind.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Plane => "plane",
+            Self::Cylinder => "cylinder",
+            Self::Cone => "cone",
+            Self::Sphere => "sphere",
+            Self::Torus => "torus",
+            Self::Other(_) => "other",
+        }
+    }
+}
+
+/// The kind of curve an edge lies on, stated for every edge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CurveKind {
+    Line,
+    Circle,
+    Ellipse,
+    /// Anything the table has no closed form for.
+    Other(u32),
+}
+
+impl CurveKind {
+    fn from_edge(value: u32) -> Self {
+        match value {
+            0 => Self::Line,
+            1 => Self::Circle,
+            2 => Self::Ellipse,
+            other => Self::Other(other),
+        }
+    }
+
+    /// The name this reader uses for the kind.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Line => "line",
+            Self::Circle => "circle",
+            Self::Ellipse => "ellipse",
+            Self::Other(_) => "other",
+        }
+    }
+}
+
+/// One face of a part's B-rep.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Face {
     /// The identifier the producing system persisted for this face.
     ///
     /// A PMI association names a face by its position among the faces of
-    /// its body ordered by increasing identifier, which is why this is
-    /// needed at all (specification section 11.13). It is not a position
-    /// itself: the values are distinct and ascending but leave gaps, so
-    /// the largest exceeds the number of faces.
+    /// its body ordered by increasing identifier (specification section
+    /// 11.13), which is why this is needed at all.
     pub identifier: u32,
     /// Whether the face normal points into the shell that owns it.
     ///
-    /// The specification writes two per-face flags and this reader
-    /// cannot tell which of its two flag vectors is which by position,
-    /// because the section has an extra vector the figure does not show.
-    /// The reading is taken from content: this one is clear on every
-    /// face of every part in the test file, which is what an outward
-    /// facing solid gives, while [`Face::normal_reversed`] varies.
+    /// The specification contradicts itself: its prose sets the flag
+    /// when the normal points inward and its table when it points
+    /// outward. The prose is taken, because it makes every face of every
+    /// solid in the test file point outward, as a solid's faces do.
     pub inward: bool,
     /// Whether the face normal opposes the normal of its surface.
     pub normal_reversed: bool,
+    /// The face's loops, as a range over [`Topology::loops`].
+    pub loops: Range<usize>,
+    /// What the face lies on, named even when it is not described below.
+    pub surface_kind: SurfaceKind,
+    /// The surface itself, when the table describes it.
+    pub surface: Option<Surface>,
+}
+
+/// One trim loop, a closed circuit of coedges bounding a face.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Loop {
+    /// The loop's coedges, as a range over [`Topology::coedges`].
+    pub coedges: Range<usize>,
+    /// The loop type (specification table H.7); 2 is an outer boundary
+    /// and 3 a hole.
+    pub kind: u32,
+    /// The vertex a loop of no edges stands at.
+    pub vertex: Option<u32>,
+}
+
+/// One oriented use of an edge by a loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CoEdge {
+    /// Which edge, as a position in [`Topology::edges`].
+    pub edge: usize,
+    /// Whether the coedge runs the same way as the edge.
+    pub forward: bool,
+}
+
+/// One edge of a part's B-rep.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Edge {
+    /// Whether the edge runs the same way as its curve.
+    pub forward: bool,
+    /// Whether the edge is shorter than ten microns.
+    pub tiny: bool,
+    pub start_vertex: u32,
+    pub end_vertex: u32,
+    /// What the edge lies on, named even when it is not described below.
+    pub curve_kind: CurveKind,
+    /// The curve itself, when the table describes it.
+    pub curve: Option<Curve>,
 }
 
 /// An analytic surface a face lies on.
@@ -165,6 +280,45 @@ impl Surface {
     }
 }
 
+/// An analytic curve an edge lies on.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Curve {
+    Line {
+        point: [f64; 3],
+        direction: [f64; 3],
+    },
+    Circle {
+        centre: [f64; 3],
+        axis: [f64; 3],
+        radius: f64,
+    },
+    Ellipse {
+        centre: [f64; 3],
+        axis: [f64; 3],
+        major_radius: f64,
+        minor_radius: f64,
+    },
+}
+
+impl Curve {
+    /// The name this reader uses for the kind of curve.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Line { .. } => "line",
+            Self::Circle { .. } => "circle",
+            Self::Ellipse { .. } => "ellipse",
+        }
+    }
+
+    /// A point the curve passes through, or the centre it turns about.
+    pub fn location(&self) -> [f64; 3] {
+        match self {
+            Self::Line { point, .. } => *point,
+            Self::Circle { centre, .. } | Self::Ellipse { centre, .. } => *centre,
+        }
+    }
+}
+
 /// How many of each thing the geometry holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct GeometryCounts {
@@ -183,29 +337,125 @@ pub struct Topology {
     pub counts: Counts,
     /// The faces, in the order the table stores them.
     pub faces: Vec<Face>,
+    /// The loops, pointed into by [`Face::loops`].
+    pub loops: Vec<Loop>,
+    /// The coedges, pointed into by [`Loop::coedges`].
+    pub coedges: Vec<CoEdge>,
+    /// The edges, pointed into by [`CoEdge::edge`].
+    pub edges: Vec<Edge>,
     /// How many surfaces and curves the geometry after the topology
     /// holds. Read only when the whole topology could be.
     pub geometry: Option<GeometryCounts>,
     /// The checksum the file states over its topology.
     pub hash: Option<u32>,
-    /// The surfaces the geometry describes, each with the index of the
-    /// surface it stands for. Surfaces run parallel to faces, so that
-    /// index is also the face's position in [`Topology::faces`].
-    pub surfaces: Vec<(usize, Surface)>,
-    /// How many compressed vectors were read before one could not be,
-    /// and the number of values each held. Reading the whole chain is
-    /// what shows the table is understood; the meaning of each vector is
-    /// the next thing to establish.
+    /// How many values each compressed vector held, in the order the
+    /// table writes them. Reading the whole chain is what shows the
+    /// table is understood.
     pub vectors: Vec<usize>,
     /// Why reading stopped, when it stopped early.
     pub stopped: Option<String>,
 }
 
-/// Read a part's topology table.
+/// The compressed vectors of the topology, read but not yet assembled.
+struct Chain {
+    start_loop: Vec<u32>,
+    identifier: Vec<u32>,
+    orientation: Vec<i32>,
+    normal_reversed: Vec<i32>,
+    face_surface_kind: Vec<u32>,
+    start_coedge: Vec<u32>,
+    loop_kind: Vec<u32>,
+    loop_vertex: Vec<i32>,
+    coedge_edge: Vec<u32>,
+    coedge_sense: Vec<i32>,
+    edge_sense: Vec<i32>,
+    tiny: Vec<i32>,
+    start_vertex: Vec<u32>,
+    end_vertex: Vec<u32>,
+    edge_curve_kind: Vec<u32>,
+}
+
+/// A cursor that also records the length of every vector it reads.
+struct Vectors<'a> {
+    cursor: Cursor<'a>,
+    lengths: Vec<usize>,
+}
+
+impl Vectors<'_> {
+    fn signed(&mut self, predictor: Predictor) -> Result<Vec<i32>> {
+        let v = self.cursor.packet(predictor)?;
+        self.lengths.push(v.len());
+        Ok(v)
+    }
+
+    fn unsigned(&mut self, predictor: Predictor) -> Result<Vec<u32>> {
+        let v = self.cursor.packet_u32(predictor)?;
+        self.lengths.push(v.len());
+        Ok(v)
+    }
+}
+
+/// Read the chain of topology vectors in the order annex H writes them.
 ///
-/// The counts are read from the header and the faces from the section
-/// that follows the bodies, regions, and shells. The rest of the vectors
-/// are walked without being interpreted.
+/// The predictor each vector uses is not written in the file; it belongs
+/// to the field, so it is named here from the specification's figures.
+fn read_chain(v: &mut Vectors<'_>) -> Result<Chain> {
+    // Bodies (figure H.5), regions (H.6), and shells (H.7). Nothing
+    // above a face is needed yet, but the vectors have to be stepped
+    // over to reach the ones that are. Start Face Index has one entry
+    // per represented shell rather than per shell, because an inner
+    // shell shares its faces with its outer counterpart.
+    v.unsigned(Predictor::Lag1)?; // start region index
+    v.signed(Predictor::None)?; // body types
+    v.unsigned(Predictor::Lag1)?; // start shell index
+    v.signed(Predictor::None)?; // solid region flag
+    v.unsigned(Predictor::Lag1)?; // start face index
+    v.signed(Predictor::None)?; // shell types
+    v.signed(Predictor::None)?; // shell signs
+    v.unsigned(Predictor::Lag1)?; // shell map
+
+    Ok(Chain {
+        // Faces (figure H.8), plus the surface kind the figure omits.
+        start_loop: v.unsigned(Predictor::Lag1)?,
+        identifier: v.unsigned(Predictor::Lag1)?,
+        orientation: v.signed(Predictor::None)?,
+        normal_reversed: v.signed(Predictor::None)?,
+        face_surface_kind: v.unsigned(Predictor::None)?,
+        // Loops (figure H.9).
+        start_coedge: v.unsigned(Predictor::Lag1)?,
+        loop_kind: v.unsigned(Predictor::None)?,
+        loop_vertex: v.signed(Predictor::None)?,
+        // CoEdges (figure H.10).
+        coedge_edge: v.unsigned(Predictor::None)?,
+        coedge_sense: v.signed(Predictor::None)?,
+        // Edges (figure H.11), plus the curve kind the figure omits.
+        edge_sense: v.signed(Predictor::None)?,
+        tiny: v.signed(Predictor::None)?,
+        start_vertex: v.unsigned(Predictor::None)?,
+        end_vertex: v.unsigned(Predictor::None)?,
+        edge_curve_kind: v.unsigned(Predictor::None)?,
+    })
+}
+
+/// Turn a vector of start indices into the range each owner covers.
+///
+/// The last owner runs to the end of the section. An owner with nothing
+/// of its own gives an empty range rather than a backwards one, which a
+/// loop standing at a single vertex does.
+fn ranges(starts: &[u32], total: usize) -> Vec<Range<usize>> {
+    (0..starts.len())
+        .map(|k| {
+            let from = (starts[k] as usize).min(total);
+            let to = starts
+                .get(k + 1)
+                .map_or(total, |n| (*n as usize).min(total))
+                .max(from);
+            from..to
+        })
+        .collect()
+}
+
+/// Read a part's topology table.
 pub fn parse(data: &[u8]) -> Result<Topology> {
     let head = data.get(..29).ok_or(SttError::Truncated)?;
     let count = |k: usize| u32::from_le_bytes(head[1 + k * 4..5 + k * 4].try_into().unwrap());
@@ -220,133 +470,156 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
             data.len()
         )));
     }
+    let counts = Counts {
+        bodies: raw[0] as usize,
+        regions: raw[1] as usize,
+        shells: raw[2] as usize,
+        faces: raw[3] as usize,
+        loops: raw[4] as usize,
+        coedges: raw[5] as usize,
+        edges: raw[6] as usize,
+    };
     let mut out = Topology {
         version: head[0],
-        counts: Counts {
-            bodies: raw[0] as usize,
-            regions: raw[1] as usize,
-            shells: raw[2] as usize,
-            faces: raw[3] as usize,
-            loops: raw[4] as usize,
-            coedges: raw[5] as usize,
-            edges: raw[6] as usize,
-        },
-        faces: Vec::new(),
-        geometry: None,
-        hash: None,
-        surfaces: Vec::new(),
-        vectors: Vec::new(),
-        stopped: None,
+        counts,
+        ..Topology::default()
     };
 
-    // The topology is a fixed chain of compressed vectors: two for the
-    // bodies, two for the regions, four for the shells, five for the
-    // faces, three for the loops, two for the coedges, and five for the
-    // edges. Every table in every file seen so far agrees.
-    const BEFORE_FACES: usize = 2 + 2 + 4;
-    const FACE_VECTORS: usize = 5;
-    const TOPOLOGY_VECTORS: usize = BEFORE_FACES + FACE_VECTORS + 3 + 2 + 5;
-
-    let mut cursor = Cursor::new(&data[29..]);
-    let mut faces: Vec<Vec<i32>> = Vec::new();
-    while out.vectors.len() < TOPOLOGY_VECTORS {
-        let index = out.vectors.len();
-        let in_faces = (BEFORE_FACES..BEFORE_FACES + FACE_VECTORS).contains(&index);
-        // Read every vector as written. Which of them a predictor applies
-        // to depends on what they turn out to be, so it is undone below.
-        match cursor.packet(Predictor::None) {
-            Ok(values) => {
-                out.vectors.push(values.len());
-                if in_faces {
-                    faces.push(values);
-                }
-            }
-            Err(e) => {
-                out.stopped = Some(e.to_string());
-                break;
-            }
+    let mut vectors = Vectors {
+        cursor: Cursor::new(&data[29..]),
+        lengths: Vec::new(),
+    };
+    let chain = match read_chain(&mut vectors) {
+        Ok(chain) => chain,
+        Err(e) => {
+            out.stopped = Some(e.to_string());
+            out.vectors = vectors.lengths;
+            return Ok(out);
         }
-    }
+    };
 
     // A checksum over the topology, then the counts that head the
     // geometry. Both are plain integers rather than packets.
-    if out.vectors.len() == TOPOLOGY_VECTORS {
-        let after = 29 + cursor.at;
-        let word = |k: usize| {
-            data.get(after + k * 4..after + k * 4 + 4)
-                .and_then(|b| b.try_into().ok())
-                .map(u32::from_le_bytes)
+    let after = 29 + vectors.cursor.at;
+    let word = |k: usize| {
+        data.get(after + k * 4..after + k * 4 + 4)
+            .and_then(|b| b.try_into().ok())
+            .map(u32::from_le_bytes)
+    };
+    out.hash = word(0);
+    let mut surfaces = Vec::new();
+    let mut curves = Vec::new();
+    if let (Some(s), Some(rs), Some(c), Some(rc), Some(points)) =
+        (word(1), word(2), word(3), word(4), word(5))
+    {
+        let geometry = GeometryCounts {
+            surfaces: s as usize,
+            represented_surfaces: rs as usize,
+            curves: c as usize,
+            represented_curves: rc as usize,
+            points: points as usize,
         };
-        out.hash = word(0);
-        if let (Some(surfaces), Some(rs), Some(curves), Some(rc), Some(points)) =
-            (word(1), word(2), word(3), word(4), word(5))
-        {
-            let counts = GeometryCounts {
-                surfaces: surfaces as usize,
-                represented_surfaces: rs as usize,
-                curves: curves as usize,
-                represented_curves: rc as usize,
-                points: points as usize,
-            };
-            out.geometry = Some(counts);
-            if counts.represented_surfaces > 0 {
-                // The counts are six words past the last vector.
-                cursor.at += 6 * 4;
-                out.surfaces = read_surfaces(&mut cursor).unwrap_or_default();
-            }
+        out.geometry = Some(geometry);
+        // The counts are six words past the last vector.
+        vectors.cursor.at += 6 * 4;
+        if geometry.represented_surfaces > 0 {
+            surfaces = read_surfaces(&mut vectors.cursor).unwrap_or_default();
+        }
+        if geometry.represented_curves > 0 {
+            curves = read_curves(&mut vectors.cursor).unwrap_or_default();
         }
     }
 
-    if faces.len() == 5 && faces.iter().all(|v| v.len() == out.counts.faces) {
-        // The first vector is written as differences, so each identifier
-        // is the running total.
-        let mut identifier = faces[0].clone();
-        for i in 1..identifier.len() {
-            identifier[i] = identifier[i].wrapping_add(identifier[i - 1]);
+    let loop_ranges = ranges(&chain.start_coedge, counts.coedges);
+    out.loops = (0..counts.loops.min(chain.start_coedge.len()))
+        .map(|k| Loop {
+            coedges: loop_ranges[k].clone(),
+            kind: chain.loop_kind.get(k).copied().unwrap_or_default(),
+            vertex: match chain.loop_vertex.get(k) {
+                Some(v) if *v >= 0 => Some(*v as u32),
+                _ => None,
+            },
+        })
+        .collect();
+    out.coedges = (0..counts.coedges.min(chain.coedge_edge.len()))
+        .map(|k| CoEdge {
+            edge: chain.coedge_edge[k] as usize,
+            forward: chain.coedge_sense.get(k).copied().unwrap_or_default() != 0,
+        })
+        .collect();
+    out.edges = (0..counts.edges.min(chain.start_vertex.len()))
+        .map(|k| Edge {
+            forward: chain.edge_sense.get(k).copied().unwrap_or_default() != 0,
+            tiny: chain.tiny.get(k).copied().unwrap_or_default() != 0,
+            start_vertex: chain.start_vertex[k],
+            end_vertex: chain.end_vertex.get(k).copied().unwrap_or_default(),
+            curve_kind: CurveKind::from_edge(
+                chain.edge_curve_kind.get(k).copied().unwrap_or_default(),
+            ),
+            curve: None,
+        })
+        .collect();
+
+    let face_ranges = ranges(&chain.start_loop, counts.loops);
+    out.faces = (0..counts.faces.min(chain.identifier.len()))
+        .map(|k| Face {
+            identifier: chain.identifier[k],
+            inward: chain.orientation.get(k).copied().unwrap_or_default() != 0,
+            normal_reversed: chain.normal_reversed.get(k).copied().unwrap_or_default() != 0,
+            loops: face_ranges[k].clone(),
+            surface_kind: SurfaceKind::from_face(
+                chain.face_surface_kind.get(k).copied().unwrap_or_default(),
+            ),
+            surface: None,
+        })
+        .collect();
+
+    // The index a described surface carries is the position of the face
+    // it belongs to, and likewise a curve's is the position of its edge.
+    // Not a guess: with this reading every analytic curve bounding an
+    // analytic face lies on that face's surface, on every part of the
+    // test file, and neither of the other two readings comes close.
+    for (at, surface) in surfaces {
+        if let Some(face) = out.faces.get_mut(at) {
+            face.surface = Some(surface);
         }
-        // The flags are the vectors written as they stand whose values
-        // are only ever set or clear; the other two are not identified.
-        let flags: Vec<&Vec<i32>> = faces[1..]
-            .iter()
-            .filter(|v| v.iter().all(|x| (0..=1).contains(x)))
-            .collect();
-        out.faces = (0..out.counts.faces)
-            .map(|i| Face {
-                identifier: identifier[i] as u32,
-                inward: flags.first().is_some_and(|v| v[i] != 0),
-                normal_reversed: flags.get(1).is_some_and(|v| v[i] != 0),
-            })
-            .collect();
     }
+    for (at, curve) in curves {
+        if let Some(edge) = out.edges.get_mut(at) {
+            edge.curve = Some(curve);
+        }
+    }
+
+    out.vectors = vectors.lengths;
     Ok(out)
 }
 
-/// Read the surfaces the geometry describes.
+/// Take three values from an array laid end to end.
+fn triple(v: &[f64], at: usize) -> Option<[f64; 3]> {
+    Some([*v.get(at)?, *v.get(at + 1)?, *v.get(at + 2)?])
+}
+
+/// Read the surfaces the geometry describes, each with the position of
+/// the face it belongs to.
 ///
 /// Each surface takes what it needs from four arrays laid end to end,
 /// in the order the surfaces appear: every kind takes a location and two
 /// directions, and the kinds with curvature take radii and angles as
-/// well (specification figure H.15).
+/// well (specification figure H.14).
 fn read_surfaces(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Surface)>> {
     let index = cursor.packet_u32(Predictor::Lag1)?;
     // The type values run one above the enumeration the specification
     // lists, so a plane is written as 1 rather than 0. The counts prove
     // it: with the documented values the radius and angle arrays are far
     // too short for the surfaces they would have to describe, and with
-    // these they match exactly.
-    let kinds: Vec<u32> = cursor
-        .packet_u32(Predictor::None)?
-        .into_iter()
-        .map(|k| k.saturating_sub(1))
-        .collect();
+    // these they match exactly. The per-face kinds settle it too, since
+    // those use the documented values for the very same faces.
+    let kinds = cursor.packet_u32(Predictor::None)?;
     let coordinates = cursor.floats()?;
     let axes = cursor.floats()?;
     let radii = cursor.floats()?;
     let radians = cursor.floats()?;
 
-    let triple = |v: &[f64], at: usize| -> Option<[f64; 3]> {
-        Some([*v.get(at)?, *v.get(at + 1)?, *v.get(at + 2)?])
-    };
     let (mut coordinate, mut axis, mut radius, mut radian) = (0, 0, 0, 0);
     let mut out = Vec::with_capacity(kinds.len().min(1 << 16));
     for (position, kind) in kinds.iter().enumerate() {
@@ -366,13 +639,13 @@ fn read_surfaces(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Surface)>> {
             v
         };
         let surface = match kind {
-            0 => Surface::Plane {
+            1 => Surface::Plane {
                 location,
                 axis: direction,
             },
-            1 | 3 => {
+            2 | 4 => {
                 let Some(r) = take_radius() else { break };
-                if *kind == 1 {
+                if *kind == 2 {
                     Surface::Cylinder {
                         location,
                         axis: direction,
@@ -386,7 +659,7 @@ fn read_surfaces(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Surface)>> {
                     }
                 }
             }
-            2 => {
+            3 => {
                 let Some(r) = take_radius() else { break };
                 let Some(angle) = radians.get(radian).copied() else {
                     break;
@@ -399,7 +672,7 @@ fn read_surfaces(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Surface)>> {
                     semi_angle: angle,
                 }
             }
-            4 => {
+            5 => {
                 let (Some(major), Some(minor)) = (take_radius(), take_radius()) else {
                     break;
                 };
@@ -417,6 +690,78 @@ fn read_surfaces(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Surface)>> {
         out.push((
             index.get(position).copied().unwrap_or(position as u32) as usize,
             surface,
+        ));
+    }
+    Ok(out)
+}
+
+/// Read the curves the geometry describes, each with the position of the
+/// edge it belongs to (specification figure H.16).
+///
+/// A line takes one direction where a circle and an ellipse take two, so
+/// the axis array is not a fixed stride per curve.
+fn read_curves(cursor: &mut Cursor<'_>) -> Result<Vec<(usize, Curve)>> {
+    let index = cursor.packet_u32(Predictor::Lag1)?;
+    // As with the surfaces the written values are not the documented
+    // ones, and here they are not even a constant apart: a line is 1, a
+    // circle 2, and an ellipse 4. The arrays say so, since only this
+    // reading consumes the axis and radius arrays exactly, and the
+    // per-edge kinds agree face for face.
+    let kinds = cursor.packet_u32(Predictor::None)?;
+    let coordinates = cursor.floats()?;
+    let axes = cursor.floats()?;
+    let radii = cursor.floats()?;
+    // The parametric domain bounds the curve rather than shaping it.
+    let _domain = cursor.floats()?;
+
+    let (mut coordinate, mut axis, mut radius) = (0, 0, 0);
+    let mut out = Vec::with_capacity(kinds.len().min(1 << 16));
+    for (position, kind) in kinds.iter().enumerate() {
+        let (Some(location), Some(direction)) =
+            (triple(&coordinates, coordinate), triple(&axes, axis))
+        else {
+            break;
+        };
+        coordinate += 3;
+        let mut take_radius = || {
+            let v = radii.get(radius).copied();
+            radius += 1;
+            v
+        };
+        let curve = match kind {
+            1 => {
+                axis += 3;
+                Curve::Line {
+                    point: location,
+                    direction,
+                }
+            }
+            2 => {
+                axis += 6;
+                let Some(r) = take_radius() else { break };
+                Curve::Circle {
+                    centre: location,
+                    axis: direction,
+                    radius: r,
+                }
+            }
+            4 => {
+                axis += 6;
+                let (Some(major), Some(minor)) = (take_radius(), take_radius()) else {
+                    break;
+                };
+                Curve::Ellipse {
+                    centre: location,
+                    axis: direction,
+                    major_radius: major,
+                    minor_radius: minor,
+                }
+            }
+            _ => break,
+        };
+        out.push((
+            index.get(position).copied().unwrap_or(position as u32) as usize,
+            curve,
         ));
     }
     Ok(out)
@@ -450,7 +795,8 @@ mod tests {
         }
         let t = parse(&data).unwrap();
         assert!(t.faces.is_empty());
-        assert!(t.stopped.is_none() || t.faces.is_empty());
+        assert!(t.loops.is_empty());
+        assert!(t.edges.is_empty());
     }
 
     #[test]
@@ -465,5 +811,15 @@ mod tests {
         assert_eq!(t.counts.edges, 61);
         // Nothing follows the header, so no vector was read.
         assert!(t.vectors.is_empty());
+    }
+
+    #[test]
+    fn a_start_index_becomes_the_range_each_owner_covers() {
+        // Three owners over seven members, the middle one owning none.
+        assert_eq!(ranges(&[0, 3, 3], 7), [0..3, 3..3, 3..7]);
+        // A start index past the end cannot make a range that would be
+        // sliced with.
+        assert_eq!(ranges(&[0, 9], 4), [0..4, 4..4]);
+        assert_eq!(ranges(&[], 4), Vec::<Range<usize>>::new());
     }
 }

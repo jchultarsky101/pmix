@@ -58,13 +58,13 @@ reported with the byte it was found at rather than guessed at, because a
 guess would produce plausible numbers rather than an error, and plausible
 wrong geometry is worse than none.
 
-### What is read so far
+### What is read
 
-The whole topology, and the surfaces of the geometry after it: the
-counts, the twenty-three compressed vectors, the checksum, the geometry
-counts, and every analytic surface the table describes, with its
-location, axis, radii, and half angle. `pmix inspect` reports the counts
-and the mix of surface kinds per part.
+The whole table. The counts, the twenty-three compressed vectors of the
+topology, the checksum, the geometry counts, and every analytic surface
+and curve the geometry describes, each attached to the face or edge it
+belongs to. `pmix inspect` reports, per part, the counts and what its
+faces and edges lie on.
 
 The counts are trustworthy: they are plain integers, and they check
 against each other. Every part in the test file states one body, at least
@@ -76,63 +76,80 @@ bodies, two for the regions, four for the shells, five for the faces,
 three for the loops, two for the coedges, and five for the edges. Reading
 exactly that many lands on the geometry counts, and those check the
 reading: a B-rep has one surface per face and one curve per edge, and
-every part in the test file agrees on both. Reading the wrong number of
-vectors would put arbitrary bytes there instead.
+every part in the test file agrees on both.
 
-### What is not read yet, and why
+The strongest check is the walk. Starting from the faces and following
+the start indices down to the edges reaches every loop exactly once,
+every coedge exactly once, and every edge exactly twice, on all eight
+parts. A start index that is wrong by one anywhere breaks that.
 
-**Three of the five face vectors are named, from what they contain.**
-The specification's figure shows four vectors per face; this file writes
-five, so position alone identifies nothing. The first holds values that
-are distinct, ascending, start at zero, and outrun the face count, which
-is what the specification describes a face identifier as: unique, and not
-an index. Two others hold only zeros and ones, so they are the two flags;
-one is clear on every face of every part, which is what an outward facing
-solid gives for the orientation flag, and the other varies. The remaining
-two are left unnamed. Neither is the start-loop index the figure lists
-first: one is not monotonic, and the running total of the other does not
-reach the loop count.
+### What the predictors required
 
-**Which face each surface belongs to.** The surfaces are read but not
-attached to faces, and the table does not appear to say. This was
-investigated on 2026-09-08 and the obvious answers were ruled out, so
-they are recorded here rather than tried again.
+**A predictor does not apply to the whole vector: the first four values
+are primers.** The prose describes each predictor as though it applied
+throughout, and the format's own decoder in annex B does not — it copies
+the first four residuals through untouched and predicts only from the
+fifth.
 
-- **The surface index is not a face identifier.** For every part the two
-  are different sets; neither contains the other.
-- **The surface index is not a position among the surfaces.** If it were,
-  the values it skips would be exactly the surfaces the table does not
-  describe. They are not, in any part. The clearest case is the part
-  whose surfaces are all described: with nothing skipped the index would
-  run from zero to one less than the count, and instead it has gaps and
-  runs past the end.
-- **None of the five face vectors holds a surface reference.** Each was
-  scored against the set of described surfaces, in both raw and
-  accumulated form, over every part. The only vector whose values all
-  name a described surface is the flag that is zero everywhere, which
-  says nothing.
+This was shipped wrong in 0.3.0 and the symptom was quiet. Accumulating
+from the second value gives a vector that is still ascending and still
+distinct, so it passes for a face identifier; the face identifiers that
+release reported were in fact start-loop indices, and no test could tell.
+What catches it is following the chain: with the whole vector
+accumulated, the start indices overshoot the sections they point into,
+and the walk from faces to edges reaches loops that do not exist. With
+four primers every start index in every part lands in range and the walk
+is exact.
 
-What remains consistent with all of that is the specification's own
-words: the index is a mapping to the *original* B-rep surfaces. In
-Parasolid XT a face references its surface, and that reference lives in
-the XT data the topology table was chosen to avoid reading. So the
-correspondence may simply not be in the table.
+### What the face and edge sections required
 
-Three ways forward, none yet taken:
+**The face and edge sections each hold one vector more than the
+specification's figure shows, and both are the kind of geometry the
+entity lies on.** A face's vector uses the documented surface types
+(0 plane through 4 torus) and an edge's the documented curve types
+(0 line, 1 circle, 2 ellipse); values beyond those are the kinds the
+table has no closed form for. They account for exactly the entities left
+undescribed: on every part, the faces stating an analytic kind number
+exactly the described surfaces, and the same holds for edges and curves.
 
-- **Read only the face-to-surface reference out of the XT B-rep**, rather
-  than the whole format. Far less than a full XT reader, and it is the
-  one thing missing.
-- **Follow the edges.** An edge names the faces it separates and the
-  curve it lies on, and curves carry indices in the same numbering as
-  surfaces. If that numbering is consistent between the two, the edge
-  vectors would tie a face to a curve and so to the numbering the
-  surfaces use.
-- **Find a file whose parts describe every surface.** Then a positional
-  correspondence would be the only possibility left, and checkable.
+This also makes a face useful even when its surface is a spline: the
+reader can still say what kind of face it is.
 
-**Curves and points**, which the fingerprint recipe uses for edges and
-vertices. Surfaces are the part it needs first.
+### Which face each surface belongs to
+
+**The index a described surface carries is the position of its face, and
+a curve's is the position of its edge.**
+
+An earlier investigation ruled this out and was wrong, because it was
+reasoning about indices decoded with the whole vector accumulated. Once
+the primers were right the values changed, and every one of them fell
+inside the face count. The three readings that were ruled out then are no
+longer the same three, so the note recording them has been removed rather
+than corrected.
+
+Three readings remained, and they are distinguishable because the face
+identifiers are a permutation of the face positions rather than the
+identity:
+
+- the index is the face's **position**;
+- the index is the face's **identifier**;
+- the surface's own position in the array is the face's position.
+
+They are told apart geometrically, not structurally. A curve bounding a
+face lies on that face's surface, so a wrong mapping puts a curve off its
+surface by millimetres. Measuring every analytic curve bounding an
+analytic face across all eight parts: the first reading puts 2998 of 2998
+on the surface to within a nanometre, and the other two put 37% and 63%
+on it. That check is a test, and it is written so no tolerance could let a
+wrong mapping through.
+
+A wrong mapping here would be worse than none, because it would produce
+fingerprints that look reasonable and silently match the wrong callouts.
+That is why it is verified against geometry rather than argued from
+structure.
+
+**Points** are not read. They are quantised rather than exact, and
+nothing needs them yet; edges name their vertices by index already.
 
 ### What the surfaces required
 
@@ -205,7 +222,10 @@ count that is not there consumes the next packet's header.
 - `pmix inspect` reports each part's B-rep size.
 - The compressed integer packet is available to any future reader of
   JT's other table-shaped segments.
-- Cross-format identity for dimensions and tolerances stays open. The
-  remaining steps are the vector meanings, the two missing codecs, the
-  geometric data, and linking a part's scene-graph node to both its PMI
-  segment and its topology table.
+- A face can now be fingerprinted: it names its surface, its loops, and
+  through them its edges and their curves. That is what ADR 0004's recipe
+  needs from the JT side.
+- Cross-format identity for dimensions and tolerances stays open. What
+  remains is on the PMI side rather than the geometry side: resolving a
+  face group to the faces it names, and fingerprinting those faces to the
+  same recipe the STEP reader uses.

@@ -17,8 +17,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   surface kinds per part. Only the chopper codec is unimplemented, and no
   file has asked for it.
 
+- **A JT face now says which surface it lies on**, along with its loops,
+  their coedges, and the edges and analytic curves those run along. The
+  whole smart topology table is read and every start index checked by
+  walking it: from the faces, every loop is reached once, every coedge
+  once, and every edge twice. `pmix inspect` reports what a part's faces
+  and edges lie on, including the ones with no closed form.
+- Lines, circles, and ellipses are recovered from the curve geometry, as
+  the surfaces already were.
+
 ### Fixed
 
+- **JT vectors that use a predictor were decoded wrongly.** A predictor
+  applies from the fifth value, not the second: the first four stand for
+  themselves. Everything the 0.3.0 reader called a face identifier was in
+  fact a start-loop index, and the identifiers it reported for a part
+  were not that part's. Nothing in the extracted JSON changes, because
+  the topology table only feeds `pmix inspect` so far.
 - The bit reader assumed one refill always supplied enough bits, which
   holds for the 32-bit words a packet's code text is written as but not
   for the bytes a histogram is written as. Reading a field wider than a

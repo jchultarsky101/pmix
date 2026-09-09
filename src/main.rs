@@ -421,15 +421,28 @@ fn inspect_jt(input: PathBuf, opts: InspectOptions) -> Result<()> {
                             "      {} surfaces ({} described), {} curves, {} points",
                             g.surfaces, g.represented_surfaces, g.curves, g.points
                         )?;
+                        // Every face states what it lies on, so the
+                        // ones the table has no closed form for are
+                        // counted here too rather than going unseen.
                         let mut kinds: std::collections::BTreeMap<&str, usize> =
                             std::collections::BTreeMap::new();
-                        for (_, surface) in &t.surfaces {
-                            *kinds.entry(surface.kind()).or_default() += 1;
+                        for face in &t.faces {
+                            *kinds.entry(face.surface_kind.name()).or_default() += 1;
                         }
                         if !kinds.is_empty() {
                             let listed: Vec<String> =
                                 kinds.iter().map(|(k, n)| format!("{n} {k}")).collect();
-                            writeln!(out, "      {}", listed.join(", "))?;
+                            writeln!(out, "      faces on {}", listed.join(", "))?;
+                        }
+                        let mut curves: std::collections::BTreeMap<&str, usize> =
+                            std::collections::BTreeMap::new();
+                        for edge in &t.edges {
+                            *curves.entry(edge.curve_kind.name()).or_default() += 1;
+                        }
+                        if !curves.is_empty() {
+                            let listed: Vec<String> =
+                                curves.iter().map(|(k, n)| format!("{n} {k}")).collect();
+                            writeln!(out, "      edges on {}", listed.join(", "))?;
                         }
                     }
                     None => writeln!(

@@ -44,6 +44,16 @@ pub enum Predictor {
     None,
 }
 
+/// How many values at the head of a vector stand for themselves.
+///
+/// A predictor does not apply to the whole vector. The specification's
+/// own decoder (annex B, `CodecDriver::unpackResiduals`) copies the
+/// first four residuals through untouched and predicts only from the
+/// fifth, and real files agree: without this the start indices that tie
+/// faces to loops and loops to coedges overshoot the sections they
+/// point into, and with it every one of them lands in range.
+const PRIMERS: usize = 4;
+
 /// Bits used for the field-width change at the head of a run.
 ///
 /// The specification is self-contradictory here: its prose describes a
@@ -370,12 +380,12 @@ impl<'a> Cursor<'a> {
         match predictor {
             Predictor::None => {}
             Predictor::Lag1 => {
-                for i in 1..values.len() {
+                for i in PRIMERS..values.len() {
                     values[i] = values[i].wrapping_add(values[i - 1]);
                 }
             }
             Predictor::Xor1 => {
-                for i in 1..values.len() {
+                for i in PRIMERS..values.len() {
                     values[i] ^= values[i - 1];
                 }
             }
@@ -601,14 +611,25 @@ mod tests {
     #[test]
     fn a_predictor_is_undone_after_decoding() {
         // The null codec stores each value in a whole word, so the
-        // predictor is the only thing under test.
-        let bytes2 = packet_bytes(3, 0, 96, &[1, 2, 3]);
-        let mut c = Cursor::new(&bytes2);
-        assert_eq!(c.packet(Predictor::None).unwrap(), [1, 2, 3]);
-        let mut c = Cursor::new(&bytes2);
-        assert_eq!(c.packet(Predictor::Lag1).unwrap(), [1, 3, 6]);
-        let mut c = Cursor::new(&bytes2);
-        assert_eq!(c.packet(Predictor::Xor1).unwrap(), [1, 3, 0]);
+        // predictor is the only thing under test. Six values, because a
+        // predictor only starts at the fifth.
+        let bytes = packet_bytes(6, 0, 192, &[1, 2, 3, 4, 5, 6]);
+        let mut c = Cursor::new(&bytes);
+        assert_eq!(c.packet(Predictor::None).unwrap(), [1, 2, 3, 4, 5, 6]);
+        let mut c = Cursor::new(&bytes);
+        assert_eq!(c.packet(Predictor::Lag1).unwrap(), [1, 2, 3, 4, 9, 15]);
+        let mut c = Cursor::new(&bytes);
+        assert_eq!(c.packet(Predictor::Xor1).unwrap(), [1, 2, 3, 4, 1, 7]);
+    }
+
+    #[test]
+    fn the_first_four_values_are_left_as_they_stand() {
+        // Anything shorter than the primer run is a predictor no-op.
+        let bytes = packet_bytes(4, 0, 128, &[9, 9, 9, 9]);
+        for predictor in [Predictor::None, Predictor::Lag1, Predictor::Xor1] {
+            let mut c = Cursor::new(&bytes);
+            assert_eq!(c.packet(predictor).unwrap(), [9, 9, 9, 9]);
+        }
     }
 
     #[test]
