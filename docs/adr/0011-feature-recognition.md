@@ -3,6 +3,7 @@
 - **Status:** Accepted, 2026-09-09
 - **Deciders:** Julian Chultarsky
 - **Depends on:** [ADR 0004](0004-identity.md), [ADR 0010](0010-jt-precise-geometry.md)
+- **Leads to:** [ADR 0012](0012-geometric-comparison.md)
 
 ## Context
 
@@ -13,11 +14,19 @@ shared by exactly two faces, so the face adjacency graph that feature
 recognition works over is derivable directly. The STEP reader walks the
 same structure per face to fingerprint it.
 
-None of that is used for anything but anchoring PMI. Meanwhile the PMI
-work is short of data: no corpus available to this project carries any
-PMI beyond the seventeen NIST files. The two hundred customer models are
-AP242 with full B-rep and no PMI at all, so there is nothing else they
-can be used for.
+None of that is used for anything but anchoring PMI.
+
+**Why now.** The question people bring to a pair of CAD files is what
+changed, in words: *both have a hole there, but one is a larger
+diameter*. `pmix diff` cannot say that, because it matches on exact
+identity and has no vocabulary for a shape (ADR 0012). Features are that
+vocabulary. A difference can only be phrased as "Ø4.5 became Ø5.0" by
+something that knows one of these is a hole and that a hole has a
+diameter.
+
+There is data for it, too. No corpus available to this project carries
+any PMI beyond the seventeen NIST files, while the two hundred customer
+models are AP242 with full B-rep and no PMI at all.
 
 **What the data looks like.** Across a sample of those models:
 
@@ -30,6 +39,25 @@ can be used for.
 
 Essentially everything is analytic. In the NIST JT fixture, of 939 faces,
 72 cylinders are bounded only by circles, 17 are tori, and 53 are cones.
+
+**What the rules find.** A spike over that fixture, using nothing but
+surface kind, bounding curve kind, and face orientation, separated holes
+from bosses cleanly: every plate yielded holes and no bosses, every
+fastener part one outward-facing cylinder and no holes.
+
+| faces | holes | bosses |
+| --- | --- | --- |
+| 348 | Ø3.30 ×8, Ø6.60 ×4, Ø7.50 ×3, Ø11.00 ×4, Ø12.50 ×4 | — |
+| 278 | Ø4.50 ×20 | — |
+| 167 | Ø3.00 ×3, Ø4.00 ×8, Ø4.50 ×4, Ø10.00 ×1 | — |
+| 35 | Ø4.50 ×10 | — |
+| 32 | — | Ø7.00 × 3.58 |
+| 31 | — | Ø10.00 × 5.40 |
+| 22 | — | Ø8.00 × 0.30 |
+
+The diameters cross-check against the PMI the same file states: Ø4.50 is
+its through-hole callout, and Ø6.60 with Ø11.00 are the two stages of its
+counterbore. Two independent readings of the file agree.
 
 **What the field says.** Recognising features from a B-rep is a research
 area going back to the 1980s: attributed adjacency graphs, volume
@@ -75,10 +103,16 @@ than choosing one reading. Pockets and slots of arbitrary profile need
 volume decomposition and are out of scope until there is a reason and a
 way to test them.
 
-**Reuse identity.** A recognised feature is fingerprinted by the shared
-recipe (ADR 0004), over the faces it is made of, so two exports of one
-design name the same hole the same way and `pmix diff` can compare
-feature sets.
+**State parameters, not only identity.** A hole carries its diameter,
+depth, axis, position, and whether it is through or blind, in canonical
+units. Identity says whether two things are the same; only the
+parameters say how they differ, and describing the difference is what
+this is for (ADR 0012).
+
+**Reuse identity.** A recognised feature is also fingerprinted by the
+shared recipe (ADR 0004), over the faces it is made of, so two exports of
+one design name the same hole the same way, and whatever agrees exactly
+needs no further judgment.
 
 ### What this is not
 
