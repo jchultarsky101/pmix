@@ -47,6 +47,39 @@ fn managers(jt: &Jt<'_>) -> Vec<pmi::PmiManager> {
     out
 }
 
+/// Every edge carries a tag too, and every edge a callout names is an
+/// edge some part really has. A length is often measured between two
+/// edges rather than between two faces, so this is not a rare path.
+#[test]
+fn every_edge_a_callout_names_is_an_edge_of_some_part() {
+    let bytes = std::fs::read(fixture()).unwrap();
+    let jt = Jt::parse(&bytes).unwrap();
+    let tables = tables(&jt);
+    let mut known = BTreeSet::new();
+    for t in &tables {
+        let tags: Vec<u32> = t.edges.iter().filter_map(|e| e.tag).collect();
+        assert_eq!(tags.len(), t.counts.edges, "a tag for every edge");
+        let distinct: BTreeSet<u32> = tags.iter().copied().collect();
+        assert_eq!(distinct.len(), tags.len(), "tags name edges uniquely");
+        known.extend(distinct);
+    }
+    let mut named = BTreeSet::new();
+    for m in managers(&jt) {
+        for a in &m.associations {
+            for end in [a.source, a.destination] {
+                if end.kind == pmi::EndPoint::EDGE {
+                    if let Some(tag) = m.tag_of(end) {
+                        named.insert(u32::try_from(tag).unwrap());
+                    }
+                }
+            }
+        }
+    }
+    assert!(named.len() > 50, "only {} edges named", named.len());
+    let strays: Vec<&u32> = named.difference(&known).collect();
+    assert!(strays.is_empty(), "edges named but not found: {strays:?}");
+}
+
 /// Every face of every part carries a tag, and the tags of a part are
 /// distinct, because a tag is what names a face uniquely.
 #[test]

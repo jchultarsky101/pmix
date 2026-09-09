@@ -12,7 +12,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use crate::fingerprint::face_feature_key;
+use crate::fingerprint::single_feature_key;
 use crate::model::{
     Feature, FeatureKind, GeometryKind, GeometryRef, Meta, SurfaceKind, content_hash,
 };
@@ -35,11 +35,8 @@ pub struct Anchors {
 /// This is the STEP reader's formula, not a parallel one: a feature is
 /// its key hashed, and a feature that is one face has no key of its own
 /// beyond the face's.
-fn feature_id(face_key: &str) -> String {
-    format!(
-        "feat:{}",
-        content_hash([face_feature_key(face_key).as_str()])
-    )
+fn feature_id(key: &str) -> String {
+    format!("feat:{}", content_hash([single_feature_key(key).as_str()]))
 }
 
 /// The name this reader gives the kind of surface, in the shared model's
@@ -55,7 +52,34 @@ fn surface_kind(kind: stt::SurfaceKind) -> Option<SurfaceKind> {
     })
 }
 
-/// Work out which faces each callout applies to.
+/// A feature that is one piece of a part's B-rep and nothing else.
+fn one(
+    id: &str,
+    kind: FeatureKind,
+    geometry: GeometryKind,
+    tag: u32,
+    surface: Option<SurfaceKind>,
+) -> Feature {
+    let source_ref = format!("{geometry}#{tag}");
+    Feature {
+        meta: Meta {
+            id: id.to_owned(),
+            source_refs: vec![source_ref.clone()],
+            ..Default::default()
+        },
+        kind,
+        name: None,
+        geometry: vec![GeometryRef {
+            kind: geometry,
+            surface,
+            source_ref,
+        }],
+        members: Vec::new(),
+        count: None,
+    }
+}
+
+/// Work out which faces and edges each callout applies to.
 ///
 /// `per_metre` converts the topology table's metres into the unit the
 /// model declares, because a fingerprint is in model units.
@@ -63,14 +87,23 @@ pub fn build(managers: &[PmiManager], topologies: &[Topology], per_metre: f64) -
     // A tag names a face across the whole file, which is what lets an
     // assembly-level callout reach into a part. A tag two parts both
     // claim names neither: resolving it would be a guess.
-    let mut by_tag: HashMap<u32, Option<(usize, usize)>> = HashMap::new();
+    let mut faces: HashMap<u32, Option<(usize, usize)>> = HashMap::new();
+    let mut edges: HashMap<u32, Option<(usize, usize)>> = HashMap::new();
     for (t, topology) in topologies.iter().enumerate() {
-        for (f, face) in topology.faces.iter().enumerate() {
-            let Some(tag) = face.tag else { continue };
-            by_tag
-                .entry(tag)
+        let note = |map: &mut HashMap<u32, Option<(usize, usize)>>, tag, at| {
+            map.entry(tag)
                 .and_modify(|found| *found = None)
-                .or_insert(Some((t, f)));
+                .or_insert(Some((t, at)));
+        };
+        for (f, face) in topology.faces.iter().enumerate() {
+            if let Some(tag) = face.tag {
+                note(&mut faces, tag, f);
+            }
+        }
+        for (e, edge) in topology.edges.iter().enumerate() {
+            if let Some(tag) = edge.tag {
+                note(&mut edges, tag, e);
+            }
         }
     }
 
@@ -80,7 +113,7 @@ pub fn build(managers: &[PmiManager], topologies: &[Topology], per_metre: f64) -
         for e in 0..manager.entities.len() {
             let mut ids = Vec::new();
             for tag in manager.faces_of(e) {
-                let Some(Some((t, f))) = by_tag.get(&tag).copied() else {
+                let Some(Some((t, f))) = faces.get(&tag).copied() else {
                     continue;
                 };
                 let topology = &topologies[t];
@@ -89,22 +122,29 @@ pub fn build(managers: &[PmiManager], topologies: &[Topology], per_metre: f64) -
                     continue;
                 };
                 let id = feature_id(&key);
-                made.entry(id.clone()).or_insert_with(|| Feature {
-                    meta: Meta {
-                        id: id.clone(),
-                        source_refs: vec![format!("face#{tag}")],
-                        ..Default::default()
-                    },
-                    kind: FeatureKind::Face,
-                    name: None,
-                    geometry: vec![GeometryRef {
-                        kind: GeometryKind::Face,
-                        surface: surface_kind(face.surface_kind),
-                        source_ref: format!("face#{tag}"),
-                    }],
-                    members: Vec::new(),
-                    count: None,
+                made.entry(id.clone()).or_insert_with(|| {
+                    one(
+                        &id,
+                        FeatureKind::Face,
+                        GeometryKind::Face,
+                        tag,
+                        surface_kind(face.surface_kind),
+                    )
                 });
+                ids.push(id);
+            }
+            for tag in manager.edges_of(e) {
+                let Some(Some((t, x))) = edges.get(&tag).copied() else {
+                    continue;
+                };
+                let topology = &topologies[t];
+                let edge = &topology.edges[x];
+                let Some(key) = topology.edge_fingerprint(edge, per_metre) else {
+                    continue;
+                };
+                let id = feature_id(&key);
+                made.entry(id.clone())
+                    .or_insert_with(|| one(&id, FeatureKind::Edge, GeometryKind::Edge, tag, None));
                 ids.push(id);
             }
             ids.sort();
@@ -126,7 +166,7 @@ mod tests {
     fn a_feature_that_is_one_face_is_keyed_by_that_face_alone() {
         // The STEP reader keys a feature as kind, geometry, span; a lone
         // face states nothing for the first or the last.
-        assert_eq!(face_feature_key("plane/0,0,1/5"), "|plane/0,0,1/5|");
+        assert_eq!(single_feature_key("plane/0,0,1/5"), "|plane/0,0,1/5|");
         let id = feature_id("plane/0,0,1/5");
         assert!(id.starts_with("feat:"), "{id}");
         // The same face gives the same id, a different face a different

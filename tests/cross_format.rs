@@ -183,7 +183,7 @@ fn both_formats_anchor_a_dimension_on_the_faces_it_applies_to() {
 /// parallel one that happens to look similar.
 #[test]
 fn a_jt_feature_id_is_the_shared_recipe_applied_to_its_face() {
-    use pmix::fingerprint::{Surface, face_feature_key, face_key, identity_quantum};
+    use pmix::fingerprint::{Surface, face_key, identity_quantum, single_feature_key};
     use pmix::model::content_hash;
 
     let j = jt();
@@ -194,7 +194,7 @@ fn a_jt_feature_id_is_the_shared_recipe_applied_to_its_face() {
         axis: [0.0, 0.0, 1.0],
     };
     let key = face_key(&plane, &[[0.0; 3]], identity_quantum());
-    let id = format!("feat:{}", content_hash([face_feature_key(&key).as_str()]));
+    let id = format!("feat:{}", content_hash([single_feature_key(&key).as_str()]));
     assert!(id.starts_with("feat:") && id.len() > 6);
     // Every id the reader produced has that shape, and the ones a
     // dimension names are ones the reader stated.

@@ -214,6 +214,9 @@ pub struct Edge {
     pub curve: Option<Curve>,
     /// The stretch of the curve this edge is, as parameter bounds.
     pub domain: Option<[f64; 2]>,
+    /// The tag the originating system knows this edge by, which is what
+    /// a PMI association names an edge with.
+    pub tag: Option<u32>,
 }
 
 /// An analytic surface a face lies on.
@@ -421,6 +424,16 @@ pub struct Topology {
     pub stopped: Option<String>,
 }
 
+/// The tags the originating system gave a part's entities, as the
+/// attribute section states them.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+struct Tags {
+    /// One per face, in face group order.
+    faces: Vec<u32>,
+    /// One per edge, in the order the topology stores them.
+    edges: Vec<u32>,
+}
+
 /// The vertices bounding one face.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Boundary {
@@ -494,6 +507,26 @@ impl Topology {
             &vertices,
             crate::fingerprint::identity_quantum(),
         ))
+    }
+
+    /// The fingerprint of `edge`, in model units (ADR 0004).
+    ///
+    /// An edge is its curve and its two ends, so an edge whose ends are
+    /// not known gets no fingerprint rather than a shorter key that
+    /// another edge could also produce.
+    pub fn edge_fingerprint(&self, edge: &Edge, per_metre: f64) -> Option<String> {
+        let at = |v: u32| self.vertices.get(v as usize).copied().flatten();
+        let (from, to) = (at(edge.start_vertex)?, at(edge.end_vertex)?);
+        Some(crate::fingerprint::edge_key(
+            edge.curve_kind.name(),
+            &[scale(from, per_metre), scale(to, per_metre)],
+            crate::fingerprint::identity_quantum(),
+        ))
+    }
+
+    /// The edge a PMI association names, by the tag it names it with.
+    pub fn edge_with_tag(&self, tag: u32) -> Option<&Edge> {
+        self.edges.iter().find(|e| e.tag == Some(tag))
     }
 
     /// What `face` lies on, in model units, as the shared recipe wants.
@@ -723,7 +756,7 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
     out.hash = word(0);
     let mut surfaces = Vec::new();
     let mut curves = Vec::new();
-    let mut face_tags: Vec<u32> = Vec::new();
+    let mut tags = Tags::default();
     if let (Some(s), Some(rs), Some(c), Some(rc), Some(points)) =
         (word(1), word(2), word(3), word(4), word(5))
     {
@@ -747,7 +780,7 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
         // them are what a PMI callout names, so the points have to be
         // stepped over to reach them.
         if skip_points(&mut vectors.cursor).is_ok() {
-            face_tags = read_face_tags(&mut vectors.cursor).unwrap_or_default();
+            tags = read_tags(&mut vectors.cursor).unwrap_or_default();
         }
     }
 
@@ -779,6 +812,7 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
             ),
             curve: None,
             domain: None,
+            tag: tags.edges.get(k).copied(),
         })
         .collect();
 
@@ -796,7 +830,7 @@ pub fn parse(data: &[u8]) -> Result<Topology> {
             // The attribute section writes one tag per face group, and
             // the table stores its faces in that same order, so the two
             // line up position for position.
-            tag: face_tags.get(k).copied(),
+            tag: tags.faces.get(k).copied(),
         })
         .collect();
 
@@ -865,7 +899,7 @@ fn skip_strings(cursor: &mut Cursor<'_>, n: usize) -> Result<()> {
 /// be stepped over to get there. Every count here is either zero or the
 /// number of entities, which is what makes a wrong offset show up
 /// immediately rather than as plausible numbers.
-fn read_face_tags(cursor: &mut Cursor<'_>) -> Result<Vec<u32>> {
+fn read_tags(cursor: &mut Cursor<'_>) -> Result<Tags> {
     // Body attributes, which have to be stepped over to reach the faces.
     // Two of these fields are not in the specification's figure and are
     // not named here either; they are stepped over because the file
@@ -885,12 +919,7 @@ fn read_face_tags(cursor: &mut Cursor<'_>) -> Result<Vec<u32>> {
     }
     cursor.word()?; // unnamed
     cursor.packet(Predictor::Lag1)?; // where each body's monikers start
-    let n = cursor.word()? as usize;
-    if n > 0 {
-        cursor.skip(n * 4)?; // the identifier of each moniker's GUID
-        cursor.skip(n * 16)?; // the GUIDs
-        skip_strings(cursor, n)?; // the application each came from
-    }
+    skip_moniker_table(cursor)?; // where each body came from
     let n = cursor.word()? as usize;
     if n > 0 {
         cursor.skip(n * 8)?; // a version number per body
@@ -900,11 +929,62 @@ fn read_face_tags(cursor: &mut Cursor<'_>) -> Result<Vec<u32>> {
 
     // Face attributes. The identifiers are ordered as face groups are,
     // so the nth is the tag of the face in face group n.
+    let mut tags = Tags::default();
+    let n = cursor.word()? as usize;
+    if n > 0 {
+        tags.faces = cursor.packet_u32(Predictor::None)?;
+    }
+    // The edges are further on, and a failure reaching them costs their
+    // tags rather than the face tags already read.
+    match read_edge_tags(cursor) {
+        Ok(edges) => tags.edges = edges,
+        Err(e) => tracing::debug!("edge tags were not reached: {e}"),
+    }
+    Ok(tags)
+}
+
+/// The rest of the face attributes, then the edge tags after them.
+///
+/// An edge is described the same way a face is, and a PMI association
+/// names one the same way, so the walk continues past the faces.
+fn read_edge_tags(cursor: &mut Cursor<'_>) -> Result<Vec<u32>> {
+    for _ in 0..2 {
+        let n = cursor.word()? as usize;
+        if n > 0 {
+            cursor.skip(n * 16)?; // an exact checksum, then a relaxed one
+            cursor.packet(Predictor::None)?; // whether each is valid
+        }
+    }
+    // The figure puts a moniker table here, shaped as the bodies' one
+    // is. What the file writes is not that: a count of faces, a packet
+    // of one more value than there are faces, a word per face, and two
+    // more packets. They are stepped over unnamed rather than guessed
+    // at, and the landing point is checked instead — searching this
+    // region for an edge identifier count followed by that many
+    // distinct values finds exactly this offset on all eight parts.
+    let faces = cursor.word()? as usize;
+    cursor.packet(Predictor::None)?;
+    cursor.skip(faces * 4)?;
+    cursor.packet(Predictor::None)?;
+    cursor.packet(Predictor::None)?;
+
     let n = cursor.word()? as usize;
     if n == 0 {
         return Ok(Vec::new());
     }
     cursor.packet_u32(Predictor::None).map_err(Into::into)
+}
+
+/// A table naming where each entity came from: an identifier per entry,
+/// a GUID, and the application that produced it.
+fn skip_moniker_table(cursor: &mut Cursor<'_>) -> Result<()> {
+    let n = cursor.word()? as usize;
+    if n > 0 {
+        cursor.skip(n * 4)?;
+        cursor.skip(n * 16)?;
+        skip_strings(cursor, n)?;
+    }
+    Ok(())
 }
 
 /// Take three values from an array laid end to end.

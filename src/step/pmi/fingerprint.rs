@@ -79,10 +79,8 @@ pub(crate) fn of_item(ex: &Exchange, item: &Instance, q: f64) -> Fingerprint {
             })
             .filter_map(|v| vertex_point(ex, v))
             .collect();
-        let mut ends: Vec<String> = pts.iter().map(|pt| triple(*pt, q)).collect();
-        ends.sort();
         return Fingerprint {
-            key: format!("edge/{curve_kind}/{}", ends.join("/")),
+            key: fingerprint::edge_key(&curve_kind, &pts, q),
             points: pts,
         };
     }

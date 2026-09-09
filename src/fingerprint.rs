@@ -161,9 +161,20 @@ pub fn feature_key(kind: &str, keys: &[String], span: &str) -> String {
     [kind, &keys.join(";"), span].join("|")
 }
 
-/// [`feature_key`] for a feature that is one face and nothing else.
-pub fn face_feature_key(face_key: &str) -> String {
-    feature_key("", std::slice::from_ref(&face_key.to_owned()), "")
+/// [`feature_key`] for a feature that is one piece of geometry and
+/// nothing else: a face, an edge, a vertex.
+pub fn single_feature_key(geometry_key: &str) -> String {
+    feature_key("", std::slice::from_ref(&geometry_key.to_owned()), "")
+}
+
+/// The key for an edge: the kind of curve it runs along, and its ends.
+///
+/// The ends are sorted, because an edge is the same edge whichever way
+/// round a file states it.
+pub fn edge_key(curve: &str, ends: &[[f64; 3]], q: f64) -> String {
+    let mut ends: Vec<String> = ends.iter().map(|p| triple(*p, q)).collect();
+    ends.sort();
+    format!("edge/{curve}/{}", ends.join("/"))
 }
 
 /// `[min, max]` of the vertices projected onto the surface's axis.
@@ -348,6 +359,18 @@ mod tests {
         // A surface with no closed form is kept apart by its vertices.
         let spline = Surface::Other("b_spline_surface".into());
         assert_ne!(face_key(&spline, &a, Q), face_key(&spline, &[], Q));
+    }
+
+    #[test]
+    fn an_edge_is_its_curve_and_its_ends_whichever_way_round() {
+        let a = [0.0, 0.0, 0.0];
+        let b = [10.0, 0.0, 0.0];
+        assert_eq!(edge_key("line", &[a, b], Q), edge_key("line", &[b, a], Q));
+        // A different curve between the same points is a different edge.
+        assert_ne!(edge_key("line", &[a, b], Q), edge_key("circle", &[a, b], Q));
+        // As is the same curve between different points.
+        assert_ne!(edge_key("line", &[a, b], Q), edge_key("line", &[a, a], Q));
+        assert!(edge_key("line", &[a, b], Q).starts_with("edge/line/"));
     }
 
     #[test]
