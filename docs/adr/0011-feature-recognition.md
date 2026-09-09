@@ -87,9 +87,16 @@ between them:
 | through hole | a cylinder bounded by circles, normal facing its axis, open at both ends |
 | blind hole | the same, capped by a plane or a cone |
 | counterbore, countersink | a coaxial cylinder or cone meeting a hole |
-| fillet, round | a torus, or a cylinder tangent to the two faces it joins |
-| chamfer | a cone between two faces |
+| fillet | a torus or cylinder tangent to the two faces it joins, filling an inside corner |
+| round | the same, on an outside corner |
+| chamfer | a cone between two faces, tangent to neither |
 | boss | a cylinder whose normal faces away from its axis |
+
+A fillet and a round are one rule and two answers. The geometry is
+identical and only the side the material is on differs, which is the
+same flag that separates a bore from a shaft. They are reported apart
+because they look nothing alike on the part, and a reader told only
+"blend" would have to go back to the model to find out which.
 
 **Account for every face.** The output says which faces went into each
 feature and lists every face that went into none. A recogniser that
@@ -128,7 +135,17 @@ produce a body that pairs with nothing.
 
 It is not general automated feature recognition. A file whose faces are
 mostly splines will yield mostly nothing, and the output will say so
-rather than guessing. The JT smart topology table is an abstraction that
+rather than guessing.
+
+**A chamfer is recognised only where it is a cone.** Cutting the corner
+off a circular edge gives one, and that is the case the rule covers.
+Cutting the corner off a *straight* edge gives a plane, and a narrow
+planar strip between two faces is not distinguishable by any local rule
+from a narrow face that was always meant to be there. Recognising it
+would need a judgment about intent, which is exactly what this refuses
+to make, so edge breaks on prismatic parts are reported as unassigned
+faces. That is the honest answer and it will surprise people, so the
+documentation says it rather than leaving it to be discovered. The JT smart topology table is an abstraction that
 describes only analytic surfaces — 107 of the NIST fixture's 939 faces
 have no closed form there — so JT has blind spots that STEP does not, and
 the output records which reader it came from.

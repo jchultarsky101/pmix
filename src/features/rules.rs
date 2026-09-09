@@ -6,7 +6,7 @@
 //! between two readings of the same material: where a rule cannot settle
 //! something, the output says so instead of guessing.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::fingerprint::{self, Scale, Surface};
 use crate::identity::{num, triple};
@@ -14,6 +14,7 @@ use crate::model::ContentId;
 
 use super::brep::{CurveKind, Solid};
 use super::model::{Body, FaceCounts, Feature, Kind, Shape, UnassignedFace};
+use super::surface;
 
 /// How close two numbers must be to count as the same. The identity
 /// quantum (ADR 0004): a fixed thousandth of a millimetre, so that what
@@ -22,7 +23,7 @@ fn tolerance() -> f64 {
     fingerprint::identity_quantum()
 }
 
-/// A bore or a shaft that a rule might claim, before the rules run.
+/// A surface a rule might claim, before the rules run.
 ///
 /// It is a *set* of faces, not one: exporters routinely cut a cylinder
 /// into halves meeting along two straight edges, and a rule that asks
@@ -45,6 +46,13 @@ struct Candidate {
     radius: f64,
     /// Half the apex angle in radians, for a cone.
     semi_angle: Option<f64>,
+    /// The radius of the tube, for a torus. That is the radius a blend
+    /// is called by; `radius` then holds the circle the tube is swept
+    /// along, which is what puts the surface in space.
+    minor_radius: Option<f64>,
+    /// Whether every edge bounding the group is a circle, seams aside.
+    /// A bore is; a blend running along an edge is not.
+    circular: bool,
     /// The largest circle bounding the face. A cylinder's circles are
     /// all its own radius; a cone's differ, and the wider one is what a
     /// countersink is called by.
@@ -138,12 +146,19 @@ fn cap_at(solid: &Solid, c: &Candidate, t: f64) -> Option<usize> {
 /// How a face is grouped with the others on its surface: the line it
 /// turns about, its radius, and its taper. Faces agreeing on all three
 /// and touching each other are one surface the file cut up.
-fn surface_group(axis_key: &str, radius: f64, semi_angle: Option<f64>) -> String {
+fn surface_group(
+    axis_key: &str,
+    radius: f64,
+    semi_angle: Option<f64>,
+    minor_radius: Option<f64>,
+) -> String {
     let q = tolerance();
+    let opt = |v: Option<f64>| v.map(|x| num(x, q)).unwrap_or_default();
     format!(
-        "{axis_key}|{}|{}",
+        "{axis_key}|{}|{}|{}",
         num(radius, q),
-        semi_angle.map(|a| num(a, q)).unwrap_or_default()
+        opt(semi_angle),
+        opt(minor_radius)
     )
 }
 
@@ -159,21 +174,28 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
         position: [f64; 3],
         radius: f64,
         semi_angle: Option<f64>,
+        minor_radius: Option<f64>,
     }
     let mut parts: Vec<Part> = Vec::new();
     for (i, f) in solid.faces.iter().enumerate() {
-        let (axis, origin, radius, semi_angle) = match &f.surface {
+        let (axis, origin, radius, semi_angle, minor_radius) = match &f.surface {
             Some(Surface::Cylinder {
                 origin,
                 axis,
                 radius,
-            }) => (*axis, *origin, *radius, None),
+            }) => (*axis, *origin, *radius, None, None),
             Some(Surface::Cone {
                 origin,
                 axis,
                 radius,
                 semi_angle,
-            }) => (*axis, *origin, *radius, Some(*semi_angle)),
+            }) => (*axis, *origin, *radius, Some(*semi_angle), None),
+            Some(Surface::Torus {
+                origin,
+                axis,
+                major_radius,
+                minor_radius,
+            }) => (*axis, *origin, *major_radius, None, Some(*minor_radius)),
             _ => continue,
         };
         let (axis, position) = axis_of(axis, origin);
@@ -185,6 +207,7 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
             position,
             radius,
             semi_angle,
+            minor_radius,
         });
     }
 
@@ -195,7 +218,12 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
     let mut by_surface: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (n, p) in parts.iter().enumerate() {
         by_surface
-            .entry(surface_group(&p.axis_key, p.radius, p.semi_angle))
+            .entry(surface_group(
+                &p.axis_key,
+                p.radius,
+                p.semi_angle,
+                p.minor_radius,
+            ))
             .or_default()
             .push(n);
     }
@@ -255,13 +283,15 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
             }
         }
         boundary.sort_unstable();
-        if boundary.is_empty()
-            || boundary
-                .iter()
-                .any(|e| solid.edges[*e].curve != CurveKind::Circle)
-        {
+        if boundary.is_empty() {
             continue;
         }
+        // A bore is bounded by circles and nothing else. A blend running
+        // along an edge is not, and used to be dropped here; it is kept
+        // now, and the rules that follow sort out which is which.
+        let circular = boundary
+            .iter()
+            .all(|e| solid.edges[*e].curve == CurveKind::Circle);
         let Some(extent) = extent_of(solid, &boundary, p.axis) else {
             continue;
         };
@@ -277,6 +307,8 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
             position: p.position,
             radius: p.radius,
             semi_angle: p.semi_angle,
+            minor_radius: p.minor_radius,
+            circular,
             major_radius: major,
             extent,
             // A surface of revolution's own normal points away from its
@@ -285,6 +317,56 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
         });
     }
     out
+}
+
+/// Whether the faces meeting across `edge` join smoothly there.
+///
+/// Smoothly means the two look the same way at the points they share,
+/// so the surface has no crease along the edge. Sampling the edge's own
+/// ends is enough: both surfaces are analytic, so if they agree there
+/// they agree along it.
+fn tangent_across(solid: &Solid, a: usize, b: usize, edge: usize) -> bool {
+    let (fa, fb) = (&solid.faces[a], &solid.faces[b]);
+    let (Some(sa), Some(sb)) = (&fa.surface, &fb.surface) else {
+        return false;
+    };
+    let points = &solid.edges[edge].ends;
+    if points.is_empty() {
+        return false;
+    }
+    points.iter().all(|p| {
+        match (
+            surface::face_normal(sa, fa.same_sense, *p),
+            surface::face_normal(sb, fb.same_sense, *p),
+        ) {
+            (Some(na), Some(nb)) => surface::parallel(na, nb),
+            _ => false,
+        }
+    })
+}
+
+/// The faces `c` meets, and which of those it joins smoothly.
+///
+/// A blend has more neighbours than the two it runs between: its ends
+/// stop against whatever is there. So what identifies it is how many
+/// neighbours it is *tangent* to, not how many it has.
+fn joins(solid: &Solid, c: &Candidate) -> (BTreeSet<usize>, BTreeSet<usize>) {
+    let (mut neighbours, mut tangent) = (BTreeSet::new(), BTreeSet::new());
+    for e in c.boundary.iter().copied() {
+        for other in solid.across.get(&e).into_iter().flatten() {
+            if c.faces.contains(other) {
+                continue;
+            }
+            neighbours.insert(*other);
+            if c.faces
+                .iter()
+                .any(|f| solid.faces[*f].is_bounded_by(e) && tangent_across(solid, *f, *other, e))
+            {
+                tangent.insert(*other);
+            }
+        }
+    }
+    (neighbours, tangent)
 }
 
 /// Whether two stretches of one axis meet end to end.
@@ -308,7 +390,7 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
     // it opens into a bore, which is decided next.
     let mut kinds: BTreeMap<usize, Kind> = BTreeMap::new();
     for (n, c) in cands.iter().enumerate() {
-        if c.semi_angle.is_none() {
+        if c.circular && c.semi_angle.is_none() && c.minor_radius.is_none() {
             kinds.insert(n, if c.outward { Kind::Boss } else { Kind::Hole });
         }
     }
@@ -317,12 +399,18 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
     // counterbore; a cone meeting a bore is its countersink.
     let mut coaxial: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for (n, c) in cands.iter().enumerate() {
-        if c.outward {
+        if c.outward || !c.circular || c.minor_radius.is_some() {
             continue;
         }
         for other in by_axis.get(c.axis_key.as_str()).into_iter().flatten() {
             let o = &cands[*other];
-            if *other == n || o.outward || o.semi_angle.is_some() || !adjacent(c.extent, o.extent) {
+            if *other == n
+                || o.outward
+                || !o.circular
+                || o.semi_angle.is_some()
+                || o.minor_radius.is_some()
+                || !adjacent(c.extent, o.extent)
+            {
                 continue;
             }
             coaxial.entry(n).or_default().push(*other);
@@ -361,6 +449,30 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
         kinds.remove(&n);
     }
 
+    // What no bore rule claimed may still be a blend or a chamfer. Both
+    // are decided at the join rather than on the face: a blend leaves
+    // the surface smooth where two faces would meet at an edge, and a
+    // chamfer puts a different edge there instead.
+    let taken: BTreeSet<usize> = kinds
+        .keys()
+        .flat_map(|n| cands[*n].faces.iter().copied())
+        .chain(caps.keys().copied())
+        .collect();
+    for (n, c) in cands.iter().enumerate() {
+        if kinds.contains_key(&n) || c.faces.iter().any(|f| taken.contains(f)) {
+            continue;
+        }
+        let (neighbours, tangent) = joins(solid, c);
+        if tangent.len() >= 2 {
+            // Tangent to both the faces it runs between, so the surface
+            // carries on smoothly through it. Which side the material
+            // is on is what separates the two words for that.
+            kinds.insert(n, if c.outward { Kind::Round } else { Kind::Fillet });
+        } else if c.semi_angle.is_some() && neighbours.len() >= 2 {
+            kinds.insert(n, Kind::Chamfer);
+        }
+    }
+
     let id_of = |n: usize| feature_id(solid, &cands[n], kinds.get(&n).copied());
 
     let mut features: Vec<Feature> = Vec::new();
@@ -368,6 +480,7 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
         let Some(kind) = kinds.get(&n).copied() else {
             continue;
         };
+        let blend = matches!(kind, Kind::Fillet | Kind::Round);
         let mut faces: Vec<String> = c.faces.iter().map(|f| face_ids[*f].clone()).collect();
         for (cap, owner) in &caps {
             if *owner == n {
@@ -392,13 +505,19 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
             kind,
             faces,
             shape: Shape {
-                diameter: Some(round(c.major_radius * 2.0)),
-                depth: Some(round(c.extent[1] - c.extent[0])),
-                // Only a bore is open or closed at its ends. A shaft has
-                // no inside, and a cone at the mouth of a hole is open
-                // at both ends by construction, so neither is asked, and
-                // neither gets a misleading `true`.
-                through: (!c.outward && c.semi_angle.is_none()).then_some(!lo && !hi),
+                // A blend is called by its radius and a bore by its
+                // diameter, so each states the one it is named by rather
+                // than both and a note about which to read.
+                diameter: (!blend).then(|| round(c.major_radius * 2.0)),
+                radius: blend.then(|| round(c.minor_radius.unwrap_or(c.radius))),
+                depth: (!blend).then(|| round(c.extent[1] - c.extent[0])),
+                length: blend.then(|| round(c.extent[1] - c.extent[0])),
+                // Only a bore is open or closed at its ends. A shaft
+                // has no inside, a cone at the mouth of a hole is open
+                // at both ends by construction, and a blend runs along
+                // an edge rather than into anything, so none of them is
+                // asked and none gets a misleading answer.
+                through: matches!(kind, Kind::Hole | Kind::Counterbore).then_some(!lo && !hi),
                 axis: Some(rounded(c.axis)),
                 position: Some(rounded(c.position)),
                 extent: Some([round(c.extent[0]), round(c.extent[1])]),

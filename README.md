@@ -17,8 +17,8 @@ the tolerances change between revision B and revision C?" or "which
 components changed material?" without opening a CAD package.
 
 `pmix features` reads the geometry instead of the annotations, and
-describes the holes, counterbores, countersinks and bosses a part is
-made of, with their sizes and positions. That is the base data for
+describes the holes, counterbores, countersinks, bosses, fillets, rounds
+and chamfers a part is made of, with their sizes and positions. That is the base data for
 answering the question people actually bring to two CAD files: not
 whether they differ, but *how* — the same hole, bored wider; the
 mounting holes, five millimetres off.
@@ -34,9 +34,9 @@ mounting holes, five millimetres off.
 > dimension is anchored on the B-rep faces and edges it applies to, by
 > the same recipe the STEP reader uses, and in millimetres whatever unit
 > the file states, so one design keys the same way however it was
-> exported. `pmix features` recognises holes, counterbores,
-> countersinks and bosses from the B-rep of either format, states their
-> diameters, depths and positions in millimetres, and lists every face
+> exported. `pmix features` recognises holes, counterbores, countersinks,
+> bosses, fillets, rounds and chamfers from the B-rep of either format,
+> states their sizes and positions in millimetres, and lists every face
 > that went into none of them. See the [roadmap](#roadmap).
 
 ## What pmix extracts
@@ -154,12 +154,18 @@ pmix features bracket.jt --json --output bracket.features.json
 ```
 
 ```text
-plate.stp (STEP), 1 body
+bracket.stp (STEP), 1 body
 
-body:558dfa20046c9426: 7 faces, 1 in features, 6 unassigned
-  hole         ⌀8, 10 deep, through, at 20,15,0, span 0..10   feat:b96e5cc43a88f9b8
-  unassigned:  6 plane
+body:376fae1082b3ebc9 (PartBody): 117 faces, 59 in features, 58 unassigned
+  hole         ⌀25, 50 deep, through, at 160,-45,0, span -50..0    feat:0ef17061c4843423
+  fillet       R5, 63.509 long, at -27.5,47.631,5, span -31.7..31.7 feat:0f4ea43335de14f9
+  round        R50, 100 long, at -300,-175,0, span -100..0         feat:2525182f82703c5f
+  unassigned:  58 plane
 ```
+
+A bore states the diameter it is called by and a blend states its
+radius; a fillet fills an inside corner and a round breaks an outside
+one, which is the same distinction as a bore against a shaft.
 
 Every face is accounted for: the ones no rule claimed are listed, so
 that *not recognised* is never mistaken for *not there*. Lengths are
@@ -370,7 +376,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Units normalised: one design keys the same way whether it states millimetres or inches (ADR 0004)
 - [ ] Confirming a JT and a STEP fingerprint agree, which needs a model published in both formats
 - [x] `pmix features`: holes, counterbores, countersinks, and bosses from the B-rep of either format (ADR 0011)
-- [ ] Fillets and chamfers, which need tangency between a face and the two it joins (ADR 0011)
+- [x] Fillets, rounds, and chamfers, decided by tangency between a face and the two it joins (ADR 0011)
+- [ ] Chamfers on straight edges, which are planes rather than cones and which no local rule settles (ADR 0011)
 - [ ] Comparing two feature documents, once the document has been used enough to say what a comparison of it needs (ADR 0012)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 

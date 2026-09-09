@@ -30,6 +30,14 @@ document is that answering it takes one field (ADR 0011, ADR 0012).
 | `plate_hole_split.stp` | The bore is written as two half-cylinders, which is how most exporters write one. The same hole, so the same id |
 | `plate_one_hole_inches.stp` | The same design stated in inches. Nothing changes at all, and the documents must be equal |
 
+Blends and chamfers need shapes with corners rather than holes:
+
+| File | What it is for |
+| --- | --- |
+| `plate_corner_round.stp` | A plate with one outside corner rounded at R5, tangent to both faces it joins |
+| `plate_inside_fillet.stp` | An L-shaped plate whose inside corner is filleted at R5. The same blend, the other way round |
+| `shaft_chamfered.stp` | A bar with its top edge chamfered at 45°. The cone sits beside a shaft, not a bore, which is what makes it a chamfer and not a countersink |
+
 The plate is deliberately the simplest solid that still exercises the
 rules: the hole's mouth has to be an inner loop of the faces it opens
 onto, or a through hole would read as blind, and the six planar sides

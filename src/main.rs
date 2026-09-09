@@ -323,8 +323,15 @@ fn render_features(document: &pmix::features::FeatureDocument) -> String {
             if let Some(d) = f.shape.diameter {
                 parts.push(format!("\u{2300}{d}"));
             }
+            // A blend is named by its radius, never by a diameter.
+            if let Some(r) = f.shape.radius {
+                parts.push(format!("R{r}"));
+            }
             if let Some(depth) = f.shape.depth {
                 parts.push(format!("{depth} deep"));
+            }
+            if let Some(length) = f.shape.length {
+                parts.push(format!("{length} long"));
             }
             match f.shape.through {
                 Some(true) => parts.push("through".to_owned()),
