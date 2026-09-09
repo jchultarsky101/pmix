@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A datum feature or datum target the file gives no geometry is now
+  anchored on the datum it establishes**, the way a drawing names it —
+  `A`, or `A` target `1`. Across the NIST corpus 26 of the 44 such
+  features fell back to a CAD label or to the source entity number,
+  which does not survive a re-export. The datum's letter takes
+  precedence over the aspect's own name, because a name like
+  `Simple Datum.5` carries an index that moves when the model is edited.
+- The 18 that remain are bare shape aspects a note or a tolerance hangs
+  off, for which the file states nothing at all. Their diagnostic now
+  says plainly that their ids will not survive a re-export.
+
 ## [0.7.0] - 2026-09-09
 
 A design keys the same way whatever units it states. A fingerprint used

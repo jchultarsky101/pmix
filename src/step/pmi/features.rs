@@ -105,10 +105,17 @@ pub(crate) fn feature_for(ctx: &mut Ctx<'_>, sa: Id) -> Option<String> {
     }
 
     let kind = feature_kind(inst, &geometry, &members);
-    if geometry.is_empty() && members.is_empty() {
+    // A shape aspect with no geometry may still be a datum feature or a
+    // datum target, and those are named the way a drawing names them.
+    let anchor = (geometry.is_empty() && members.is_empty())
+        .then(|| datum_anchor(ctx, sa, inst))
+        .flatten();
+    if geometry.is_empty() && members.is_empty() && anchor.is_none() {
         ctx.warn(
             format!(
-                "feature #{sa} ({}) has no geometry and no members",
+                "feature #{sa} ({}) has no geometry, no members, and no datum \
+                 to name it by, so its id rests on the entity number and \
+                 will not survive a re-export",
                 inst.type_key()
             ),
             Some(sa),
@@ -137,6 +144,9 @@ pub(crate) fn feature_for(ctx: &mut Ctx<'_>, sa: Id) -> Option<String> {
 
     ctx.consume(sa);
     ctx.feature_fingerprints.insert(id.clone(), fingerprints);
+    if let Some(anchor) = anchor {
+        ctx.feature_anchors.insert(id.clone(), anchor);
+    }
     ctx.features.push(Feature {
         meta: Meta {
             id: id.clone(),
@@ -287,4 +297,37 @@ fn known_surface(inst: &Instance) -> Option<SurfaceKind> {
 
 fn surface_kind(inst: &Instance) -> SurfaceKind {
     known_surface(inst).unwrap_or_else(|| SurfaceKind::Other(inst.type_key().to_ascii_lowercase()))
+}
+
+/// What anchors a shape aspect the file gives no geometry.
+///
+/// A datum feature establishes a datum, and a datum target is one of the
+/// spots that datum is taken from. Both are named on a drawing by the
+/// datum's letter — `A`, or `A` target `1` — and that is design intent,
+/// stable in the way a letter is and an entity number is not. It is the
+/// recipe the datum record itself is keyed by (ADR 0004).
+fn datum_anchor(ctx: &Ctx<'_>, sa: Id, inst: &Instance) -> Option<String> {
+    let datum = ctx
+        .datum_links
+        .iter()
+        .find(|(_, links)| links.iter().any(|(_, aspect)| *aspect == sa))
+        .map(|(datum, _)| *datum)?;
+    let letter = ctx
+        .ex
+        .get(datum)?
+        .attr("DATUM", 4)
+        .and_then(Parameter::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())?
+        .to_owned();
+    // A target says which of the datum's spots it is.
+    let target = inst
+        .attr("PLACED_DATUM_TARGET_FEATURE", 4)
+        .and_then(Parameter::as_str)
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    Some(match target {
+        Some(n) => format!("datum/{letter}/target/{n}"),
+        None => format!("datum/{letter}"),
+    })
 }

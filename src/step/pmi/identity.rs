@@ -79,13 +79,19 @@ pub(crate) fn finalise(ctx: &mut Ctx<'_>) {
             };
             let mut parts = vec![crate::fingerprint::feature_key(kind, &keys, &span)];
             if keys.is_empty() && f.members.is_empty() {
-                // Nothing to anchor on: the name, or failing that the
-                // source entity, which keeps distinct unresolved features
-                // distinct even though it is not stable across exports.
-                match f.name.as_deref().filter(|n| !n.is_empty()) {
-                    Some(n) => parts.push(n.to_owned()),
-                    None if f.kind.as_str() == "all_over" => {}
-                    None => parts.push(f.meta.source_refs.first().cloned().unwrap_or_default()),
+                // No geometry to anchor on. A datum feature or a datum
+                // target is still named the way a drawing names it, which
+                // is design intent and stable; failing that the aspect's
+                // own name; failing that the source entity, which keeps
+                // distinct unresolved features distinct even though it
+                // does not survive a re-export.
+                match ctx.feature_anchors.get(&f.meta.id) {
+                    Some(anchor) => parts.push(anchor.clone()),
+                    None => match f.name.as_deref().filter(|n| !n.is_empty()) {
+                        Some(n) => parts.push(n.to_owned()),
+                        None if f.kind.as_str() == "all_over" => {}
+                        None => parts.push(f.meta.source_refs.first().cloned().unwrap_or_default()),
+                    },
                 }
             }
             pending_aggregates.push((f.meta.id.clone(), keys, points));
