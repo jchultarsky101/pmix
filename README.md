@@ -16,7 +16,7 @@ Run it on two or more models and `pmix diff` answers questions like "did
 the tolerances change between revision B and revision C?" or "which
 components changed material?" without opening a CAD package.
 
-> **Status: 0.4.0.** `pmix extract` reads STEP AP242 and JT files and
+> **Status: 0.5.0.** `pmix extract` reads STEP AP242 and JT files and
 > emits the semantic layer (units, features, dimensions with tolerances,
 > geometric tolerances with zones, modifiers and composites, datums with
 > targets, datum reference frames), the presentation layer (annotations
