@@ -519,7 +519,7 @@ impl Topology {
     }
 
     /// What `face` lies on, as the shared recipe wants it.
-    fn surface_of(&self, face: &Face) -> Option<crate::fingerprint::Surface> {
+    pub fn surface_of(&self, face: &Face) -> Option<crate::fingerprint::Surface> {
         use crate::fingerprint::Surface as Key;
         let Some(surface) = face.surface else {
             // A face on a surface the table does not describe is named

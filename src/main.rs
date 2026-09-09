@@ -42,6 +42,33 @@ enum Command {
         presentation_geometry: bool,
     },
 
+    /// Recognise manufacturing features in a model's geometry.
+    ///
+    /// Reads holes, counterbores, countersinks, and bosses from the
+    /// B-rep and writes them with their diameters, depths, and
+    /// positions, in millimetres whatever the file declared. Every face
+    /// that went into no feature is listed too, so that what was not
+    /// recognised cannot be mistaken for what is not there.
+    ///
+    /// This is not PMI: nothing in the file states it. It is a
+    /// description of the shape, meant to be compared with another.
+    Features {
+        /// Path to the input model (.stp, .step, or .jt).
+        input: PathBuf,
+
+        /// Where to write the output. Defaults to standard output.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Emit JSON instead of text.
+        #[arg(long)]
+        json: bool,
+
+        /// Emit compact JSON instead of pretty-printed JSON.
+        #[arg(long, requires = "json")]
+        compact: bool,
+    },
+
     /// Compare the PMI of two or more models.
     ///
     /// Inputs are model files (extracted on the fly) or JSON documents
@@ -146,6 +173,12 @@ fn run(cli: Cli) -> Result<ExitCode> {
             },
         )
         .map(|()| ExitCode::SUCCESS),
+        Command::Features {
+            input,
+            output,
+            json,
+            compact,
+        } => features(input, output, json, compact).map(|()| ExitCode::SUCCESS),
         Command::Diff { inputs, json } => diff(inputs, json),
         Command::Inspect {
             input,
@@ -229,6 +262,109 @@ fn extract(
         None => println!("{json}"),
     }
     Ok(())
+}
+
+fn features(input: PathBuf, output: Option<PathBuf>, json: bool, compact: bool) -> Result<()> {
+    tracing::info!(input = %input.display(), "recognising features");
+    let document = pmix::features::read_path(&input)
+        .with_context(|| format!("failed to read `{}`", input.display()))?;
+
+    let text = if json && compact {
+        serde_json::to_string(&document)?
+    } else if json {
+        serde_json::to_string_pretty(&document)?
+    } else {
+        render_features(&document)
+    };
+
+    match output {
+        Some(path) => std::fs::write(&path, text)
+            .with_context(|| format!("failed to write `{}`", path.display()))?,
+        None => print!("{text}"),
+    }
+    Ok(())
+}
+
+/// The features of a document as lines meant to be read.
+///
+/// Every body reports what was recognised and how much of it was not, in
+/// that order, because a count of unrecognised faces is what tells the
+/// reader how much weight the rest can carry.
+fn render_features(document: &pmix::features::FeatureDocument) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "{} ({}), {} bod{}",
+        document.source.file_name,
+        document.source.format,
+        document.bodies.len(),
+        if document.bodies.len() == 1 {
+            "y"
+        } else {
+            "ies"
+        }
+    );
+    for body in &document.bodies {
+        let _ = writeln!(
+            out,
+            "\n{}{}: {} faces, {} in features, {} unassigned",
+            body.id,
+            body.name
+                .as_deref()
+                .map(|n| format!(" ({n})"))
+                .unwrap_or_default(),
+            body.faces.total,
+            body.faces.in_features,
+            body.faces.unassigned
+        );
+        for f in &body.features {
+            let mut parts: Vec<String> = Vec::new();
+            if let Some(d) = f.shape.diameter {
+                parts.push(format!("\u{2300}{d}"));
+            }
+            if let Some(depth) = f.shape.depth {
+                parts.push(format!("{depth} deep"));
+            }
+            match f.shape.through {
+                Some(true) => parts.push("through".to_owned()),
+                Some(false) => parts.push("blind".to_owned()),
+                None => {}
+            }
+            if let Some(a) = f.shape.angle {
+                parts.push(format!("{a}\u{b0}"));
+            }
+            if let Some(p) = f.shape.position {
+                parts.push(format!("at {},{},{}", p[0], p[1], p[2]));
+            }
+            // Two chamfers on one hole share a position, because a line
+            // has one closest point to the origin however much of it a
+            // face covers. The span along the axis is what tells them
+            // apart, so it is shown rather than left to the JSON.
+            if let Some(e) = f.shape.extent {
+                parts.push(format!("span {}..{}", e[0], e[1]));
+            }
+            let _ = writeln!(
+                out,
+                "  {:<12} {:<62} {}",
+                f.kind.name(),
+                parts.join(", "),
+                f.id
+            );
+        }
+        if !body.unassigned.is_empty() {
+            let mut by_kind: BTreeMap<&str, usize> = BTreeMap::new();
+            for u in &body.unassigned {
+                *by_kind.entry(u.surface.as_str()).or_default() += 1;
+            }
+            let listed: Vec<String> = by_kind.iter().map(|(k, n)| format!("{n} {k}")).collect();
+            let _ = writeln!(out, "  unassigned:  {}", listed.join(", "));
+        }
+    }
+    for d in &document.diagnostics {
+        let _ = writeln!(out, "\n! {}", d.message);
+    }
+    out
 }
 
 struct InspectOptions {

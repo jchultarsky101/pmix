@@ -1,0 +1,260 @@
+//! Recognising features from geometry (ADR 0011), and the promise that
+//! makes the result usable for comparison (ADR 0012).
+//!
+//! The synthetic plates are one design and three single deliberate
+//! changes to it: a wider hole, a moved hole, and the same design stated
+//! in inches. Each is here because it is a question people bring to a
+//! pair of CAD files, and the point of the document is that answering it
+//! needs only one field of it.
+
+use std::collections::BTreeSet;
+use std::path::{Path, PathBuf};
+
+use pmix::features::{self, FeatureDocument, Kind};
+
+fn fixture(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name)
+}
+
+fn read(name: &str) -> FeatureDocument {
+    features::read_path(&fixture(name)).expect("the fixture reads")
+}
+
+/// The one feature of a one-feature body.
+fn only_feature(doc: &FeatureDocument) -> &features::Feature {
+    let body = doc.bodies.first().expect("a body");
+    assert_eq!(body.features.len(), 1, "{:?}", body.features);
+    &body.features[0]
+}
+
+#[test]
+fn a_plate_with_one_hole_yields_that_hole_and_accounts_for_the_rest() {
+    let doc = read("synthetic/plate_one_hole.stp");
+    assert_eq!(doc.bodies.len(), 1);
+    let body = &doc.bodies[0];
+    let hole = only_feature(&doc);
+    assert_eq!(hole.kind, Kind::Hole);
+    assert_eq!(hole.shape.diameter, Some(8.0));
+    assert_eq!(hole.shape.depth, Some(10.0));
+    assert_eq!(hole.shape.through, Some(true));
+    assert_eq!(hole.shape.position, Some([20.0, 15.0, 0.0]));
+
+    // The six sides of the plate went into nothing, and say so. A
+    // recogniser that reported the hole and stayed quiet about them
+    // would invite the reader to assume there was nothing else.
+    assert_eq!(body.faces.total, 7);
+    assert_eq!(body.faces.in_features, 1);
+    assert_eq!(body.unassigned.len(), 6);
+    assert!(body.unassigned.iter().all(|u| u.surface == "plane"));
+}
+
+#[test]
+fn the_numbers_are_millimetres_whatever_the_file_declared() {
+    let mm = read("synthetic/plate_one_hole.stp");
+    let inches = read("synthetic/plate_one_hole_inches.stp");
+    assert_eq!(mm.units.declared_length.as_deref(), Some("mm"));
+    assert_eq!(inches.units.declared_length.as_deref(), Some("in"));
+    assert_eq!(inches.units.length, "mm");
+
+    // One design, so one document: the same ids and the same numbers,
+    // not merely the same shape described twice.
+    assert_eq!(mm.bodies, inches.bodies);
+}
+
+#[test]
+fn boring_the_hole_wider_changes_the_diameter_and_nothing_else() {
+    let before = read("synthetic/plate_one_hole.stp");
+    let after = read("synthetic/plate_hole_larger.stp");
+    let (a, b) = (only_feature(&before), only_feature(&after));
+
+    assert_eq!(a.shape.diameter, Some(8.0));
+    assert_eq!(b.shape.diameter, Some(10.0));
+    // Everything that did not change reads the same, which is what lets
+    // a reader of the two documents say the hole was bored rather than
+    // moved, replaced, or renumbered.
+    assert_eq!(a.shape.position, b.shape.position);
+    assert_eq!(a.shape.extent, b.shape.extent);
+    assert_eq!(a.shape.depth, b.shape.depth);
+    assert_eq!(a.shape.axis, b.shape.axis);
+    assert_eq!(a.kind, b.kind);
+    // The plate around it is untouched, so its faces keep their ids.
+    let faces = |d: &FeatureDocument| -> BTreeSet<String> {
+        d.bodies[0]
+            .unassigned
+            .iter()
+            .map(|u| u.id.clone())
+            .collect()
+    };
+    assert_eq!(faces(&before), faces(&after));
+}
+
+#[test]
+fn moving_the_hole_changes_the_position_and_nothing_else() {
+    let before = read("synthetic/plate_one_hole.stp");
+    let after = read("synthetic/plate_hole_moved.stp");
+    let (a, b) = (only_feature(&before), only_feature(&after));
+
+    assert_eq!(a.shape.position, Some([20.0, 15.0, 0.0]));
+    assert_eq!(b.shape.position, Some([25.0, 15.0, 0.0]));
+    assert_eq!(a.shape.diameter, b.shape.diameter);
+    assert_eq!(a.shape.depth, b.shape.depth);
+    assert_eq!(a.shape.extent, b.shape.extent);
+    assert_eq!(a.shape.axis, b.shape.axis);
+}
+
+/// The identity of a hole is geometric, so a hole that changed is a
+/// different hole and says so by its id. That is what makes an exact
+/// match worth trusting, and it is why matching cannot be the whole
+/// answer: the two documents above differ in one number, and their ids
+/// agree about nothing.
+#[test]
+fn a_changed_hole_gets_a_different_id() {
+    let a = only_feature(&read("synthetic/plate_one_hole.stp"))
+        .id
+        .clone();
+    let wider = only_feature(&read("synthetic/plate_hole_larger.stp"))
+        .id
+        .clone();
+    let moved = only_feature(&read("synthetic/plate_hole_moved.stp"))
+        .id
+        .clone();
+    assert_ne!(a, wider);
+    assert_ne!(a, moved);
+    assert_ne!(wider, moved);
+}
+
+/// Most exporters do not write a bore as one cylindrical face. They cut
+/// it into halves meeting along two straight edges. It is the same bore,
+/// and a document that called it something else would pair with nothing.
+#[test]
+fn a_bore_cut_into_halves_is_one_hole_with_one_id() {
+    let whole = read("synthetic/plate_one_hole.stp");
+    let split = read("synthetic/plate_hole_split.stp");
+    let (a, b) = (only_feature(&whole), only_feature(&split));
+
+    // The file states one more face, and the hole is made of two.
+    assert_eq!(whole.bodies[0].faces.total, 7);
+    assert_eq!(split.bodies[0].faces.total, 8);
+    assert_eq!(a.faces.len(), 1);
+    assert_eq!(b.faces.len(), 2);
+
+    // None of which the description depends on.
+    assert_eq!(a.id, b.id);
+    assert_eq!(a.kind, b.kind);
+    assert_eq!(a.shape, b.shape);
+
+    // Nor does pairing the bodies they are in, which is the first thing
+    // anything comparing two documents has to do.
+    assert_eq!(whole.bodies[0].id, split.bodies[0].id);
+
+    // The plate around the bore is untouched either way.
+    assert_eq!(whole.bodies[0].unassigned, split.bodies[0].unassigned);
+}
+
+#[test]
+fn reading_the_same_file_twice_gives_the_same_document() {
+    assert_eq!(
+        read("synthetic/plate_one_hole.stp"),
+        read("synthetic/plate_one_hole.stp")
+    );
+}
+
+#[test]
+fn every_face_is_either_in_a_feature_or_listed_as_in_none() {
+    for name in ["synthetic/plate_one_hole.stp", "jt/nist_mtc_assembly.jt"] {
+        let doc = read(name);
+        for body in &doc.bodies {
+            let claimed: BTreeSet<&String> =
+                body.features.iter().flat_map(|f| f.faces.iter()).collect();
+            let listed: BTreeSet<&String> = body.unassigned.iter().map(|u| &u.id).collect();
+            assert!(
+                claimed.is_disjoint(&listed),
+                "{name}: a face is both in a feature and reported as in none"
+            );
+            assert_eq!(
+                claimed.len() + listed.len(),
+                body.faces.total,
+                "{name}: {} faces, {} in features, {} unassigned",
+                body.faces.total,
+                claimed.len(),
+                listed.len()
+            );
+        }
+    }
+}
+
+/// The JT fixture states its own PMI, and the callouts resolved from it
+/// name a through hole and a counterbore. Recognising the same sizes
+/// from the geometry alone is two independent readings of one file
+/// agreeing, which is the closest thing to ground truth available here.
+#[test]
+fn the_jt_fixture_yields_the_holes_its_own_callouts_state() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    let all: Vec<&features::Feature> = doc.bodies.iter().flat_map(|b| &b.features).collect();
+    let with = |kind: Kind, d: f64| -> Vec<&&features::Feature> {
+        all.iter()
+            .filter(|f| f.kind == kind && f.shape.diameter == Some(d))
+            .collect()
+    };
+
+    // The through-hole callout: Ø4.50.
+    let thru = with(Kind::Hole, 4.5);
+    assert!(!thru.is_empty(), "no Ø4.5 hole was recognised");
+    assert!(thru.iter().all(|f| f.shape.through == Some(true)));
+
+    // The counterbore callout: Ø11.00 opening into a Ø6.60 bore. The
+    // wider stage is closed by its own floor, so it is not through, and
+    // it names the hole it opens into.
+    let bore = with(Kind::Counterbore, 11.0);
+    assert!(!bore.is_empty(), "no Ø11 counterbore was recognised");
+    let pilots: BTreeSet<&String> = with(Kind::Hole, 6.6).iter().map(|f| &f.id).collect();
+    for cb in &bore {
+        assert_eq!(cb.shape.through, Some(false));
+        assert!(
+            cb.coaxial_with.iter().any(|id| pilots.contains(id)),
+            "a counterbore names no bore it opens into: {:?}",
+            cb.coaxial_with
+        );
+    }
+}
+
+/// A drill tip is the bottom of the hole it left, not a countersink at
+/// the far end from any countersink. It belongs to the hole's faces and
+/// is not a feature of its own.
+#[test]
+fn a_blind_hole_owns_the_tip_that_drilled_it() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    let blind: Vec<&features::Feature> = doc
+        .bodies
+        .iter()
+        .flat_map(|b| &b.features)
+        .filter(|f| f.kind == Kind::Hole && f.shape.through == Some(false))
+        .collect();
+    assert!(!blind.is_empty(), "the fixture has blind holes");
+    assert!(
+        blind.iter().any(|f| f.faces.len() > 1),
+        "no blind hole claimed the face closing it"
+    );
+    // A countersink of no depth would be a tip counted twice.
+    for f in doc.bodies.iter().flat_map(|b| &b.features) {
+        if f.kind == Kind::Countersink {
+            assert!(
+                f.shape.depth.unwrap_or_default() > 0.0,
+                "a countersink of no depth is a drill tip: {f:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_file_with_no_geometry_says_so_rather_than_reporting_nothing() {
+    let doc = read("synthetic/dimension_basics.stp");
+    assert!(doc.bodies.is_empty());
+    assert!(
+        doc.diagnostics.iter().any(|d| d.message.contains("shell")),
+        "{:?}",
+        doc.diagnostics
+    );
+}

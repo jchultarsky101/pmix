@@ -16,6 +16,13 @@ Run it on two or more models and `pmix diff` answers questions like "did
 the tolerances change between revision B and revision C?" or "which
 components changed material?" without opening a CAD package.
 
+`pmix features` reads the geometry instead of the annotations, and
+describes the holes, counterbores, countersinks and bosses a part is
+made of, with their sizes and positions. That is the base data for
+answering the question people actually bring to two CAD files: not
+whether they differ, but *how* — the same hole, bored wider; the
+mounting holes, five millimetres off.
+
 > **Status: 0.8.0.** `pmix extract` reads STEP AP242 and JT files and
 > emits the semantic layer (units, features, dimensions with tolerances,
 > geometric tolerances with zones, modifiers and composites, datums with
@@ -27,7 +34,10 @@ components changed material?" without opening a CAD package.
 > dimension is anchored on the B-rep faces and edges it applies to, by
 > the same recipe the STEP reader uses, and in millimetres whatever unit
 > the file states, so one design keys the same way however it was
-> exported. See the [roadmap](#roadmap).
+> exported. `pmix features` recognises holes, counterbores,
+> countersinks and bosses from the B-rep of either format, states their
+> diameters, depths and positions in millimetres, and lists every face
+> that went into none of them. See the [roadmap](#roadmap).
 
 ## What pmix extracts
 
@@ -50,8 +60,8 @@ rather than on a 2D drawing.
 
 | Format | Standard | Extensions | Status |
 | ------ | -------- | ---------- | ------ |
-| STEP | ISO 10303 (AP242) | `.stp`, `.step`, `.p21` | Extraction and comparison |
-| JT | ISO 14306 (9 and 10) | `.jt` | Extraction and comparison |
+| STEP | ISO 10303 (AP242) | `.stp`, `.step`, `.p21` | Extraction, comparison, feature recognition |
+| JT | ISO 14306 (9 and 10) | `.jt` | Extraction, comparison, feature recognition |
 
 ## Installation
 
@@ -131,6 +141,37 @@ The exit status is 0 when nothing differs, 1 when something does, and 2
 on error, so the command works as a check in scripts. What is compared
 and what is deliberately ignored is recorded in
 [ADR 0005](docs/adr/0005-diff.md).
+
+### Recognising features
+
+`pmix features` describes what a part *is*, rather than what its file
+*says*. It reads the B-rep and reports the features local rules can
+prove, with the numbers a difference can be stated in:
+
+```bash
+pmix features bracket.stp
+pmix features bracket.jt --json --output bracket.features.json
+```
+
+```text
+plate.stp (STEP), 1 body
+
+body:558dfa20046c9426: 7 faces, 1 in features, 6 unassigned
+  hole         ⌀8, 10 deep, through, at 20,15,0, span 0..10   feat:b96e5cc43a88f9b8
+  unassigned:  6 plane
+```
+
+Every face is accounted for: the ones no rule claimed are listed, so
+that *not recognised* is never mistaken for *not there*. Lengths are
+millimetres and angles degrees whatever the file declared, so one design
+exported in inches and in millimetres gives one document.
+
+This is not PMI — nothing in the file states it — so it is a separate
+command with its own output, and `pmix extract` is unchanged. What is
+recognised and what the tool refuses to guess at is in
+[ADR 0011](docs/adr/0011-feature-recognition.md); why it exists and
+where the judgment is deliberately left to the reader is in
+[ADR 0012](docs/adr/0012-geometric-comparison.md).
 
 ### Exploring a STEP file
 
@@ -328,6 +369,9 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] One fingerprint recipe for both readers, anchoring a dimension on the faces it is about (ADR 0004)
 - [x] Units normalised: one design keys the same way whether it states millimetres or inches (ADR 0004)
 - [ ] Confirming a JT and a STEP fingerprint agree, which needs a model published in both formats
+- [x] `pmix features`: holes, counterbores, countersinks, and bosses from the B-rep of either format (ADR 0011)
+- [ ] Fillets and chamfers, which need tangency between a face and the two it joins (ADR 0011)
+- [ ] Comparing two feature documents, once the document has been used enough to say what a comparison of it needs (ADR 0012)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

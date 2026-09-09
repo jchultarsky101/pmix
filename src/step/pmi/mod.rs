@@ -224,6 +224,15 @@ fn unknown_reason(inst: &Instance) -> Option<(&'static str, Layer)> {
 pub(crate) type PropertyRepr = (Id, Id, Id);
 
 /// Shared state for the walkers.
+/// The units a file declares for lengths and angles.
+///
+/// Reading them needs no PMI, and `pmix features` needs them without
+/// wanting anything else the extractor produces, so they are reachable
+/// on their own.
+pub fn units_of(ex: &Exchange) -> crate::model::Units {
+    units::document_units(&mut Ctx::new(ex))
+}
+
 pub(crate) struct Ctx<'a> {
     pub ex: &'a Exchange,
     /// What the file's numbers have to be multiplied by to reach the
