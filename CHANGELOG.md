@@ -7,66 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.4.0] - 2026-09-08
 
-- The arithmetic and move-to-front codecs for JT's compressed integer
-  packets. **Every part in the test file now reads its whole B-rep
-  topology and every analytic surface its geometry describes**: planes,
-  cylinders, cones, spheres, and tori, with their locations, axes, radii,
-  and half angles. `pmix inspect` reports the counts and the mix of
-  surface kinds per part. Only the chopper codec is unimplemented, and no
-  file has asked for it.
+The headline is that a JT dimension or tolerance is now anchored on the
+geometry it is about rather than on where it happens to be drawn. The
+whole smart topology table is read, a PMI callout resolves to the B-rep
+faces it applies to, and those faces are fingerprinted by the same recipe
+the STEP reader uses — which now lives in one place that both readers
+call. JT 9 files can also be read.
 
-- **A JT face now says which surface it lies on**, along with its loops,
-  their coedges, and the edges and analytic curves those run along. The
-  whole smart topology table is read and every start index checked by
-  walking it: from the faces, every loop is reached once, every coedge
-  once, and every edge twice. `pmix inspect` reports what a part's faces
-  and edges lie on, including the ones with no closed form.
-- Lines, circles, and ellipses are recovered from the curve geometry, as
-  the surfaces already were.
-- **A JT dimension, tolerance, and datum is now anchored on the geometry
-  it is about.** The faces a callout names are fingerprinted by the same
-  recipe the STEP reader uses, which now lives in one place rather than
-  two, and each becomes a `feature` record in the output. A callout whose
-  faces the file does not give still falls back to where it attaches to
-  the part. Note that JT ids change as a result: re-extract rather than
-  reusing saved JSON. Whether a JT fingerprint equals the STEP
-  fingerprint of the same face is still unchecked, because no model is
-  published in both formats.
-- The vertices a fingerprint spans are recovered by evaluating each
-  edge's curve over the stretch of it that edge covers, rather than read
-  from JT's point geometry, which is quantised. Every edge meeting at a
-  vertex agrees on where it is to within a micron.
-- **A JT annotation now reaches the B-rep faces it applies to.** An
-  association names a face by a tag from the originating system; the
-  topology table's attribute section carries one tag per face, and the
-  PMI element's CAD tag pool is read to resolve it. Every face a callout
-  names in the test file is found, and a through hole callout reaches the
-  cylinder it is about. `pmix inspect` reports how many of a part's faces
-  carry a tag.
-
-- **JT 9 files can be read.** They differ from JT 10 in four places, none
-  of them in the specification: a 105-byte header stating the offset of
-  the table of contents in 32 bits, 28-byte table entries, ZLIB rather
-  than XZ compression, and element version numbers written as two bytes
-  rather than one. A JT 9 file's scene-graph properties now extract the
-  same way a JT 10 file's do. Its PMI and precise geometry are read as
-  version 10 states them and are **not** verified, so a pre-10 file
-  carrying either gets a diagnostic saying so.
-
-### Fixed
-
-- **JT vectors that use a predictor were decoded wrongly.** A predictor
-  applies from the fifth value, not the second: the first four stand for
-  themselves. Everything the 0.3.0 reader called a face identifier was in
-  fact a start-loop index, and the identifiers it reported for a part
-  were not that part's. Nothing in the extracted JSON changes, because
-  the topology table only feeds `pmix inspect` so far.
-- The bit reader assumed one refill always supplied enough bits, which
-  holds for the 32-bit words a packet's code text is written as but not
-  for the bytes a histogram is written as. Reading a field wider than a
-  byte from a histogram overflowed.
+**JT ids change in this release.** Re-extract rather than reusing saved
+JSON. STEP output is unchanged, byte for byte, across every fixture.
 
 ### Added
 
@@ -79,6 +30,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The part is part of a property's identity, so two parts made of
   different materials are two records rather than one. A part saying the
   same thing twice is still recorded once.
+- The arithmetic and move-to-front codecs for JT's compressed integer
+  packets. **Every part in the test file now reads its whole B-rep
+  topology and every analytic surface its geometry describes**: planes,
+  cylinders, cones, spheres, and tori, with their locations, axes, radii,
+  and half angles. Only the chopper codec is unimplemented, and no file
+  has asked for it.
+- **A JT face now says which surface it lies on**, along with its loops,
+  their coedges, and the edges and analytic curves those run along. Every
+  start index is checked by walking the table: from the faces, every loop
+  is reached once, every coedge once, and every edge twice. `pmix inspect`
+  reports what a part's faces and edges lie on, including the ones with
+  no closed form.
+- Lines, circles, and ellipses are recovered from the curve geometry, as
+  the surfaces already were.
+- **A JT annotation now reaches the B-rep faces it applies to.** An
+  association names a face by a tag from the originating system; the
+  topology table's attribute section carries one tag per face, and the
+  PMI element's CAD tag pool is read to resolve it. Every face a callout
+  names in the test file is found, and a through hole callout reaches the
+  cylinder it is about.
+- **A JT dimension, tolerance, and datum is anchored on the geometry it
+  is about.** The faces a callout names are fingerprinted by the recipe
+  the STEP reader uses, which now lives in one place rather than two, and
+  each becomes a `feature` record in the output. A callout whose faces
+  the file does not give still falls back to where it attaches to the
+  part. Whether a JT fingerprint equals the STEP fingerprint of the same
+  face remains unchecked, because no model is published in both formats.
+- The vertices a fingerprint spans are recovered by evaluating each
+  edge's curve over the stretch of it that edge covers, rather than read
+  from JT's point geometry, which is quantised. Every edge meeting at a
+  vertex agrees on where it is to within a micron.
+- **JT 9 files can be read.** They differ from JT 10 in four places, none
+  of them in the specification: a 105-byte header stating the offset of
+  the table of contents in 32 bits, 28-byte table entries, ZLIB rather
+  than XZ compression, and element version numbers written as two bytes
+  rather than one. A JT 9 file's scene-graph properties now extract the
+  same way a JT 10 file's do. Its PMI and precise geometry are read as
+  version 10 states them and are **not** verified, so a pre-10 file
+  carrying either gets a diagnostic saying so.
+
+### Changed
+
+- A JT dimension, tolerance, and datum that reaches its geometry is
+  identified by that geometry, so its id differs from the one 0.3.0 gave
+  it. A datum reference now resolves to the record that carries its
+  letter plainly rather than to one of the suffixed duplicates.
+
+### Fixed
+
+- **JT vectors that use a predictor were decoded wrongly.** A predictor
+  applies from the fifth value, not the second: the first four stand for
+  themselves. Everything the 0.3.0 reader called a face identifier was in
+  fact a start-loop index, and the identifiers it reported for a part
+  were not that part's.
+- The bit reader assumed one refill always supplied enough bits, which
+  holds for the 32-bit words a packet's code text is written as but not
+  for the bytes a histogram is written as. Reading a field wider than a
+  byte from a histogram overflowed.
 
 ## [0.3.0] - 2026-09-08
 
@@ -304,7 +313,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/jchultarsky101/pmix/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/jchultarsky101/pmix/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/jchultarsky101/pmix/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jchultarsky101/pmix/compare/v0.1.1...v0.2.0
