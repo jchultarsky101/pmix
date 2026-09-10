@@ -404,7 +404,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Resolving a JT callout to the B-rep faces it applies to (ADR 0010)
 - [x] One fingerprint recipe for both readers, anchoring a dimension on the faces it is about (ADR 0004)
 - [x] Units normalised: one design keys the same way whether it states millimetres or inches (ADR 0004)
-- [ ] Confirming a JT and a STEP fingerprint agree, which needs a model published in both formats
+- [ ] Confirming a JT and a STEP fingerprint agree, which needs one design exported to both formats with the JT written **with precise geometry**; it no longer needs PMI, because `pmix features` keys on geometry alone (ADR 0011)
 - [x] `pmix features`: holes, counterbores, countersinks, and bosses from the B-rep of either format (ADR 0011)
 - [x] Fillets, rounds, and chamfers, decided by tangency between a face and the two it joins (ADR 0011)
 - [ ] Chamfers on straight edges, which are planes rather than cones and which no local rule settles (ADR 0011)

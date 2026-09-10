@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **What is still needed to confirm cross-format identity is now stated
+  accurately.** The roadmap, ADR 0004, ADR 0010, and `tests/cross_format.rs`
+  all said it needed "a model published in both formats". Two thirds of
+  that has quietly gone away: no XT B-rep parser is required, because the
+  smart topology table gives the same geometry (ADR 0010), and the pair
+  need not carry PMI at all, because a recognised feature is keyed on
+  geometry alone (ADR 0011). What is actually needed is one design
+  exported to both formats **with the JT written with precise geometry** —
+  the JT exports that have reached this project were tessellation-only,
+  which is a different and much easier obstacle to remove. The test's own
+  doc comment was staler still: it claimed the JT reader had no B-rep to
+  fingerprint, which stopped being true in 0.6.0.
+
 ## [0.11.0] - 2026-09-10
 
 `pmix features` now compares two models as well as describing one: what

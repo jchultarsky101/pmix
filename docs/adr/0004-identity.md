@@ -196,6 +196,18 @@ as native CAD only, and the JT derivatives the CAx-IF produces are not
 public. Until a pair exists, a cross-format match would be untestable, so
 the reader does not claim one.
 
+**Amended 2026-09-10.** Two of those three needs have gone away. No XT
+parser was required: the smart topology table gives the same geometry
+(ADR 0010). And the pair no longer needs to carry PMI at all, because
+`pmix features` keys a recognised feature on geometry alone (ADR 0011),
+so two feature documents of one design test this recipe directly. What is
+left is narrow and worth stating precisely when asking for it: **one
+design exported to both formats, with the JT written with precise
+geometry**. The JT exports that have reached this project were
+tessellation-only — `pmix features` on such a file reports that it holds
+no topology segment — which is a different obstacle from the one this
+paragraph describes, and an easier one to remove.
+
 **Assemblies remain out of scope**, as above, and the JT test file is an
 assembly: each of its parts states its own datum A, so the ids are
 `datum:A`, `datum:A-2`, and so on under the collision rule. Qualifying
