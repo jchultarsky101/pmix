@@ -209,6 +209,36 @@ recognised and what the tool refuses to guess at is in
 where the judgment is deliberately left to the reader is in
 [ADR 0012](docs/adr/0012-geometric-comparison.md).
 
+### Serving the documents to a language model
+
+`pmix mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
+server over standard input and output, so a model can ask the questions
+above itself and reason about the answers:
+
+```bash
+claude mcp add pmix -- pmix mcp
+```
+
+or, in a client's configuration file:
+
+```json
+{ "mcpServers": { "pmix": { "command": "pmix", "args": ["mcp"] } } }
+```
+
+It offers four tools — `describe_model`, `compare_models`, `extract_pmi`,
+`diff_pmi` — each a call into the library and nothing more. They are
+shaped for a context window rather than for completeness: `describe_model`
+with `summary: true` returns each body's counts without listing anything,
+and `body`, `kind`, and `only_changed` narrow the rest, with counts always
+describing the whole body whatever a view lists. The tools read files and
+change nothing.
+
+What the model adds is what this project deliberately does not: naming a
+pattern in four moved holes, joining a changed diameter to the tolerance
+still on it, deciding on evidence that is not geometry whether a hole
+moved. The decisions behind the server, and what it refuses, are in
+[ADR 0013](docs/adr/0013-mcp-server.md).
+
 ### Exploring a STEP file
 
 `pmix inspect` shows the raw entity graph of a STEP file, which is useful
@@ -458,7 +488,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [ ] Chamfers on straight edges, which are planes rather than cones and which no local rule settles (ADR 0011)
 - [x] Comparing two feature documents: exact pairing, a displacement stated once, and candidates as observations (ADR 0012)
 - [ ] Rotation as well as displacement, which needs orientation evidence rather than positions alone (ADR 0012)
-- [ ] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
+- [x] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

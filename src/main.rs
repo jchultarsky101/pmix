@@ -94,6 +94,14 @@ enum Command {
         json: bool,
     },
 
+    /// Serve the documents to a language model over standard input and
+    /// output, as a Model Context Protocol server.
+    ///
+    /// One JSON-RPC message per line in, one per line out; logs go to
+    /// standard error. The tools read files and change nothing. Point a
+    /// client at `pmix mcp` and it will list them. See ADR 0013.
+    Mcp,
+
     /// Explore the raw entity graph of a STEP file.
     ///
     /// With no options, prints the header, a summary, and a count of every
@@ -189,6 +197,13 @@ fn run(cli: Cli) -> Result<ExitCode> {
             compact,
         } => features(inputs, output, json, compact),
         Command::Diff { inputs, json } => diff(inputs, json),
+        Command::Mcp => {
+            tracing::info!("serving over standard input and output");
+            let stdin = std::io::stdin();
+            let stdout = std::io::stdout();
+            pmix::mcp::serve(stdin.lock(), stdout.lock()).context("the server stopped")?;
+            Ok(ExitCode::SUCCESS)
+        }
         Command::Inspect {
             input,
             entities,
