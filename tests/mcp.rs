@@ -294,6 +294,13 @@ fn a_tool_that_cannot_do_what_was_asked_says_so_as_its_result() {
             "a tool failure is a result, not a protocol error: {r}"
         );
     }
+    // A model that passed a path is told which path failed.
+    assert!(
+        replies[0]["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("/nowhere/at/all.stp")
+    );
     assert!(
         replies[1]["result"]["content"][0]["text"]
             .as_str()

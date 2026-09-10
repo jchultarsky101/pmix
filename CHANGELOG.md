@@ -40,6 +40,12 @@ nothing more; the server computes nothing.
   field, the one thing it must know before reading a comparison: a
   possible pairing is an observation the tool does not stand behind.
 
+  A tool that fails names the path it failed on, so a model that passed
+  two is told which. [`docs/mcp.md`](docs/mcp.md) is the guide: setup
+  in Claude Code and Claude Desktop, each tool with its arguments and
+  what it returns, how to read a comparison, and driving the server by
+  hand.
+
 ## [0.12.0] - 2026-09-10
 
 The one thing `pmix` emits that it declines to stand behind now says so

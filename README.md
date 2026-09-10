@@ -236,7 +236,10 @@ change nothing.
 What the model adds is what this project deliberately does not: naming a
 pattern in four moved holes, joining a changed diameter to the tolerance
 still on it, deciding on evidence that is not geometry whether a hole
-moved. The decisions behind the server, and what it refuses, are in
+moved. **[docs/mcp.md](docs/mcp.md)** is the guide: setting it up in
+Claude Code or Claude Desktop, each tool with its arguments and what it
+returns, how to read a comparison, and how to drive the server by hand.
+The decisions behind it, and what it refuses, are in
 [ADR 0013](docs/adr/0013-mcp-server.md).
 
 ### Exploring a STEP file

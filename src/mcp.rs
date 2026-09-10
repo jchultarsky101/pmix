@@ -240,10 +240,10 @@ enum Failure {
     Tool(String),
 }
 
-impl From<crate::Error> for Failure {
-    fn from(e: crate::Error) -> Self {
-        Self::Tool(e.to_string())
-    }
+/// A library error, with the path it was about in front of it. A model
+/// that passed two paths has to be told which one failed.
+fn about(path: &str) -> impl FnOnce(crate::Error) -> Failure + '_ {
+    move |e| Failure::Tool(format!("`{path}`: {e}"))
 }
 
 fn required<'a>(args: &'a Value, name: &str) -> Result<&'a str, Failure> {
@@ -278,7 +278,7 @@ fn call(name: &str, args: &Value) -> Result<Value, Failure> {
     match name {
         "describe_model" => {
             let path = required(args, "path")?;
-            let doc = features::read_path(Path::new(path))?;
+            let doc = features::read_path(Path::new(path)).map_err(about(path))?;
             if args
                 .get("summary")
                 .and_then(Value::as_bool)
@@ -295,8 +295,9 @@ fn call(name: &str, args: &Value) -> Result<Value, Failure> {
             document(&serde_json::to_value(view::narrow(&doc, filter)).unwrap_or(Value::Null))
         }
         "compare_models" => {
-            let a = features::read_path(Path::new(required(args, "baseline")?))?;
-            let b = features::read_path(Path::new(required(args, "compared")?))?;
+            let (pa, pb) = (required(args, "baseline")?, required(args, "compared")?);
+            let a = features::read_path(Path::new(pa)).map_err(about(pa))?;
+            let b = features::read_path(Path::new(pb)).map_err(about(pb))?;
             let filter = view::CompareFilter {
                 body: optional(args, "body").map(str::to_owned),
                 kind: kind_of(args)?,
@@ -311,12 +312,14 @@ fn call(name: &str, args: &Value) -> Result<Value, Failure> {
             )
         }
         "extract_pmi" => {
-            let doc = crate::load(Path::new(required(args, "path")?))?;
+            let path = required(args, "path")?;
+            let doc = crate::load(Path::new(path)).map_err(about(path))?;
             document(&serde_json::to_value(doc).unwrap_or(Value::Null))
         }
         "diff_pmi" => {
-            let a = crate::load(Path::new(required(args, "baseline")?))?;
-            let b = crate::load(Path::new(required(args, "compared")?))?;
+            let (pa, pb) = (required(args, "baseline")?, required(args, "compared")?);
+            let a = crate::load(Path::new(pa)).map_err(about(pa))?;
+            let b = crate::load(Path::new(pb)).map_err(about(pb))?;
             document(&serde_json::to_value(crate::diff::diff(&a, &b)).unwrap_or(Value::Null))
         }
         _ => Err(Failure::NoSuchTool),
