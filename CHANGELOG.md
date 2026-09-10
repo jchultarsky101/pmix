@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-10
+
+`pmix features` now compares two models as well as describing one: what
+pairs exactly, a displacement stated once where one explains a whole
+body, and candidates offered as observations rather than conclusions. It
+still will not decide whether a feature moved or was removed with
+another added, because geometry cannot tell those apart. Building the
+comparison turned up three identity defects, each found because a
+difference came out with nothing different about it.
+
 ### Added
 
 - **`pmix features` compares two models** (ADR 0012). Given two or more
@@ -535,7 +545,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/jchultarsky101/pmix/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/jchultarsky101/pmix/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/jchultarsky101/pmix/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/jchultarsky101/pmix/compare/v0.7.0...v0.8.0
