@@ -450,6 +450,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [ ] Chamfers on straight edges, which are planes rather than cones and which no local rule settles (ADR 0011)
 - [x] Comparing two feature documents: exact pairing, a displacement stated once, and candidates as observations (ADR 0012)
 - [ ] Rotation as well as displacement, which needs orientation evidence rather than positions alone (ADR 0012)
+- [ ] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design
