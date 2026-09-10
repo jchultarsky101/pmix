@@ -82,6 +82,29 @@ ones this project deliberately does not produce:
 | settles move against delete-and-add | it can weigh part names, properties, revision context, none of which is geometry |
 | triages — "37 of these 41 are the same 0.003mm shift, so this is a re-export" | `pmix` reports each difference; deciding they are one story is a judgment |
 
+### Amended 2026-09-10, on building it
+
+**No feature gate.** The gate was to keep the protocol's dependencies
+out of the default build. A tools-only server over stdio needs five
+methods — `initialize`, `ping`, `tools/list`, `tools/call`, and ignoring
+notifications — and those are written directly against JSON-RPC with
+`serde_json`, which the crate already had. Nothing new to keep out, so
+nothing to gate; a gate would have been ceremony. If a later revision of
+the protocol needs an SDK, that is the point to add one and the gate
+with it.
+
+**The narrowing lives in `features::view`**, as the decision required,
+with its own tests: an overview that counts without listing, and views
+that filter by body and kind while leaving every count describing the
+whole body. `src/mcp.rs` holds the protocol and the words a model reads,
+and nothing that computes.
+
+**The caution reaches the model twice.** In the comparison document's
+`notes`, as decided, and again in the protocol's `instructions` field on
+connecting — the one paragraph a client shows a model before it chooses a
+tool, and the right place to say what `possible_pairings` means before it
+has seen one.
+
 ## Alternatives considered
 
 - **A separate repository.** Cleaner in scope, and wrong for this

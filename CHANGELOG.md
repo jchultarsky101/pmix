@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`pmix mcp`**, a Model Context Protocol server over standard input and
+  output (ADR 0013), so a language model can ask what a file says and what
+  a shape is, and reason about how two models differ. Four tools —
+  `describe_model`, `compare_models`, `extract_pmi`, `diff_pmi` — each a
+  call into the library and nothing more. The server computes nothing.
+
+  The tools are shaped for a context window: `describe_model` with
+  `summary: true` returns each body's counts without listing a feature,
+  and `body`, `kind`, and `only_changed` narrow what follows. A view never
+  changes what a number means — counts describe the whole body whatever
+  the view lists — and each carries the filter that produced it. Those
+  views live in the library (`features::view`), where they are tested.
+
+  Written directly against JSON-RPC rather than through an SDK: a
+  tools-only server needs five methods, and the alternative brings an
+  asynchronous runtime and a tree of dependencies into a crate that is
+  nine crates deep. So there was nothing to gate behind a Cargo feature,
+  and there is none.
+
+  The handshake tells the model, in the protocol's own `instructions`
+  field, the one thing it must know before reading a comparison: a
+  possible pairing is an observation the tool does not stand behind.
+
 ## [0.12.0] - 2026-09-10
 
 The one thing `pmix` emits that it declines to stand behind now says so

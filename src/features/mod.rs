@@ -17,6 +17,7 @@ pub mod model;
 mod rules;
 pub mod step;
 pub mod surface;
+pub mod view;
 
 pub use model::{
     Body, Diagnostic, FaceCounts, Feature, FeatureDocument, Kind, SCHEMA_VERSION, Shape,

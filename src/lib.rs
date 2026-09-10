@@ -14,6 +14,7 @@
 //!   and the scene graph properties that declare the model units (ADR 0009).
 //! - [`reader`] is the format-independent entry point.
 //! - [`diff`] compares two documents (ADR 0005).
+//! - [`mcp`] serves the documents to a language model (ADR 0013).
 //!
 //! # Status
 //!
@@ -32,6 +33,7 @@ pub mod format;
 pub mod geometry;
 pub mod identity;
 pub mod jt;
+pub mod mcp;
 pub mod model;
 pub mod reader;
 pub mod step;
