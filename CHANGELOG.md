@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The caution about a possible pairing is now in the document**
+  (ADR 0013), and the comparison schema version is 2. It used to be a
+  sentence the CLI printed beneath its output, so anything reading the
+  JSON — a language model, most obviously — saw a list that looked like
+  findings and would report it as findings. That is the failure ADR 0012
+  set out to avoid, reintroduced by the transport.
+
+  It is carried three ways, so no consumer can drop it by accident:
+  `candidates` is renamed **`possible_pairings`**; each one states in
+  **`paired_on`** the single agreement it rests on (`size`, `place`, or
+  `size_and_place`); and the document carries the sentence in **`notes`**,
+  keyed to the field it is about. The text output reads that note rather
+  than restating it, so the two cannot drift apart.
+
+
 - **What is still needed to confirm cross-format identity is now stated
   accurately.** The roadmap, ADR 0004, ADR 0010, and `tests/cross_format.rs`
   all said it needed "a model published in both formats". Two thirds of

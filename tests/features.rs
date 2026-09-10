@@ -337,7 +337,7 @@ fn a_file_with_no_geometry_says_so_rather_than_reporting_nothing() {
 
 mod comparing {
     use super::read;
-    use pmix::features::compare::{self, Comparison, Paired};
+    use pmix::features::compare::{self, Comparison, Paired, PairedOn};
 
     fn against(a: &str, b: &str) -> Comparison {
         compare::compare(&read(a), &read(b))
@@ -364,9 +364,10 @@ mod comparing {
         assert_eq!(b.only_baseline.len(), 1);
         assert_eq!(b.only_compared.len(), 1);
 
-        assert_eq!(b.candidates.len(), 1);
-        let cand = &b.candidates[0];
+        assert_eq!(b.possible_pairings.len(), 1);
+        let cand = &b.possible_pairings[0];
         assert_eq!(cand.distance, 0.0, "the hole did not move");
+        assert_eq!(cand.paired_on, PairedOn::Place);
         let fields: Vec<&str> = cand.differs.iter().map(|d| d.field.as_str()).collect();
         assert_eq!(fields, ["diameter"], "{:?}", cand.differs);
         assert_eq!(
@@ -386,9 +387,10 @@ mod comparing {
             "synthetic/plate_hole_moved.stp",
         );
         let b = &c.bodies[0];
-        assert_eq!(b.candidates.len(), 1);
-        let cand = &b.candidates[0];
+        assert_eq!(b.possible_pairings.len(), 1);
+        let cand = &b.possible_pairings[0];
         assert_eq!(cand.distance, 5.0);
+        assert_eq!(cand.paired_on, PairedOn::Size);
         let fields: Vec<&str> = cand.differs.iter().map(|d| d.field.as_str()).collect();
         assert_eq!(fields, ["position"], "{:?}", cand.differs);
         assert_eq!(cand.differs[0].from, "20,15,0");
@@ -428,8 +430,8 @@ mod comparing {
         assert_eq!(b.only_baseline.len(), 1);
         assert_eq!(b.placement, None, "three holes stayed put");
         assert!(!b.same_shapes_moved);
-        assert_eq!(b.candidates.len(), 1);
-        assert_eq!(b.candidates[0].distance, 5.0);
+        assert_eq!(b.possible_pairings.len(), 1);
+        assert_eq!(b.possible_pairings[0].distance, 5.0);
     }
 
     /// The same design in two units is the same design, and a comparison
@@ -468,8 +470,57 @@ mod comparing {
         assert_eq!(c.summary.bodies_paired, 0);
         assert_eq!(c.summary.bodies_only_baseline, 1);
         assert_eq!(c.summary.bodies_only_compared, 1);
-        assert!(c.bodies.iter().all(|b| b.candidates.is_empty()));
+        assert!(c.bodies.iter().all(|b| b.possible_pairings.is_empty()));
         assert!(!c.summary.identical());
+    }
+
+    /// The one thing this document states that `pmix` does not stand
+    /// behind must say so *in the data*. A consumer rendering only the
+    /// fields it recognises — a language model reading the JSON, say —
+    /// would never see a caution printed beside the output (ADR 0013).
+    #[test]
+    fn a_possible_pairing_carries_its_own_caution() {
+        let c = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/plate_hole_larger.stp",
+        );
+        assert!(!c.bodies[0].possible_pairings.is_empty());
+
+        // Stated at the document level, naming the field it is about.
+        let note = c
+            .notes
+            .iter()
+            .find(|n| n.field == "possible_pairings")
+            .expect("the caution travels with the document");
+        assert!(note.note.contains("not a conclusion"), "{}", note.note);
+
+        // And carried by each pairing, so that dropping the note does not
+        // turn an observation into a finding: what it rests on is part of
+        // the record.
+        let p = &c.bodies[0].possible_pairings[0];
+        assert_eq!(p.paired_on, PairedOn::Place);
+
+        // A document with nothing inferred in it says nothing.
+        let same = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/plate_one_hole.stp",
+        );
+        assert!(same.notes.is_empty(), "{:?}", same.notes);
+    }
+
+    /// The whole point of naming it: serialised, it cannot be read as a
+    /// list of findings.
+    #[test]
+    fn the_serialised_document_does_not_call_them_findings() {
+        let c = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/plate_hole_moved.stp",
+        );
+        let json = serde_json::to_string(&c).unwrap();
+        assert!(json.contains("possible_pairings"), "{json}");
+        assert!(!json.contains("\"candidates\""), "{json}");
+        assert!(json.contains("not a conclusion"), "{json}");
+        assert_eq!(c.schema_version, compare::SCHEMA_VERSION);
     }
 
     /// Comparing a document with itself is the control: if this is not

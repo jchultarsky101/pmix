@@ -401,7 +401,15 @@ diagnostic.
 Comparing two models (`pmix features a b --json`) writes a third document
 again, with its own schema version: paired bodies, `matched` feature ids,
 what is `only_baseline` and `only_compared`, any `placement` explaining a
-whole body, and `candidates` with the fields that differ.
+whole body, and `possible_pairings` with the fields that differ.
+
+Only `matched` is proof that two features are the same. A possible
+pairing is an observation — it states in `paired_on` the one agreement it
+rests on (`size`, `place`, or `size_and_place`) and in `distance` how far
+it reaches — and the document says so in `notes`, keyed to the field. That
+caution is in the data rather than printed beside it, because a consumer
+that renders only the fields it recognises would otherwise read a list of
+guesses as a list of findings (ADR 0013).
 
 ## Library use
 

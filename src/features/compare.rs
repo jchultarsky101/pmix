@@ -47,7 +47,10 @@ use super::model::{Body, Feature, FeatureDocument};
 
 /// Version of the comparison document, independent of the feature
 /// document's.
-pub const SCHEMA_VERSION: u32 = 1;
+///
+/// 2: `candidates` became `possible_pairings`, gained `paired_on`, and
+/// the document carries the caution that used to be printed beside it.
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// How close two numbers must be to count as the same, which is the
 /// quantum ids are built at (ADR 0004).
@@ -64,6 +67,10 @@ pub struct Comparison {
     pub compared: Source,
     pub bodies: Vec<BodyPair>,
     pub summary: Summary,
+    /// Cautions that belong with the data. Empty when nothing in this
+    /// document needs one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notes: Vec<Note>,
 }
 
 /// The counts, so a reader knows how much of the answer is certain
@@ -130,10 +137,11 @@ pub struct BodyPair {
     pub only_baseline: Vec<Feature>,
     /// Features in the compared document with no counterpart.
     pub only_compared: Vec<Feature>,
-    /// Leftovers that look related, with how they differ. Advisory: a
-    /// candidate is an observation, never a conclusion.
+    /// Leftovers that look related, with how they differ. Named for what
+    /// they are: a pairing this noticed, which it does not stand behind.
+    /// See [`Comparison::notes`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub candidates: Vec<Candidate>,
+    pub possible_pairings: Vec<PossiblePairing>,
     /// One displacement carrying every leftover onto its counterpart,
     /// where one does. Stated once here rather than repeated on every
     /// feature in the body.
@@ -149,15 +157,66 @@ pub struct BodyPair {
 
 /// Two leftovers of one kind that agree on size or on position.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Candidate {
+pub struct PossiblePairing {
     pub baseline: String,
     pub compared: String,
+    /// What the pairing rests on. Two leftovers are put beside each other
+    /// only when one of these still agrees, and which one it is says how
+    /// much the pairing is worth: a hole that kept its size and moved,
+    /// and a hole that kept its place and was bored, are the two things
+    /// this can offer. It is not evidence that either happened.
+    pub paired_on: PairedOn,
     /// How far apart they sit, in millimetres.
     pub distance: f64,
     /// The fields that differ, named, so the difference can be read
     /// without setting the two features side by side.
     pub differs: Vec<Change>,
 }
+
+/// The agreement a possible pairing rests on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PairedOn {
+    /// The same size, somewhere else.
+    Size,
+    /// The same place, a different size.
+    Place,
+    /// Both, so the two differ in something else again — the stretch of
+    /// axis they occupy, most often.
+    SizeAndPlace,
+}
+
+impl PairedOn {
+    /// How this reads in a line of text.
+    pub fn describe(self) -> &'static str {
+        match self {
+            Self::Size => "same size",
+            Self::Place => "same place",
+            Self::SizeAndPlace => "same size and place",
+        }
+    }
+}
+
+/// Something a reader has to know to read a field correctly, carried in
+/// the document rather than printed beside it.
+///
+/// `pmix` stands behind everything else it emits. It does not stand
+/// behind a possible pairing, and a consumer that renders only the
+/// fields it recognises would never learn that from prose in a terminal
+/// (ADR 0013).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Note {
+    /// The field this is about.
+    pub field: String,
+    pub note: String,
+}
+
+/// What `possible_pairings` means, stated in the document that carries
+/// them.
+const ABOUT_PAIRINGS: &str = "A possible pairing is an observation, not a conclusion. One feature \
+     moved and one removed with another added are the same geometry, and nothing here can tell \
+     them apart; `paired_on` says what the pairing rests on and `distance` how far it reaches. \
+     Only `matched` is proof that two features are the same.";
 
 /// One field of a feature, before and after.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -235,12 +294,21 @@ pub fn compare(baseline: &FeatureDocument, compared: &FeatureDocument) -> Compar
         }
     }
 
+    let mut notes = Vec::new();
+    if bodies.iter().any(|b| !b.possible_pairings.is_empty()) {
+        notes.push(Note {
+            field: "possible_pairings".to_owned(),
+            note: ABOUT_PAIRINGS.to_owned(),
+        });
+    }
+
     Comparison {
         schema_version: SCHEMA_VERSION,
         baseline: baseline.source.clone(),
         compared: compared.source.clone(),
         bodies,
         summary,
+        notes,
     }
 }
 
@@ -385,7 +453,7 @@ fn lone(body: &Body, is_baseline: bool) -> BodyPair {
             Vec::new()
         },
         only_compared: if is_baseline { Vec::new() } else { features },
-        candidates: Vec::new(),
+        possible_pairings: Vec::new(),
         placement: None,
         same_shapes_moved: false,
     }
@@ -422,7 +490,7 @@ fn compare_bodies(a: &Body, b: &Body, how: Option<(Paired, usize)>) -> BodyPair 
         paired: Some(paired),
         paired_on: (paired == Paired::Faces).then_some(on),
         matched,
-        candidates: candidates(&only_a, &only_b),
+        possible_pairings: possible_pairings(&only_a, &only_b),
         only_baseline: only_a,
         only_compared: only_b,
         placement,
@@ -495,19 +563,19 @@ fn displacement(a: &[Feature], b: &[Feature], matched: usize) -> (Option<[f64; 3
 
 /// Leftovers that look related, paired off greedily.
 ///
-/// A candidate has to agree on its size or on its position, so that
-/// "the same hole, bored wider" and "the same hole, moved" are offered
-/// and two unrelated holes are not. That is a deliberately narrow rule:
-/// a candidate is meant to save a reader from scanning two lists, not to
-/// stand in for their judgement.
-fn candidates(a: &[Feature], b: &[Feature]) -> Vec<Candidate> {
+/// A pairing has to agree on its size or on its position, so that "the
+/// same hole, bored wider" and "the same hole, moved" are offered and
+/// two unrelated holes are not. That is a deliberately narrow rule: this
+/// is meant to save a reader from scanning two lists, not to stand in
+/// for their judgement.
+fn possible_pairings(a: &[Feature], b: &[Feature]) -> Vec<PossiblePairing> {
     let q = tolerance();
     let same = |x: Option<f64>, y: Option<f64>| match (x, y) {
         (Some(x), Some(y)) => (x - y).abs() <= q,
         (None, None) => true,
         _ => false,
     };
-    let mut scored: Vec<(f64, usize, usize)> = Vec::new();
+    let mut scored: Vec<(f64, usize, usize, PairedOn)> = Vec::new();
     for (i, x) in a.iter().enumerate() {
         for (j, y) in b.iter().enumerate() {
             if x.kind != y.kind {
@@ -519,14 +587,17 @@ fn candidates(a: &[Feature], b: &[Feature]) -> Vec<Candidate> {
                 (Some(p), Some(r)) => distance(p, r) <= q,
                 _ => false,
             };
-            if !size && !here {
-                continue;
-            }
+            let paired_on = match (size, here) {
+                (true, true) => PairedOn::SizeAndPlace,
+                (true, false) => PairedOn::Size,
+                (false, true) => PairedOn::Place,
+                (false, false) => continue,
+            };
             let d = match (x.shape.position, y.shape.position) {
                 (Some(p), Some(r)) => distance(p, r),
                 _ => 0.0,
             };
-            scored.push((d, i, j));
+            scored.push((d, i, j, paired_on));
         }
     }
     scored.sort_by(|p, r| {
@@ -537,7 +608,7 @@ fn candidates(a: &[Feature], b: &[Feature]) -> Vec<Candidate> {
     });
     let (mut used_a, mut used_b) = (BTreeSet::new(), BTreeSet::new());
     let mut out = Vec::new();
-    for (d, i, j) in scored {
+    for (d, i, j, paired_on) in scored {
         if !used_a.insert(i) {
             continue;
         }
@@ -545,9 +616,10 @@ fn candidates(a: &[Feature], b: &[Feature]) -> Vec<Candidate> {
             used_a.remove(&i);
             continue;
         }
-        out.push(Candidate {
+        out.push(PossiblePairing {
             baseline: a[i].id.clone(),
             compared: b[j].id.clone(),
+            paired_on,
             distance: num(d, q).parse().unwrap_or(d),
             differs: changes(&a[i], &b[j]),
         });

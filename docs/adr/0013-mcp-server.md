@@ -99,10 +99,21 @@ ones this project deliberately does not produce:
 
 ## Consequences
 
-- The features and comparison documents gain a field carrying what the
-  text output already says: that a candidate is an observation. This
-  changes the JSON, so it is a schema change, and the CLI's text renderer
-  should read that field rather than restating it.
+- The comparison document gains what the text output already says: that
+  such a pairing is an observation. This changes the JSON, so it is a
+  schema change, and the CLI's text renderer reads it rather than
+  restating it.
+
+  **Amended 2026-09-10, on doing it.** This said "the features and
+  comparison documents". Only the comparison document needed anything.
+  A possible pairing is the one thing `pmix` emits that it declines to
+  stand behind; everything in the features document is either measured
+  or provable by the rule that produced it, and `unassigned` already says
+  in its name that nothing was concluded. The caution is carried three
+  ways, so that no consumer can drop it by accident: the field is called
+  `possible_pairings`, each one states in `paired_on` the single
+  agreement it rests on, and the document carries the sentence in
+  `notes`, keyed to the field it is about.
 - Determinism stops being tidiness. A model consuming a document that
   differs run to run will explain the difference.
 - The tests for the server are the library's tests plus a thin check that
