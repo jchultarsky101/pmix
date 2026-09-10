@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-09-10
+
+The one thing `pmix` emits that it declines to stand behind now says so
+in the data rather than in a sentence printed beside it. A comparison's
+`candidates` become `possible_pairings`, each stating what it rests on,
+which is a breaking change to that document and the reason for the minor
+bump. Plus the docs corrections that went with it.
+
 ### Changed
 
 - **The caution about a possible pairing is now in the document**
@@ -586,7 +594,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/jchultarsky101/pmix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/jchultarsky101/pmix/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/jchultarsky101/pmix/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/jchultarsky101/pmix/compare/v0.8.0...v0.9.0
