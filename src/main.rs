@@ -78,6 +78,33 @@ enum Command {
         compact: bool,
     },
 
+    /// Read a model's product structure: its parts and its assembly tree.
+    ///
+    /// Says what the file *contains* rather than what it states or what
+    /// its shapes are: which parts it names, at what revision, how many
+    /// times each is used, and where each occurrence sits. Placements
+    /// are in millimetres whatever the file declared.
+    ///
+    /// This is what makes a component addressable — a body with a part
+    /// number and a revision beside it is something a person or a model
+    /// can look up. See ADR 0014.
+    Product {
+        /// Path to the model (.stp, .step, or .jt).
+        input: PathBuf,
+
+        /// Where to write the output. Defaults to standard output.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Emit JSON instead of text.
+        #[arg(long)]
+        json: bool,
+
+        /// Emit compact JSON instead of pretty-printed JSON.
+        #[arg(long, requires = "json")]
+        compact: bool,
+    },
+
     /// Compare the PMI of two or more models.
     ///
     /// Inputs are model files (extracted on the fly) or JSON documents
@@ -196,6 +223,12 @@ fn run(cli: Cli) -> Result<ExitCode> {
             json,
             compact,
         } => features(inputs, output, json, compact),
+        Command::Product {
+            input,
+            output,
+            json,
+            compact,
+        } => product(input, output, json, compact),
         Command::Diff { inputs, json } => diff(inputs, json),
         Command::Mcp => {
             tracing::info!("serving over standard input and output");
@@ -225,6 +258,122 @@ fn run(cli: Cli) -> Result<ExitCode> {
         )
         .map(|()| ExitCode::SUCCESS),
     }
+}
+
+fn product(input: PathBuf, output: Option<PathBuf>, json: bool, compact: bool) -> Result<ExitCode> {
+    tracing::info!(input = %input.display(), "reading product structure");
+    let document = pmix::product::read_path(&input)
+        .with_context(|| format!("failed to read `{}`", input.display()))?;
+    let text = match (json, compact) {
+        (true, true) => serde_json::to_string(&document)?,
+        (true, false) => serde_json::to_string_pretty(&document)?,
+        (false, _) => render_product(&document),
+    };
+    match output {
+        Some(path) => std::fs::write(&path, text)
+            .with_context(|| format!("failed to write `{}`", path.display()))?,
+        None => print!("{text}"),
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// The assembly as an indented tree, each part named as a person would
+/// name it, with the occurrences beneath the part that contains them.
+fn render_product(document: &pmix::product::ProductDocument) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "{} ({}), {} part{}, {} occurrence{}",
+        document.source.file_name,
+        document.source.format,
+        document.parts.len(),
+        if document.parts.len() == 1 { "" } else { "s" },
+        document.relations.len(),
+        if document.relations.len() == 1 {
+            ""
+        } else {
+            "s"
+        }
+    );
+
+    let named = |id: &str| -> String {
+        let Some(part) = document.parts.iter().find(|p| p.id == id) else {
+            return id.to_owned();
+        };
+        let mut label = part
+            .number
+            .clone()
+            .or_else(|| part.name.clone())
+            .unwrap_or_else(|| part.id.clone());
+        if let (Some(number), Some(name)) = (&part.number, &part.name) {
+            label = format!("{number} ({name})");
+        }
+        match &part.revision {
+            Some(rev) => format!("{label} rev {rev}"),
+            None => label,
+        }
+    };
+
+    // A subassembly used twice is printed twice, because that is what
+    // the assembly holds; the part list above it says it once.
+    fn walk(
+        out: &mut String,
+        document: &pmix::product::ProductDocument,
+        named: &impl Fn(&str) -> String,
+        part: &str,
+        depth: usize,
+        seen: &mut Vec<String>,
+    ) {
+        use std::fmt::Write as _;
+        if seen.contains(&part.to_owned()) {
+            let _ = writeln!(out, "{:indent$}... cycle", "", indent = depth * 2 + 2);
+            return;
+        }
+        seen.push(part.to_owned());
+        for r in document.relations.iter().filter(|r| r.parent == part) {
+            let where_at = match &r.placement {
+                Some(p) => format!(" at {},{},{}", p.origin[0], p.origin[1], p.origin[2]),
+                None => String::new(),
+            };
+            let _ = writeln!(
+                out,
+                "{:indent$}{}{}{}",
+                "",
+                named(&r.child),
+                r.name
+                    .as_deref()
+                    .map(|n| format!(" [{n}]"))
+                    .unwrap_or_default(),
+                where_at,
+                indent = depth * 2 + 2
+            );
+            walk(out, document, named, &r.child, depth + 1, seen);
+        }
+        seen.pop();
+    }
+
+    for root in &document.roots {
+        let _ = writeln!(out, "\n{}", named(root));
+        walk(&mut out, document, &named, root, 0, &mut Vec::new());
+    }
+
+    let unused: Vec<&pmix::product::Part> = document
+        .parts
+        .iter()
+        .filter(|p| p.occurrences == 0 && !document.roots.contains(&p.id))
+        .collect();
+    if !unused.is_empty() {
+        let _ = writeln!(out, "\nnamed but not placed:");
+        for p in unused {
+            let _ = writeln!(out, "  {}", named(&p.id));
+        }
+    }
+
+    for d in &document.diagnostics {
+        let _ = writeln!(out, "\nnote: {}", d.message);
+    }
+    out
 }
 
 fn diff(inputs: Vec<PathBuf>, json: bool) -> Result<ExitCode> {

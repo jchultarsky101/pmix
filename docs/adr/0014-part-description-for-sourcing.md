@@ -121,6 +121,34 @@ This stage alone changes what the question can be. "Find substitutes for
 this assembly" becomes a list of parts with names and quantities rather
 than an undifferentiated pile of bodies.
 
+### Amended 2026-09-10, on building stage 1
+
+**Volume and surface area are read, not computed.** Stage 2 below says
+both are computed from the B-rep and stated as measured facts. They
+cannot be: `brep::Solid` holds analytic surfaces, loops of edges, circle
+centres and vertex points, but no trimmed surface parameterisation, and
+integrating a general trimmed face needs the geometry kernel ADR 0001
+declined to depend on. So both are read where the file states them and
+recorded as absent where it does not — which is the rule this record
+already sets for mass, applied to its neighbours. The envelope becomes
+the one computed quantity, and it is the one a catalogue search needs
+first anyway.
+
+**An unidentifiable part is reported rather than resolved.** A part keys
+on its number, name and revision. A file stating none of the three — and
+`nist_ftc_09` states four such products — leaves nothing to key on, so
+the id falls back to an ordinal in file order, which is the one thing
+ADR 0004 forbids an id to rest on. The reader cannot fix that, so the
+document says it. This is the same posture as `unassigned`: a limit that
+is stated is a fact, and a limit that is silent is a trap.
+
+**A body stays one per shell.** Occurrences share a shell, so a part used
+four times is one body and four occurrences. That is the right division —
+a body is a shape, and how often a shape is used is the product
+document's business — but it means the two documents disagree about
+"how many", and both the README and the tool descriptions have to say so
+or the body count reads as a bug.
+
 ### Stage 2 — size, mass, and material
 
 Per body and per part, and once for the assembly:

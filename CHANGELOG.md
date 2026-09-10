@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`pmix product`**, a third document saying what a file *contains*
+  (ADR 0014): the parts it names, their revisions, and every occurrence
+  of each with the placement that puts it where it sits. Occurrences are
+  stated one by one rather than rolled into a quantity, because two uses
+  of one part sit in different places; each part counts its own uses so
+  that nothing has to tally the list. Sorted, content-keyed, and in
+  millimetres whatever the file declared.
+
+  A part keys on its number, name and revision, which is what a person
+  would call it — not on its geometry, because a subassembly has none.
+  Where a file states none of the three, the id can only rest on the
+  order the file lists them in, and the document says so rather than
+  letting a reader discover it by diffing two exports. One NIST model
+  does exactly this.
+
+  JT files return an empty document with a diagnostic: the scene graph's
+  node hierarchy is not read yet.
+
 ### Changed
 
 - **What a part has to state before a model can source a substitute for

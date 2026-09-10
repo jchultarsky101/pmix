@@ -10,6 +10,7 @@ use super::units::unit_name;
 use super::{Ctx, PropertyRepr, source_ref};
 use crate::model::{Property, PropertyKind, PropertyValue, Unmapped};
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
+use crate::step::product::PRODUCT_LEVEL;
 
 /// Property definition names whose values describe how the PMI was
 /// written rather than what the design is (CAx-IF validation properties).
@@ -18,14 +19,6 @@ const VALIDATION_CATEGORIES: &[&str] = &[
     "geometric validation property",
     "attribute validation property",
     "tessellated validation property",
-];
-
-/// Entities a property attaches to that mean "the whole part".
-const PRODUCT_LEVEL: &[&str] = &[
-    "PRODUCT_DEFINITION",
-    "PRODUCT_DEFINITION_SHAPE",
-    "PRODUCT_DEFINITION_FORMATION",
-    "PRODUCT",
 ];
 
 /// Assembly occurrences. A property on one is about that component as
@@ -230,29 +223,19 @@ fn resolve_target(ctx: &mut Ctx<'_>, target: Id) -> Target {
 
 /// The name of the product a product-level target belongs to.
 ///
-/// A shape names its definition, a definition names its formation, and a
-/// formation names its product, so following the one reference that is
-/// itself product-level arrives at the product in at most three steps.
+/// The walk up to the product is [`crate::step::product::product_at`],
+/// shared with the product-structure reader so that the two cannot come
+/// to different conclusions about which part a thing belongs to.
 fn product_of(ex: &Exchange, target: Id) -> Option<String> {
-    let mut at = target;
-    for _ in 0..PRODUCT_LEVEL.len() {
-        let inst = ex.get(at)?;
-        if inst.has_type("PRODUCT") {
-            // The name, or the identifier when a writer leaves it empty.
-            return [1usize, 0]
-                .into_iter()
-                .filter_map(|i| inst.attr("PRODUCT", i))
-                .filter_map(Parameter::as_str)
-                .map(str::trim)
-                .find(|s| !s.is_empty())
-                .map(str::to_owned);
-        }
-        at = inst.references().into_iter().find(|r| {
-            ex.get(*r)
-                .is_some_and(|i| i.type_names().any(|t| PRODUCT_LEVEL.contains(&t)))
-        })?;
-    }
-    None
+    let product = crate::step::product::product_at(ex, target)?;
+    // The name, or the identifier when a writer leaves it empty.
+    [1usize, 0]
+        .into_iter()
+        .filter_map(|i| product.attr("PRODUCT", i))
+        .filter_map(Parameter::as_str)
+        .map(str::trim)
+        .find(|s| !s.is_empty())
+        .map(str::to_owned)
 }
 
 /// The name and typed value of a representation item, if it carries one.

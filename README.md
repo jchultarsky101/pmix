@@ -116,6 +116,40 @@ Include the full coordinates and triangles when you need them:
 pmix extract part.stp --presentation-geometry
 ```
 
+### Reading the product structure
+
+`pmix product` says what a file *contains*: which parts it names, at what
+revision, how many times each is used, and where each occurrence sits.
+
+```bash
+pmix product assembly.stp
+pmix product assembly.stp --json --output assembly.product.json
+```
+
+```text
+assembly.stp (STEP), 3 parts, 4 occurrences
+
+SYN-ASM-3 (repeated_part_assembly) rev A
+  SYN-PLATE (base_plate) rev A [plate_1] at 0,0,0
+  SYN-PIN (locating_pin) rev C [pin_left] at 8,10,6
+  SYN-PIN (locating_pin) rev C [pin_middle] at 28,10,6
+  SYN-PIN (locating_pin) rev C [pin_right] at 48,10,6
+```
+
+Occurrences are stated one by one rather than rolled into a quantity,
+because the three pins sit in different places and a comparison has to
+be able to say which one moved. The parts list names each part once and
+counts its uses.
+
+This is a third document, versioned separately from the PMI and features
+documents, for the reason those two are separate from each other: they
+answer different questions. See
+[ADR 0014](docs/adr/0014-part-description-for-sourcing.md).
+
+Note that `pmix features` reports one body per shell, so a part used four
+times is one body and four occurrences — the shape is stated once and the
+product document says how often it is used.
+
 ### Comparing models
 
 Diff the PMI of two models, or of JSON documents written by `pmix extract`:
@@ -492,7 +526,9 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Comparing two feature documents: exact pairing, a displacement stated once, and candidates as observations (ADR 0012)
 - [ ] Rotation as well as displacement, which needs orientation evidence rather than positions alone (ADR 0012)
 - [x] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
-- [ ] Product structure and part identity: a bill of materials with revisions, quantities, and the bodies each part is made of (ADR 0014)
+- [x] `pmix product`: parts, revisions, occurrences and their placements, from a STEP file's assembly structure (ADR 0014)
+- [ ] Joining each body to the part it realises, so a shape has a part number beside it (ADR 0014)
+- [ ] Owning organisation, approval, and security classification, which no file in the public corpus states (ADR 0014)
 - [ ] Envelope, volume, and material, so a part can be described as something a catalogue would recognise (ADR 0014)
 - [ ] Hole patterns and threads, the interface a substitute part has to match (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)

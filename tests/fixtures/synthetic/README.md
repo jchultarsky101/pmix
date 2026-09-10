@@ -16,6 +16,23 @@ proprietary data: part numbers and values are invented.
 | `assembly_properties.stp` | Components stating the same property names, which collide unless the part is part of the key |
 | `datum_targets.stp` | A datum established by targets, none of which the file gives geometry |
 
+## Product structure
+
+The committed public corpus holds no assemblies at all: not one of the 17
+NIST files states a `NEXT_ASSEMBLY_USAGE_OCCURRENCE`, so nothing there
+exercises the product reader (ADR 0014). These two files carry that
+coverage on their own. Each states a full advanced B-rep for every
+component, so the same files serve the body-to-part join.
+
+| File | What it is for |
+| --- | --- |
+| `assembly_two_parts.stp` | Two different parts, each placed once, at different revisions. The simplest bill of materials that is not a single part |
+| `assembly_repeated_part.stp` | One part used three times at three placements. A reader that collapses occurrences reports one pin here instead of three, which is the failure this file exists to catch |
+
+Both are written by hand rather than exported, which means they encode
+what the reader expects rather than confirming it against a real writer.
+Verify product-structure changes against real exports as well.
+
 ## Feature recognition
 
 One plate, and three single deliberate changes to it. Each is a question
