@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`pmix features` compares two models** (ADR 0012). Given two or more
+  inputs it sets them against each other instead of describing one:
+  what pairs by id and is therefore provably the same, what is left over
+  on each side stated in full, and a **displacement** reported once
+  where one explains every difference in a body. Exit status is 0 when
+  nothing differs and 1 when something does, so it works as a check.
+
+  A **candidate** pairs two leftovers of one kind that agree on either
+  their size or their place, and names the fields that differ — "same
+  place; diameter 8 → 10", or "5 apart; position 20,15,0 → 25,15,0". It
+  is an observation with its distance attached, never a conclusion: one
+  feature moved and one removed with another added are the same
+  geometry, and nothing here can tell them apart.
+
+  Bodies pair on their shared *faces* rather than their shared features,
+  because an edit to one feature leaves every face it did not touch
+  exactly as it was, and those are the evidence.
+
+### Fixed
+
+- **A cone is now keyed by its apex** rather than by the radius it has
+  wherever the file placed it (ADR 0004). The same cone placed further
+  along its own axis states a different radius there, so two exports of
+  one cone were keyed differently whenever they placed it differently.
+  Across the NIST re-export pair this takes the features that pair from
+  41 to 45.
+
+- **Faces lying on one surface are taken together even when they do not
+  touch.** The chamfer round a hexagonal head is six patches of one
+  cone, parted by the six flats, and it was reported as six chamfers
+  sharing one id. Faces on one surface whose extents lie over each other
+  are one face of it; bores of one size drilled one behind the other
+  follow each other along the axis instead, and stay separate.
+
+- **A feature's angle is now right for a file stating degrees.** The
+  neutral B-rep claimed millimetres and degrees while carrying radians,
+  so the conversion was applied to an already-converted value.
+
 ## [0.10.0] - 2026-09-09
 
 `pmix features` now recognises the blends as well as the holes. A fillet

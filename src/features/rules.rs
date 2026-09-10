@@ -43,6 +43,13 @@ struct Candidate {
     axis_key: String,
     axis: [f64; 3],
     position: [f64; 3],
+    /// The surface itself, exactly as the file states it (in
+    /// millimetres). Identity is taken from this rather than rebuilt
+    /// from the canonical axis and position below: those describe the
+    /// *line* the surface turns about, and pairing one of them with a
+    /// radius measured somewhere else on that line describes a surface
+    /// that is not in the file.
+    surface: Surface,
     radius: f64,
     /// Half the apex angle in radians, for a cone.
     semi_angle: Option<f64>,
@@ -143,23 +150,15 @@ fn cap_at(solid: &Solid, c: &Candidate, t: f64) -> Option<usize> {
     None
 }
 
-/// How a face is grouped with the others on its surface: the line it
-/// turns about, its radius, and its taper. Faces agreeing on all three
-/// and touching each other are one surface the file cut up.
-fn surface_group(
-    axis_key: &str,
-    radius: f64,
-    semi_angle: Option<f64>,
-    minor_radius: Option<f64>,
-) -> String {
-    let q = tolerance();
-    let opt = |v: Option<f64>| v.map(|x| num(x, q)).unwrap_or_default();
-    format!(
-        "{axis_key}|{}|{}|{}",
-        num(radius, q),
-        opt(semi_angle),
-        opt(minor_radius)
-    )
+/// How a face is grouped with the others lying on the same surface.
+///
+/// The identity recipe's own key for that surface (ADR 0004), because
+/// that is exactly the question: do these two faces lie on one surface?
+/// Building a key by hand here got it wrong for cones, whose radius is
+/// the radius *where the file placed them* — six patches of one cone,
+/// placed six different ways, compared as six surfaces.
+fn surface_group(surface: &Surface) -> String {
+    fingerprint::surface_key(surface, Scale::NONE)
 }
 
 /// The surfaces a rule could claim, each as the whole set of faces the
@@ -172,12 +171,16 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
         axis_key: String,
         axis: [f64; 3],
         position: [f64; 3],
+        surface: Surface,
         radius: f64,
         semi_angle: Option<f64>,
         minor_radius: Option<f64>,
     }
     let mut parts: Vec<Part> = Vec::new();
     for (i, f) in solid.faces.iter().enumerate() {
+        let Some(surface) = f.surface.clone() else {
+            continue;
+        };
         let (axis, origin, radius, semi_angle, minor_radius) = match &f.surface {
             Some(Surface::Cylinder {
                 origin,
@@ -205,6 +208,7 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
             axis_key: format!("{}|{}", triple(axis, q), triple(position, q)),
             axis,
             position,
+            surface,
             radius,
             semi_angle,
             minor_radius,
@@ -218,18 +222,36 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
     let mut by_surface: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     for (n, p) in parts.iter().enumerate() {
         by_surface
-            .entry(surface_group(
-                &p.axis_key,
-                p.radius,
-                p.semi_angle,
-                p.minor_radius,
-            ))
+            .entry(surface_group(&p.surface))
             .or_default()
             .push(n);
     }
     for members in by_surface.values() {
         let faces: Vec<usize> = members.iter().map(|n| parts[*n].face).collect();
-        // Union by shared edges, repeated until nothing more joins.
+        // How far along the axis each face reaches, taken before anything
+        // is merged, so that faces lying over one another can be told
+        // from faces following one behind the other.
+        let axis = parts[members[0]].axis;
+        let reach: BTreeMap<usize, [f64; 2]> = faces
+            .iter()
+            .filter_map(|f| {
+                let edges: Vec<usize> = solid.faces[*f].edges().collect();
+                extent_of(solid, &edges, axis).map(|e| (*f, e))
+            })
+            .collect();
+        let tol = tolerance();
+        let over = |x: usize, y: usize| match (reach.get(&x), reach.get(&y)) {
+            (Some(p), Some(q)) => p[0] < q[1] - tol && q[0] < p[1] - tol,
+            _ => false,
+        };
+        // Union, repeated until nothing more joins.
+        //
+        // Touching is not the only way to be one face of a surface: the
+        // chamfer round a hexagonal head is six patches of one cone,
+        // parted by the six flats, and no two of them touch. What tells
+        // those from two bores of one size drilled one behind the other
+        // is that the bores follow each other along the axis where these
+        // lie over each other.
         let mut merged: Vec<Vec<usize>> = faces.iter().map(|f| vec![*f]).collect();
         let mut changed = true;
         while changed {
@@ -241,6 +263,7 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
                             solid.faces[*x]
                                 .edges()
                                 .any(|e| solid.faces[*y].is_bounded_by(e))
+                                || over(*x, *y)
                         })
                     });
                     if touching {
@@ -305,6 +328,7 @@ fn candidates(solid: &Solid) -> Vec<Candidate> {
             axis_key: p.axis_key.clone(),
             axis: p.axis,
             position: p.position,
+            surface: p.surface.clone(),
             radius: p.radius,
             semi_angle: p.semi_angle,
             minor_radius: p.minor_radius,
@@ -473,7 +497,15 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
         }
     }
 
-    let id_of = |n: usize| feature_id(solid, &cands[n], kinds.get(&n).copied());
+    // Once each, in a fixed order: a feature is asked for its id again
+    // whenever another names it as coaxial, and an id that counted its
+    // own collisions would answer differently each time.
+    let feature_ids: Vec<String> = cands
+        .iter()
+        .enumerate()
+        .map(|(n, c)| feature_id(solid, c, kinds.get(&n).copied(), ids))
+        .collect();
+    let id_of = |n: usize| feature_ids[n].clone();
 
     let mut features: Vec<Feature> = Vec::new();
     for (n, c) in cands.iter().enumerate() {
@@ -521,7 +553,9 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
                 axis: Some(rounded(c.axis)),
                 position: Some(rounded(c.position)),
                 extent: Some([round(c.extent[0]), round(c.extent[1])]),
-                angle: c.semi_angle.map(|a| round(a.to_degrees() * 2.0)),
+                // Already degrees: the neutral B-rep states them, and the
+                // angle a cone is called by is the whole one at its apex.
+                angle: c.semi_angle.map(|a| round(a * 2.0)),
             },
             overlaps: Vec::new(),
             coaxial_with: with,
@@ -589,20 +623,7 @@ fn face_ids(solid: &Solid, ids: &mut ContentId) -> Vec<String> {
 /// turns about, its size, and the stretch of that line it occupies. The
 /// faces capping it are left out, so that a blind hole which gains a
 /// chamfer is still the same hole.
-fn feature_id(solid: &Solid, c: &Candidate, kind: Option<Kind>) -> String {
-    let surface = match c.semi_angle {
-        Some(semi_angle) => Surface::Cone {
-            origin: c.position,
-            axis: c.axis,
-            radius: c.radius,
-            semi_angle,
-        },
-        None => Surface::Cylinder {
-            origin: c.position,
-            axis: c.axis,
-            radius: c.radius,
-        },
-    };
+fn feature_id(solid: &Solid, c: &Candidate, kind: Option<Kind>, ids: &mut ContentId) -> String {
     let points: Vec<[f64; 3]> = c
         .boundary
         .iter()
@@ -611,13 +632,13 @@ fn feature_id(solid: &Solid, c: &Candidate, kind: Option<Kind>) -> String {
             edge.centre.into_iter().chain(edge.ends.iter().copied())
         })
         .collect();
-    let geometry = fingerprint::face_key(&surface, &points, Scale::NONE);
+    let geometry = fingerprint::face_key(&c.surface, &points, Scale::NONE);
     let key = fingerprint::feature_key(
         kind.map(Kind::name).unwrap_or_default(),
         std::slice::from_ref(&geometry),
         "",
     );
-    format!("feat:{}", crate::model::content_hash([key]))
+    ids.make("feat", &[&key])
 }
 
 /// The id of a body: the distinct surfaces it is made of.

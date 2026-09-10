@@ -30,6 +30,15 @@ document is that answering it takes one field (ADR 0011, ADR 0012).
 | `plate_hole_split.stp` | The bore is written as two half-cylinders, which is how most exporters write one. The same hole, so the same id |
 | `plate_one_hole_inches.stp` | The same design stated in inches. Nothing changes at all, and the documents must be equal |
 
+Comparing two documents needs more than one hole, so that a body having
+moved can be told from a hole having moved:
+
+| File | What it is for |
+| --- | --- |
+| `plate_four_holes.stp` | Four mounting holes; the baseline for comparisons |
+| `plate_four_holes_shifted.stp` | The whole plate moved 5mm in X. Nothing keeps its id and one displacement explains all four |
+| `plate_four_holes_one_moved.stp` | One hole moved 5mm. Three holes keep their ids, which is proof the body did not move |
+
 Blends and chamfers need shapes with corners rather than holes:
 
 | File | What it is for |

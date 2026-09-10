@@ -51,10 +51,11 @@ pub fn normal_at(surface: &Surface, point: [f64; 3]) -> Option<[f64; 3]> {
             ..
         } => {
             // A cone's normal leans out of the radial direction by the
-            // half angle at its apex, towards the narrow end.
+            // half angle at its apex, towards the narrow end. The angle
+            // is in degrees, as everything in the neutral B-rep is.
             let r = radial(*origin, *axis)?;
             let a = fingerprint::normalise(*axis);
-            let (c, s) = (semi_angle.cos(), semi_angle.sin());
+            let (c, s) = (semi_angle.to_radians().cos(), semi_angle.to_radians().sin());
             unit([
                 c * r[0] - s * a[0],
                 c * r[1] - s * a[1],
@@ -158,7 +159,7 @@ mod tests {
             origin: O,
             axis: Z,
             radius: 2.0,
-            semi_angle: std::f64::consts::FRAC_PI_4,
+            semi_angle: 45.0,
         };
         let cut = face_normal(&chamfer, true, [2.0, 0.0, 0.0]).unwrap();
         assert!(!parallel(up, cut), "{up:?} {cut:?}");

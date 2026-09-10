@@ -330,3 +330,165 @@ fn a_file_with_no_geometry_says_so_rather_than_reporting_nothing() {
         doc.diagnostics
     );
 }
+
+// Comparing two feature documents (ADR 0012). The plates exist for this:
+// each is the baseline with one deliberate change, so each comparison
+// has one right answer and it is known in advance.
+
+mod comparing {
+    use super::read;
+    use pmix::features::compare::{self, Comparison, Paired};
+
+    fn against(a: &str, b: &str) -> Comparison {
+        compare::compare(&read(a), &read(b))
+    }
+
+    /// The first of the two questions people bring to a pair of files.
+    /// The hole keeps its place and its id changes, so nothing matches;
+    /// what makes the answer readable is that the one field which
+    /// differs is named.
+    #[test]
+    fn boring_a_hole_wider_reads_as_one_changed_diameter() {
+        let c = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/plate_hole_larger.stp",
+        );
+        assert_eq!(c.bodies.len(), 1);
+        let b = &c.bodies[0];
+
+        // The plate around the bore is untouched, and those six faces are
+        // what pairs the bodies at all: no id and no feature survives.
+        assert_eq!(b.paired, Some(Paired::Faces));
+        assert_eq!(b.paired_on, Some(6));
+        assert!(b.matched.is_empty());
+        assert_eq!(b.only_baseline.len(), 1);
+        assert_eq!(b.only_compared.len(), 1);
+
+        assert_eq!(b.candidates.len(), 1);
+        let cand = &b.candidates[0];
+        assert_eq!(cand.distance, 0.0, "the hole did not move");
+        let fields: Vec<&str> = cand.differs.iter().map(|d| d.field.as_str()).collect();
+        assert_eq!(fields, ["diameter"], "{:?}", cand.differs);
+        assert_eq!(
+            (cand.differs[0].from.as_str(), cand.differs[0].to.as_str()),
+            ("8", "10")
+        );
+        // A single changed hole is not a body that moved.
+        assert_eq!(b.placement, None);
+    }
+
+    /// The second question. The hole keeps its size, so only where it
+    /// sits differs, and the distance is stated.
+    #[test]
+    fn moving_a_hole_reads_as_one_changed_position() {
+        let c = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/plate_hole_moved.stp",
+        );
+        let b = &c.bodies[0];
+        assert_eq!(b.candidates.len(), 1);
+        let cand = &b.candidates[0];
+        assert_eq!(cand.distance, 5.0);
+        let fields: Vec<&str> = cand.differs.iter().map(|d| d.field.as_str()).collect();
+        assert_eq!(fields, ["position"], "{:?}", cand.differs);
+        assert_eq!(cand.differs[0].from, "20,15,0");
+        assert_eq!(cand.differs[0].to, "25,15,0");
+    }
+
+    /// A body exported from a different origin has no feature in the same
+    /// place, so nothing matches and every feature differs. Reporting
+    /// four differences there would be reporting one fact four times.
+    #[test]
+    fn a_body_that_moved_is_one_displacement_and_not_four_differences() {
+        let c = against(
+            "synthetic/plate_four_holes.stp",
+            "synthetic/plate_four_holes_shifted.stp",
+        );
+        let b = &c.bodies[0];
+        // Nothing survived, so the bodies pair on being made of the same
+        // shapes — the only thing a displacement leaves alone.
+        assert_eq!(b.paired, Some(Paired::Shapes));
+        assert!(b.matched.is_empty());
+        assert_eq!(b.only_baseline.len(), 4);
+        assert_eq!(b.placement, Some([5.0, 0.0, 0.0]));
+        assert!(!b.same_shapes_moved);
+    }
+
+    /// One hole of the four moved. Three holes keep their ids, and that
+    /// is proof the body itself did not move, so this must not be read as
+    /// a displacement however neatly one number fits the fourth.
+    #[test]
+    fn one_hole_moving_is_not_the_body_moving() {
+        let c = against(
+            "synthetic/plate_four_holes.stp",
+            "synthetic/plate_four_holes_one_moved.stp",
+        );
+        let b = &c.bodies[0];
+        assert_eq!(b.matched.len(), 3);
+        assert_eq!(b.only_baseline.len(), 1);
+        assert_eq!(b.placement, None, "three holes stayed put");
+        assert!(!b.same_shapes_moved);
+        assert_eq!(b.candidates.len(), 1);
+        assert_eq!(b.candidates[0].distance, 5.0);
+    }
+
+    /// The same design in two units is the same design, and a comparison
+    /// of it has to come out empty or the unit normalisation is worth
+    /// nothing.
+    #[test]
+    fn one_design_in_two_units_compares_as_unchanged() {
+        let c = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/plate_one_hole_inches.stp",
+        );
+        assert!(c.summary.identical(), "{:?}", c.summary);
+        assert_eq!(c.bodies[0].paired, Some(Paired::Id));
+        assert_eq!(c.summary.matched, 1);
+    }
+
+    /// A bore written as one face and the same bore written as two is the
+    /// same bore, so it pairs exactly rather than showing up as a change.
+    #[test]
+    fn a_split_bore_compares_as_unchanged() {
+        let c = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/plate_hole_split.stp",
+        );
+        assert!(c.summary.identical(), "{:?}", c.summary);
+    }
+
+    /// Nothing pairs two unrelated parts, and the comparison says so
+    /// rather than reaching for a candidate to fill the silence.
+    #[test]
+    fn unrelated_parts_pair_with_nothing() {
+        let c = against(
+            "synthetic/plate_one_hole.stp",
+            "synthetic/shaft_chamfered.stp",
+        );
+        assert_eq!(c.summary.bodies_paired, 0);
+        assert_eq!(c.summary.bodies_only_baseline, 1);
+        assert_eq!(c.summary.bodies_only_compared, 1);
+        assert!(c.bodies.iter().all(|b| b.candidates.is_empty()));
+        assert!(!c.summary.identical());
+    }
+
+    /// Comparing a document with itself is the control: if this is not
+    /// empty, nothing else the comparison says can be trusted.
+    #[test]
+    fn a_document_compared_with_itself_is_unchanged() {
+        for name in [
+            "synthetic/plate_four_holes.stp",
+            "synthetic/shaft_chamfered.stp",
+            "jt/nist_mtc_assembly.jt",
+            "nist/nist_ctc_05_asme1_ap242-e1.stp",
+        ] {
+            let c = against(name, name);
+            assert!(c.summary.identical(), "{name}: {:?}", c.summary);
+            assert_eq!(c.summary.only_baseline, 0, "{name}");
+            assert!(
+                c.bodies.iter().all(|b| b.paired == Some(Paired::Id)),
+                "{name}: a body did not pair with itself by id"
+            );
+        }
+    }
+}
