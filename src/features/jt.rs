@@ -10,10 +10,11 @@ use crate::jt::stt::{self, Topology};
 
 use super::brep::{CurveKind, Edge, Face, Loop, Solid};
 
-/// JT states lengths in metres, and a feature document in millimetres.
+/// JT states lengths in metres and angles in radians; a feature document
+/// states millimetres and degrees.
 const SCALE: Scale = Scale {
     length: 1000.0,
-    angle: 1.0,
+    angle: 180.0 / std::f64::consts::PI,
 };
 
 fn curve_kind(k: stt::CurveKind) -> CurveKind {

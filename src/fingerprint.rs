@@ -95,8 +95,8 @@ pub enum Surface {
 }
 
 impl Surface {
-    /// The same surface with its lengths in the units `scale` converts
-    /// to. Angles are not lengths and are left alone.
+    /// The same surface with its lengths and its angles in the units
+    /// `scale` converts to: millimetres and degrees.
     ///
     /// Used where a surface has to leave its reader's own units behind,
     /// as it does on the way into a feature document, whose numbers are
@@ -126,7 +126,7 @@ impl Surface {
                 origin: scale.point(*origin),
                 axis: *axis,
                 radius: radius * k,
-                semi_angle: *semi_angle,
+                semi_angle: semi_angle * scale.angle,
             },
             Self::Sphere { origin, radius } => Self::Sphere {
                 origin: scale.point(*origin),
@@ -179,6 +179,11 @@ pub fn surface_key(s: &Surface, scale: Scale) -> String {
         }
         // A cone's radius is stated at its origin, so the axis keeps its
         // sense: flipping it would describe a different cone.
+        // A cone is fixed by its apex and the angle it opens at. Not by
+        // the radius it happens to have where the file placed it: the
+        // same cone placed further along its own axis states a different
+        // radius there, and keying on that made one cone two whenever an
+        // exporter moved the placement. The apex does not move.
         Surface::Cone {
             origin,
             axis,
@@ -186,13 +191,23 @@ pub fn surface_key(s: &Surface, scale: Scale) -> String {
             semi_angle,
         } => {
             let a = normalise(*axis);
-            let c = closest_on_axis(scale.point(*origin), a);
+            let o = scale.point(*origin);
+            let degrees = *semi_angle * scale.angle;
+            let slope = degrees.to_radians().tan();
+            let vertex = if slope.abs() > 1e-9 {
+                // The radius falls to nothing this far back along the axis.
+                let d = radius * scale.length / slope;
+                [o[0] - d * a[0], o[1] - d * a[1], o[2] - d * a[2]]
+            } else {
+                // Opening at no angle at all: there is no apex to find, so
+                // fall back to naming the line it lies on.
+                closest_on_axis(o, a)
+            };
             format!(
-                "cone/{}/{}/{}/{}",
+                "cone/{}/{}/{}",
                 triple(a, dq),
-                triple(c, q),
-                num(*radius * scale.length, q),
-                num(*semi_angle * scale.angle, dq)
+                triple(vertex, q),
+                num(degrees, dq)
             )
         }
         Surface::Sphere { origin, radius } => {

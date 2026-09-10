@@ -50,11 +50,20 @@ enum Command {
     /// that went into no feature is listed too, so that what was not
     /// recognised cannot be mistaken for what is not there.
     ///
+    /// Given two or more models, compares them instead: what pairs
+    /// exactly, what is left over on each side, and a displacement
+    /// stated once where one explains the lot. It will not decide
+    /// whether a feature moved or was removed and another added, because
+    /// geometry cannot tell those apart. Exit status is 0 when nothing
+    /// differs, 1 when something does, 2 on error.
+    ///
     /// This is not PMI: nothing in the file states it. It is a
     /// description of the shape, meant to be compared with another.
     Features {
-        /// Path to the input model (.stp, .step, or .jt).
-        input: PathBuf,
+        /// One model to describe, or two or more to compare. Every input
+        /// after the first is compared against it.
+        #[arg(num_args = 1.., required = true)]
+        inputs: Vec<PathBuf>,
 
         /// Where to write the output. Defaults to standard output.
         #[arg(short, long)]
@@ -174,11 +183,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
         )
         .map(|()| ExitCode::SUCCESS),
         Command::Features {
-            input,
+            inputs,
             output,
             json,
             compact,
-        } => features(input, output, json, compact).map(|()| ExitCode::SUCCESS),
+        } => features(inputs, output, json, compact),
         Command::Diff { inputs, json } => diff(inputs, json),
         Command::Inspect {
             input,
@@ -264,25 +273,217 @@ fn extract(
     Ok(())
 }
 
-fn features(input: PathBuf, output: Option<PathBuf>, json: bool, compact: bool) -> Result<()> {
-    tracing::info!(input = %input.display(), "recognising features");
-    let document = pmix::features::read_path(&input)
-        .with_context(|| format!("failed to read `{}`", input.display()))?;
+fn features(
+    inputs: Vec<PathBuf>,
+    output: Option<PathBuf>,
+    json: bool,
+    compact: bool,
+) -> Result<ExitCode> {
+    let read = |path: &PathBuf| {
+        tracing::info!(input = %path.display(), "recognising features");
+        pmix::features::read_path(path)
+            .with_context(|| format!("failed to read `{}`", path.display()))
+    };
+    let first = read(&inputs[0])?;
 
-    let text = if json && compact {
-        serde_json::to_string(&document)?
-    } else if json {
-        serde_json::to_string_pretty(&document)?
-    } else {
-        render_features(&document)
+    let mut differs = false;
+    let write = |text: String| -> Result<()> {
+        match &output {
+            Some(path) => std::fs::write(path, text)
+                .with_context(|| format!("failed to write `{}`", path.display())),
+            None => {
+                print!("{text}");
+                Ok(())
+            }
+        }
     };
 
-    match output {
-        Some(path) => std::fs::write(&path, text)
-            .with_context(|| format!("failed to write `{}`", path.display()))?,
-        None => print!("{text}"),
+    if inputs.len() == 1 {
+        let text = match (json, compact) {
+            (true, true) => serde_json::to_string(&first)?,
+            (true, false) => serde_json::to_string_pretty(&first)?,
+            (false, _) => render_features(&first),
+        };
+        write(text)?;
+        return Ok(ExitCode::SUCCESS);
     }
-    Ok(())
+
+    let mut rendered = String::new();
+    let mut documents = Vec::new();
+    for path in &inputs[1..] {
+        let other = read(path)?;
+        let comparison = pmix::features::compare::compare(&first, &other);
+        if !comparison.summary.identical() {
+            differs = true;
+        }
+        if json {
+            documents.push(comparison);
+        } else {
+            rendered.push_str(&render_comparison(&comparison));
+        }
+    }
+    let text = match (json, compact) {
+        (true, true) => serde_json::to_string(&documents)?,
+        (true, false) => serde_json::to_string_pretty(&documents)?,
+        (false, _) => rendered,
+    };
+    write(text)?;
+    Ok(if differs {
+        ExitCode::from(1)
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+/// One feature on a line, as a comparison shows it.
+fn feature_line(f: &pmix::features::Feature) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if let Some(d) = f.shape.diameter {
+        parts.push(format!("\u{2300}{d}"));
+    }
+    if let Some(r) = f.shape.radius {
+        parts.push(format!("R{r}"));
+    }
+    if let Some(v) = f.shape.depth {
+        parts.push(format!("{v} deep"));
+    }
+    if let Some(v) = f.shape.length {
+        parts.push(format!("{v} long"));
+    }
+    if let Some(a) = f.shape.angle {
+        parts.push(format!("{a}\u{b0}"));
+    }
+    if let Some(p) = f.shape.position {
+        parts.push(format!("at {},{},{}", p[0], p[1], p[2]));
+    }
+    format!("{:<12} {}", f.kind.name(), parts.join(", "))
+}
+
+/// A comparison as lines meant to be read.
+///
+/// Ordered by how much weight each part carries: what is certain first,
+/// what is measured next, what is merely observed after that, and the
+/// leftovers last.
+fn render_comparison(c: &pmix::features::compare::Comparison) -> String {
+    use pmix::features::compare::Paired;
+    use std::fmt::Write as _;
+    let mut out = String::new();
+    let mut showed_candidate = false;
+    let _ = writeln!(
+        out,
+        "{} \u{2192} {}",
+        c.baseline.file_name, c.compared.file_name
+    );
+    for b in &c.bodies {
+        let how = match b.paired {
+            Some(Paired::Id) => " (identical)".to_owned(),
+            Some(Paired::Faces) => {
+                format!(" (paired on {} shared faces)", b.paired_on.unwrap_or(0))
+            }
+            Some(Paired::Shapes) => " (paired on being the same shapes)".to_owned(),
+            Some(Paired::Name) => " (paired on name alone)".to_owned(),
+            None => " (no counterpart)".to_owned(),
+        };
+        let _ = writeln!(
+            out,
+            "\n{}{}{}",
+            b.baseline.as_deref().unwrap_or("-"),
+            b.compared
+                .as_deref()
+                .filter(|id| Some(*id) != b.baseline.as_deref())
+                .map(|id| format!(" \u{2192} {id}"))
+                .unwrap_or_default(),
+            how
+        );
+        let _ = writeln!(
+            out,
+            "  {} matched, {} only in baseline, {} only in compared",
+            b.matched.len(),
+            b.only_baseline.len(),
+            b.only_compared.len()
+        );
+        if let Some(d) = b.placement {
+            let _ = writeln!(
+                out,
+                "  placement: nothing kept its place and all {} sit {},{},{} from their \
+                 counterparts, so one move explains the body",
+                b.only_baseline.len(),
+                d[0],
+                d[1],
+                d[2]
+            );
+            // The displacement is the whole of the difference, so listing
+            // every feature again would be stating it once per feature,
+            // which is what the placement line exists to replace.
+            continue;
+        } else if b.same_shapes_moved {
+            let _ = writeln!(
+                out,
+                "  the same {} shapes are present but in different places, and no single move \
+                 puts them there",
+                b.only_baseline.len()
+            );
+        }
+        let paired: BTreeMap<&str, &pmix::features::compare::Candidate> = b
+            .candidates
+            .iter()
+            .map(|c| (c.baseline.as_str(), c))
+            .collect();
+        for f in &b.only_baseline {
+            let _ = writeln!(out, "  - {}", feature_line(f));
+            if let Some(cand) = paired.get(f.id.as_str()) {
+                if let Some(other) = b.only_compared.iter().find(|x| x.id == cand.compared) {
+                    let _ = writeln!(out, "  + {}", feature_line(other));
+                }
+                let how: Vec<String> = cand
+                    .differs
+                    .iter()
+                    .map(|ch| format!("{} {} \u{2192} {}", ch.field, ch.from, ch.to))
+                    .collect();
+                let place = if cand.distance == 0.0 {
+                    "same place".to_owned()
+                } else {
+                    format!("{} apart", cand.distance)
+                };
+                // An empty list would read as a difference with nothing
+                // different about it, so say which way it fell instead.
+                let how = if how.is_empty() {
+                    "differs in nothing reported here".to_owned()
+                } else {
+                    how.join(", ")
+                };
+                let _ = writeln!(out, "      candidate: {place}; {how}");
+                showed_candidate = true;
+            }
+        }
+        for f in &b.only_compared {
+            if b.candidates.iter().any(|c| c.compared == f.id) {
+                continue;
+            }
+            let _ = writeln!(out, "  + {}", feature_line(f));
+        }
+    }
+    let s = &c.summary;
+    let _ = writeln!(
+        out,
+        "\nsummary: {} matched, {} only in baseline, {} only in compared; \
+         bodies {} paired, {} only in baseline, {} only in compared",
+        s.matched,
+        s.only_baseline,
+        s.only_compared,
+        s.bodies_paired,
+        s.bodies_only_baseline,
+        s.bodies_only_compared
+    );
+    if !showed_candidate {
+        return out;
+    }
+    let _ = writeln!(
+        out,
+        "\nA candidate is an observation, not a conclusion: one feature moved and one removed \
+         with another added are the same geometry, and nothing here can tell them apart."
+    );
+    out
 }
 
 /// The features of a document as lines meant to be read.

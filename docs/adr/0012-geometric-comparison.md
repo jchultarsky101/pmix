@@ -60,9 +60,22 @@ silence as a change.
 agree the answer is already certain and free. Saying so shrinks the set
 needing judgment to the part that actually needs it.
 
-**Placement is stated once.** A rigid transform fitted from the exact
-matches, reported as a single fact when it explains the rest, instead of
-the same displacement repeated across every feature in the part.
+**Placement is stated once.** A single displacement, reported as one
+fact when it explains the rest, instead of the same displacement repeated
+across every feature in the part.
+
+It cannot be fitted from the exact matches, as this ADR first said: a
+feature that matches exactly has not moved, so a body that *has* moved
+offers no exact match to fit from. Every id changed with it. What a
+displacement cannot alter is a feature's kind, its size, and the
+direction it points, so pairing on those and measuring what is left is
+the only way to see a displacement at all. And the claim needs guarding:
+nothing may have kept its id, or the body plainly did not move, and at
+least two features must agree, or one feature having moved is
+indistinguishable from the body having done so. Where the shapes all
+have counterparts and no one displacement puts them there — a rotation,
+a different origin, several separate edits — that is said and not
+guessed at.
 
 ### What this refuses
 

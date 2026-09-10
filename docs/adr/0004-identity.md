@@ -67,9 +67,10 @@ The anchor for features. Per B-rep entity, in model units, every number
 rounded to the *identity quantum* `q`:
 
 - **Face:** surface kind, then surface parameters that fix it in space:
-  plane: unit normal and signed distance from the origin; cylinder and
-  cone: axis direction, the axis point closest to the origin, radius and
-  semi-angle; sphere: centre and radius; torus: centre, axis, both radii;
+  plane: unit normal and signed distance from the origin; cylinder: axis
+  direction, the axis point closest to the origin, and radius; cone: axis
+  direction, **apex**, and semi-angle; sphere: centre and radius; torus:
+  centre, axis, both radii;
   swept and B-spline surfaces: none. Then the face's vertex set: count and
   bounding box of the `vertex_point`s reachable through its bounds.
 - **Edge:** curve kind and both end points.
@@ -248,6 +249,22 @@ seam keeps its key. The cost is that faces differing only in the sector
 they cover are one key: the six facets of a hex socket on one cone
 fingerprint alike. That is the trade this ADR already made for STEP, and
 the JT reader inherits it rather than diverging.
+
+### A cone is keyed by its apex, not by a radius somewhere along it
+
+Amended 2026-09-09. A cone used to be keyed by the axis point closest to
+the origin together with the radius the file states, as a cylinder is.
+That is wrong for a cone, because the radius is the radius *at the
+placement the file chose*, and a cone placed further along its own axis
+states a different radius there. Two exports of one cone keyed
+differently whenever they placed it differently, which is exactly what
+the NIST re-export pair does: one writes the cone at its apex with
+radius zero and the other 2.66mm away with radius 3.35mm.
+
+The apex is the one point of a cone that no placement moves, so the key
+is the axis direction, the apex, and the semi-angle. Found by comparing
+feature documents (ADR 0012), where four countersinks came out as
+differences with every reported number identical.
 
 ### Everything keyed on geometry is stated in millimetres
 

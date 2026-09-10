@@ -11,6 +11,7 @@
 //! What no rule claims is reported as unclaimed rather than passed over.
 
 pub mod brep;
+pub mod compare;
 pub mod jt;
 pub mod model;
 mod rules;

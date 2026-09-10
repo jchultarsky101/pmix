@@ -172,6 +172,36 @@ that *not recognised* is never mistaken for *not there*. Lengths are
 millimetres and angles degrees whatever the file declared, so one design
 exported in inches and in millimetres gives one document.
 
+### Comparing what a shape is
+
+Give `pmix features` two models and it compares them:
+
+```bash
+pmix features bracket_revB.stp bracket_revC.stp
+```
+
+```text
+bracket_revB.stp → bracket_revC.stp
+
+body:558dfa20046c9426 → body:293954a0dda6bb8a (paired on 6 shared faces)
+  0 matched, 1 only in baseline, 1 only in compared
+  - hole         ⌀8, 10 deep, through, at 20,15,0
+  + hole         ⌀10, 10 deep, through, at 20,15,0
+      candidate: same place; diameter 8 → 10
+```
+
+Evidence, strongest first: what pairs by id is provably the same; a
+**placement** is reported once where one displacement explains every
+difference in a body; a **candidate** is an observation, with its
+distance, offered so a reader need not scan two lists. Exit status is 0
+when nothing differs, 1 when something does.
+
+What it will not do is decide that a hole moved rather than being removed
+with another added elsewhere. One hole moved and one deleted with another
+added are the same geometry, and no amount of it separates them
+([ADR 0012](docs/adr/0012-geometric-comparison.md)), so both are
+described and the reading is left to the reader.
+
 This is not PMI — nothing in the file states it — so it is a separate
 command with its own output, and `pmix extract` is unchanged. What is
 recognised and what the tool refuses to guess at is in
@@ -378,7 +408,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] `pmix features`: holes, counterbores, countersinks, and bosses from the B-rep of either format (ADR 0011)
 - [x] Fillets, rounds, and chamfers, decided by tangency between a face and the two it joins (ADR 0011)
 - [ ] Chamfers on straight edges, which are planes rather than cones and which no local rule settles (ADR 0011)
-- [ ] Comparing two feature documents, once the document has been used enough to say what a comparison of it needs (ADR 0012)
+- [x] Comparing two feature documents: exact pairing, a displacement stated once, and candidates as observations (ADR 0012)
+- [ ] Rotation as well as displacement, which needs orientation evidence rather than positions alone (ADR 0012)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design
