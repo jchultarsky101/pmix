@@ -72,6 +72,34 @@ sample), PyOpenJt's example files (JT 8.0 to 10.3, copied from a repository
 with no licence), and assimp's `conrod.jt` all sit in open-source repos but
 their original provenance is unstated. Use for local experiments only.
 
+## What is still wanted
+
+One thing, and it is worth stating exactly because it is what we have to
+ask a supplier or a colleague for:
+
+> **one design exported to both STEP and JT, with the JT written with
+> precise geometry.**
+
+Not PMI. Since [ADR 0011](adr/0011-feature-recognition.md) a recognised
+feature is keyed on geometry alone, so two *feature* documents of one
+design test the shared identity recipe directly — and geometry-bearing
+files are far commoner than PMI-bearing ones. That removes the constraint
+that blocked this for months.
+
+The catch is that a JT can legitimately carry no geometry at all: an
+exporter set to write tessellation only produces a file with no topology
+segment and nothing to fingerprint. Every JT that has reached this project
+so far has been of that kind. Check any candidate in one command before
+building anything on it:
+
+```bash
+pmix features candidate.jt
+```
+
+It answers "the file holds no topology segment" when there is nothing
+there. See [ADR 0004](adr/0004-identity.md) for what the check would
+settle.
+
 ## Local data
 
 The `data/` directory is ignored by git and **may hold proprietary customer

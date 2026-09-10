@@ -190,6 +190,17 @@ it means rather than the unit it is written in.
 
 ### Changed
 
+- **The features document is documented.** `pmix features --json` and its
+  comparison have had their own schema versions since 0.9.0 and 0.11.0,
+  and the README described only the PMI document. Both shapes are now
+  shown, along with why a bore states a diameter where a blend states a
+  radius.
+
+- **`docs/test-data.md` says what data is still wanted**, in the terms
+  someone could act on: one design in both formats with the JT written
+  with precise geometry, not PMI, and how to check a candidate JT in one
+  command.
+
 - Records in a file stating anything but millimetres and degrees change
   id, which is the point: they now agree with the same design stated in
   millimetres. Files already in millimetres are unaffected.

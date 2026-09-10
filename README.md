@@ -363,6 +363,46 @@ across the formats. Measures are kept in the unit the file declares. Anything
 the reader recognises but cannot map is reported under `unknown` rather
 than dropped. The model lives in [`src/model/`](src/model/).
 
+### The features document
+
+`pmix features --json` writes a different document, with its own
+`schema_version` (ADR 0011). It describes what a shape *is*, so it shares
+no records with the PMI document above:
+
+```jsonc
+{
+  "schema_version": 1,
+  "source": { "file_name": "bracket.stp", "format": "STEP" },
+  "units": { "length": "mm", "angle": "deg", "declared_length": "in" },
+  "bodies": [
+    {
+      "id": "body:558dfa20046c9426",
+      "faces": { "total": 7, "in_features": 1, "unassigned": 6 },
+      "features": [
+        { "id": "feat:3f940ff1…", "kind": "hole", "faces": ["face:…"],
+          "diameter": 8.0, "depth": 10.0, "through": true,
+          "axis": [0.0, 0.0, 1.0], "position": [20.0, 15.0, 0.0],
+          "extent": [0.0, 10.0] }
+      ],
+      "unassigned": [ { "id": "face:…", "surface": "plane" } ]
+    }
+  ],
+  "diagnostics": []
+}
+```
+
+Each feature states the measurement it is called by and omits the others:
+a bore has `diameter` and `depth`, a blend has `radius` and `length`, a
+cone has `angle`. Lengths are millimetres and angles degrees whatever the
+file declared, with what it declared recorded beside them. `unassigned`
+lists every face no rule claimed — it is part of the answer, not a
+diagnostic.
+
+Comparing two models (`pmix features a b --json`) writes a third document
+again, with its own schema version: paired bodies, `matched` feature ids,
+what is `only_baseline` and `only_compared`, any `placement` explaining a
+whole body, and `candidates` with the fields that differ.
+
 ## Library use
 
 The crate is split into a library and a thin CLI. The library is the intended
