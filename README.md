@@ -492,6 +492,9 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Comparing two feature documents: exact pairing, a displacement stated once, and candidates as observations (ADR 0012)
 - [ ] Rotation as well as displacement, which needs orientation evidence rather than positions alone (ADR 0012)
 - [x] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
+- [ ] Product structure and part identity: a bill of materials with revisions, quantities, and the bodies each part is made of (ADR 0014)
+- [ ] Envelope, volume, and material, so a part can be described as something a catalogue would recognise (ADR 0014)
+- [ ] Hole patterns and threads, the interface a substitute part has to match (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

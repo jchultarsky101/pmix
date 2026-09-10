@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **What a part has to state before a model can source a substitute for
+  it** is recorded in [ADR 0014](docs/adr/0014-part-description-for-sourcing.md),
+  proposed: product structure and part identity first, then envelope,
+  volume and material, then the hole patterns and threads a replacement
+  has to match. No behaviour changes yet — the roadmap and the ADR index
+  name the stages.
+
 ## [0.13.0] - 2026-09-10
 
 `pmix mcp` serves the documents to a language model over the Model
