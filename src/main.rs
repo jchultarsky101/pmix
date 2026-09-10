@@ -424,8 +424,8 @@ fn render_comparison(c: &pmix::features::compare::Comparison) -> String {
                 b.only_baseline.len()
             );
         }
-        let paired: BTreeMap<&str, &pmix::features::compare::Candidate> = b
-            .candidates
+        let paired: BTreeMap<&str, &pmix::features::compare::PossiblePairing> = b
+            .possible_pairings
             .iter()
             .map(|c| (c.baseline.as_str(), c))
             .collect();
@@ -440,11 +440,12 @@ fn render_comparison(c: &pmix::features::compare::Comparison) -> String {
                     .iter()
                     .map(|ch| format!("{} {} \u{2192} {}", ch.field, ch.from, ch.to))
                     .collect();
-                let place = if cand.distance == 0.0 {
-                    "same place".to_owned()
-                } else {
-                    format!("{} apart", cand.distance)
-                };
+                // What the pairing rests on comes from the data now, not
+                // from this renderer deciding what to call it.
+                let mut place = cand.paired_on.describe().to_owned();
+                if cand.distance > 0.0 {
+                    place.push_str(&format!(", {} apart", cand.distance));
+                }
                 // An empty list would read as a difference with nothing
                 // different about it, so say which way it fell instead.
                 let how = if how.is_empty() {
@@ -452,12 +453,12 @@ fn render_comparison(c: &pmix::features::compare::Comparison) -> String {
                 } else {
                     how.join(", ")
                 };
-                let _ = writeln!(out, "      candidate: {place}; {how}");
+                let _ = writeln!(out, "      possible pairing: {place}; {how}");
                 showed_candidate = true;
             }
         }
         for f in &b.only_compared {
-            if b.candidates.iter().any(|c| c.compared == f.id) {
+            if b.possible_pairings.iter().any(|c| c.compared == f.id) {
                 continue;
             }
             let _ = writeln!(out, "  + {}", feature_line(f));
@@ -475,14 +476,13 @@ fn render_comparison(c: &pmix::features::compare::Comparison) -> String {
         s.bodies_only_baseline,
         s.bodies_only_compared
     );
-    if !showed_candidate {
-        return out;
+    // The caution travels in the document, so print what it says rather
+    // than a second copy of it that could drift (ADR 0013).
+    if showed_candidate {
+        for note in &c.notes {
+            let _ = writeln!(out, "\n{}", note.note);
+        }
     }
-    let _ = writeln!(
-        out,
-        "\nA candidate is an observation, not a conclusion: one feature moved and one removed \
-         with another added are the same geometry, and nothing here can tell them apart."
-    );
     out
 }
 
