@@ -296,5 +296,9 @@ count that is not there consumes the next packet's header.
   it is about rather than on where it is drawn.
 - The point geometry stays unread. Vertices come from the curves instead,
   which is exact where the quantised points would not be.
-- What remains for cross-format identity is a model published in both
-  formats. Everything either reader can do without one is done.
+- What remains for cross-format identity is one design exported to both
+  formats **with the JT written with precise geometry**; a JT exported as
+  tessellation alone carries no topology segment and nothing to
+  fingerprint. Since ADR 0011 it need not carry PMI either, because a
+  recognised feature is keyed on geometry alone. Everything either reader
+  can do without such a pair is done.

@@ -2,9 +2,12 @@
 //!
 //! A record whose identity is design intent rather than geometry gets the
 //! same id from a STEP file and a JT file, because both readers use the
-//! same recipe. A record anchored on geometry does not yet: the STEP
-//! reader keys those on B-rep fingerprints and the JT reader has no
-//! B-rep to fingerprint.
+//! same recipe. A record anchored on geometry is arranged to as well:
+//! both readers now fingerprint the faces a callout applies to, the JT
+//! side through the smart topology table (ADR 0010). Whether the two
+//! actually produce the same string has never been observed, because
+//! that needs one design in both formats with the JT written with
+//! precise geometry, and no such pair has reached this project.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -138,8 +141,8 @@ fn both_formats_use_one_vocabulary_of_id_prefixes() {
 
 /// Both readers now anchor a dimension on the faces it applies to, and
 /// both build the feature id from the same recipe. What is still missing
-/// is a model published in both formats, so this records what can be
-/// checked without one.
+/// is one design in both formats with the JT written with precise
+/// geometry, so this records what can be checked without such a pair.
 #[test]
 fn both_formats_anchor_a_dimension_on_the_faces_it_applies_to() {
     let (s, j) = (step(), jt());
