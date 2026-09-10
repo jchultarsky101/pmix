@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-09-10
+
+`pmix mcp` serves the documents to a language model over the Model
+Context Protocol, so a model can ask what a file says, what a shape is,
+and how two models differ, and reason about the answers — the consumer
+ADR 0012 had in mind. Four tools, each a call into the library and
+nothing more; the server computes nothing.
+
 ### Added
 
 - **`pmix mcp`**, a Model Context Protocol server over standard input and
@@ -31,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The handshake tells the model, in the protocol's own `instructions`
   field, the one thing it must know before reading a comparison: a
   possible pairing is an observation the tool does not stand behind.
+
+  A tool that fails names the path it failed on, so a model that passed
+  two is told which. [`docs/mcp.md`](docs/mcp.md) is the guide: setup
+  in Claude Code and Claude Desktop, each tool with its arguments and
+  what it returns, how to read a comparison, and driving the server by
+  hand.
 
 ## [0.12.0] - 2026-09-10
 
@@ -619,7 +633,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/jchultarsky101/pmix/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/jchultarsky101/pmix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/jchultarsky101/pmix/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/jchultarsky101/pmix/compare/v0.9.0...v0.10.0
