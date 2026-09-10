@@ -17,33 +17,93 @@ and [ADR 0013](adr/0013-mcp-server.md).
 ## Setting it up
 
 The server speaks over standard input and output, so a client runs it as
-a subprocess. Install `pmix` first (see the [README](../README.md#installation));
-then:
+a subprocess. Install `pmix` first (see the [README](../README.md#installation))
+and note where the binary landed — `which pmix` on macOS or Linux,
+`where pmix` on Windows. You will want the **absolute path** below.
 
-**Claude Code**
+**Claude Code and Claude Desktop keep separate configurations.** Registering
+the server in one does not make it appear in the other.
+
+### Claude Code
 
 ```bash
-claude mcp add pmix -- pmix mcp
+claude mcp add -s user pmix -- /absolute/path/to/pmix mcp
 ```
 
-**Claude Desktop**, or any client with a JSON configuration — add to
-`mcpServers`:
+`-s user` makes it available in every project; leave it off to register
+for the current project only. `claude mcp get pmix` should then report
+*Connected*.
+
+### Claude Desktop
+
+Claude Desktop reads one JSON file. Open it from the application —
+**Settings → Developer → Edit Config** — which creates it if it does not
+exist and shows where it is:
+
+| | |
+| --- | --- |
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| Windows | `%APPDATA%\Claude\claude_desktop_config.json` |
+
+Add `pmix` under `mcpServers`, giving the **absolute path** to the binary:
 
 ```json
 {
   "mcpServers": {
-    "pmix": { "command": "pmix", "args": ["mcp"] }
+    "pmix": {
+      "command": "/Users/you/.cargo/bin/pmix",
+      "args": ["mcp"]
+    }
   }
 }
 ```
 
-If `pmix` is not on the client's `PATH`, give the full path to the binary
-as `command`. Nothing else is needed: no keys, no network, no
-configuration file of its own.
+On Windows, escape the backslashes and name the executable:
 
-The tools **read files and change nothing**. Paths are resolved by the
-server process, so a model can only read what the user running the client
-can read.
+```json
+"command": "C:\\Users\\you\\.cargo\\bin\\pmix.exe"
+```
+
+The absolute path is not optional. A desktop application does not
+inherit the `PATH` your shell has, so `"command": "pmix"` will start
+nothing, and the only sign will be a line in a log file. Nothing else is
+needed: no keys, no network, no environment variables.
+
+If the file already has servers in it — it usually does — add `pmix` as
+another key inside the existing `mcpServers` object rather than adding a
+second `mcpServers`. The file must stay valid JSON, so mind the comma
+between entries.
+
+Then **quit Claude Desktop and start it again**. Closing the window is
+not enough; the configuration is read at launch. After relaunch, the
+tools appear under the tools control in the message box (the icon that
+lists connected servers), with `pmix` and its six tools beneath it. Two
+good first questions:
+
+> What parts are in `/path/to/assembly.stp`?
+
+> Describe the shape in `/path/to/part.stp` — just the summary.
+
+**When it does not work**, the log says why. On macOS it is
+`~/Library/Logs/Claude/mcp-server-pmix.log`, with the launcher's own
+account in `mcp.log` beside it; on Windows, `%APPDATA%\Claude\logs\`.
+Three causes cover nearly every case:
+
+- *spawn pmix ENOENT* — the command was not found. Use the absolute path.
+- *Unexpected token* or *JSON* in the launcher's log — the config file is
+  no longer valid JSON. Check the comma after the previous server.
+- The server starts and a tool returns `isError: true` with *No such
+  file or directory* — the path given to the tool is relative. The server
+  runs with the application's working directory, not your shell's, so
+  give tool calls absolute paths to model files as well.
+
+### Any other client
+
+Any client that speaks the protocol over stdio needs the same two facts:
+the command is the absolute path to `pmix`, and its one argument is
+`mcp`. The tools **read files and change nothing**; paths are resolved
+by the server process, so a model can only read what the user running
+the client can read.
 
 ## How a session goes
 

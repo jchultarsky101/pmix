@@ -320,13 +320,15 @@ server over standard input and output, so a model can ask the questions
 above itself and reason about the answers:
 
 ```bash
-claude mcp add pmix -- pmix mcp
+claude mcp add -s user pmix -- /absolute/path/to/pmix mcp
 ```
 
-or, in a client's configuration file:
+or, in Claude Desktop's configuration file (*Settings → Developer → Edit
+Config*), with the absolute path because a desktop application does not
+inherit your shell's `PATH`:
 
 ```json
-{ "mcpServers": { "pmix": { "command": "pmix", "args": ["mcp"] } } }
+{ "mcpServers": { "pmix": { "command": "/absolute/path/to/pmix", "args": ["mcp"] } } }
 ```
 
 It offers six tools — `list_parts`, `describe_part`, `describe_model`,
