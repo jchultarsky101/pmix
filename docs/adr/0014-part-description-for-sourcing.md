@@ -1,6 +1,6 @@
 # ADR 0014: Describing a part well enough to source a substitute
 
-- **Status:** Proposed, 2026-09-10
+- **Status:** Accepted, 2026-09-10. Built in 0.14.0 and 0.15.0; amended four times with what building it contradicted.
 - **Deciders:** Julian Chultarsky
 - **Depends on:** [ADR 0007](0007-properties.md), [ADR 0011](0011-feature-recognition.md), [ADR 0012](0012-geometric-comparison.md), [ADR 0013](0013-mcp-server.md)
 
