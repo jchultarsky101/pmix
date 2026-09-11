@@ -81,6 +81,31 @@ pub fn document(jt: &Jt<'_>, source: Source) -> ProductDocument {
 
     let (parts, relations) = build(&graph, &scene, scale, &mut diagnostics);
 
+    // A partition node states the box around everything beneath it.
+    // Reading it beats computing one, and it is there even in a file
+    // exported without precise geometry, where there is no body to
+    // measure (ADR 0014).
+    let envelope = graph.nodes.values().find_map(|n| n.bbox).map(|(lo, hi)| {
+        let at = |v: [f32; 3]| {
+            [
+                v[0] as f64 * scale,
+                v[1] as f64 * scale,
+                v[2] as f64 * scale,
+            ]
+        };
+        let (min, max) = (at(lo), at(hi));
+        let mut size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+        size.sort_by(|a, b| b.total_cmp(a));
+        crate::features::Envelope {
+            min,
+            max,
+            size,
+            // Stated by the file rather than derived from what it
+            // locates, so there is nothing left unbounded.
+            approximate: false,
+        }
+    });
+
     if parts.is_empty() {
         diagnostics.push(Diagnostic {
             message: "the scene graph states no part node, so this file names no part".into(),
@@ -90,6 +115,7 @@ pub fn document(jt: &Jt<'_>, source: Source) -> ProductDocument {
     let mut doc = ProductDocument {
         schema_version: SCHEMA_VERSION,
         source,
+        envelope,
         units: Units {
             length: "mm".into(),
             angle: "deg".into(),

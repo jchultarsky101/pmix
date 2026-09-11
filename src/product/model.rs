@@ -45,6 +45,15 @@ pub struct ProductDocument {
     /// canonical ones. The file's own declared units are stated for
     /// provenance, not because anything here is in them.
     pub units: Units,
+    /// How big the whole model is, in millimetres, with every
+    /// occurrence put where it sits. Absent when nothing locates it.
+    ///
+    /// This is the assembly's size, which is not the same as any one
+    /// body's: a body states its own shape in its own coordinates, and
+    /// what turns fourteen of those into one box is the placements
+    /// (ADR 0014).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<crate::features::Envelope>,
     /// Every distinct part the file names, sorted by id.
     pub parts: Vec<Part>,
     /// Every use of one part inside another, sorted by id.

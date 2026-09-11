@@ -149,6 +149,35 @@ document's business — but it means the two documents disagree about
 "how many", and both the README and the tool descriptions have to say so
 or the body count reads as a bug.
 
+### Amended 2026-09-11, on building the JT track
+
+**JT states the assembly's envelope, so it is read rather than
+computed.** A partition node carries the box around everything beneath
+it, and it is there whether or not the file was exported with precise
+geometry — which is the case stage 2 could not otherwise serve, because
+a tessellation-only export has no body to measure. Where a file states
+the box, the document says so: that envelope is not marked approximate,
+because nothing about it was derived.
+
+**The whole-assembly envelope belongs to the product document**, as
+deviation 3 said, and it is composed there from each body's box and the
+placements of its occurrences. Only the translation is applied. Turning
+a rotated box into an axis-aligned one needs its corners rather than its
+extremes, so an assembly holding a rotated occurrence is marked
+approximate rather than stated wrongly.
+
+**Threads are deferred, and the reason is the corpora.** Stage 3 asks
+for thread designations parsed from notes where AP242 states none. There
+is almost nothing to parse: one designation in one of seventeen NIST
+files, reaching this reader as a property value rather than as PMI, and
+none at all in two hundred real exports. What the files do carry is a
+*name* on a shape aspect — "Thread Cylinder", "Radial Hole and Thread
+Callout" — which says a thread exists and not which thread it is. A
+parser built on one example would encode its author's assumptions with
+nothing to check them against, which is the objection this record
+already raises against stage 1's identity extras. Both wait for a file
+that exercises them.
+
 ### Stage 2 — size, mass, and material
 
 Per body and per part, and once for the assembly:

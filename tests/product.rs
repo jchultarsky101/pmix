@@ -396,3 +396,56 @@ fn an_unattached_body_says_why() {
         }
     }
 }
+
+// --- how big the whole model is (ADR 0014) ---
+
+/// A body states its shape in its own coordinates; only the placements
+/// say where those coordinates sit. The pins stand 10 tall on a 6-thick
+/// plate, so the assembly is 16 tall even though no body is.
+#[test]
+fn the_assembly_is_as_big_as_where_its_parts_are_put() {
+    let doc = read("synthetic/assembly_repeated_part.stp");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size, [60.0, 24.0, 16.0]);
+    assert!(!envelope.approximate);
+}
+
+#[test]
+fn a_second_part_placed_above_the_first_raises_the_assembly() {
+    let doc = read("synthetic/assembly_two_parts.stp");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    // A 40 x 24 x 6 plate with an 18-tall block standing on it.
+    assert_eq!(envelope.size, [40.0, 24.0, 24.0]);
+}
+
+/// JT states the box itself, on the partition node. Reading it beats
+/// computing one, and it is there even in a file exported without
+/// precise geometry, where there is no body to measure.
+#[test]
+fn a_jt_file_states_its_own_envelope() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    assert!(
+        !envelope.approximate,
+        "the file states it, so nothing is derived"
+    );
+    // 347.6 x 152.4 x 101.6 mm, which is 13.7 x 6 x 4 inches.
+    assert!(
+        (envelope.size[1] - 152.4).abs() < 0.01,
+        "{:?}",
+        envelope.size
+    );
+    assert!(
+        (envelope.size[2] - 101.6).abs() < 0.01,
+        "{:?}",
+        envelope.size
+    );
+}
+
+/// A part whose own box is a lower bound makes the assembly's one too.
+#[test]
+fn an_approximate_body_makes_the_assembly_approximate() {
+    let doc = read("nist/nist_ctc_01_asme1_ap242-e1.stp");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    assert!(envelope.approximate);
+}

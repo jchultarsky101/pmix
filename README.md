@@ -574,6 +574,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] `list_parts` and `describe_part` over the Model Context Protocol, and the caution that travels with them (ADR 0014)
 - [x] Hole patterns: bolt circles, rows and grids, with both readings stated where both hold (ADR 0014)
 - [x] JT product structure from the scene graph's node hierarchy: parts, occurrences and placements (ADR 0014)
+- [x] How big the whole assembly is, composed from the placements or read where a file states it (ADR 0014)
 - [ ] Threads, which neither corpus states: one designation in one NIST file, none in any real export (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 

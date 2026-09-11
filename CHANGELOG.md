@@ -101,6 +101,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   between silently reporting a bounding-box volume as the part's volume
   and saying that the file states two volumes.
 
+- **The whole model states how big it is.** A body's box is in its own
+  coordinates; what turns a hundred of those into one assembly is the
+  placements, so the size of the thing itself belongs to the product
+  document. A JT file states the box on its partition node and it is
+  read rather than computed — which is the case that works even when the
+  file was exported without precise geometry and there is no body to
+  measure. For STEP it is composed from the bodies and their
+  occurrences; where an occurrence is rotated the box is marked
+  approximate rather than stated wrongly.
+
 - **`pmix product` reads JT files too** (ADR 0014). JT states its
   structure in the logical scene graph's node hierarchy, which this
   reader now parses: a part node is a part, an instance node is an
