@@ -102,6 +102,10 @@ pub struct BodySummary {
     /// Faces no rule claimed. Stated so that *not recognised* is not
     /// read as *not there*.
     pub unassigned_faces: usize,
+    /// Arrangements of those features: the bolt circles, rows and grids
+    /// a substitute part would have to match.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub patterns: Vec<crate::features::Pattern>,
 }
 
 /// A value lifted out of a property, with where it came from.
@@ -165,6 +169,7 @@ pub fn summarise(
                         envelope: body.envelope.clone(),
                         features,
                         unassigned_faces: body.faces.unassigned,
+                        patterns: body.patterns.clone(),
                     })
                 })
                 .collect();

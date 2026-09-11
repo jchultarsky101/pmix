@@ -55,6 +55,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   patch of each face, which this B-rep does not hold. ADR 0014 is amended
   accordingly.
 
+- **Patterns in the features a body holds**: bolt circles with their
+  pitch circle diameter and clocking, rows with their pitch, and filled
+  rectangular grids with their counts and both pitches. Four holes are
+  four facts; that they sit on a 24 by 14 rectangle is the one that
+  answers whether a substitute would bolt where the old one bolted, and
+  nothing else in either document answered it.
+
+  Nothing in a file says "bolt circle", so each pattern states the rule
+  that produced it. Members must be alike and parallel — same kind, same
+  size, same axis — and a pattern needs three members, because two of
+  anything lie on a line at an even pitch.
+
+  Where two readings both hold, both are stated and each names the
+  other, as ADR 0011 settled for features: four holes at the corners of
+  a square are a grid and a bolt circle. Four on a *rectangle* are only
+  a grid, though they are concyclic, which is what the even-angular-pitch
+  rule is for.
+
 - **`list_parts` and `describe_part`**, two new Model Context Protocol
   tools (ADR 0013, ADR 0014). `list_parts` gives a model the bill of
   materials — which parts, what revision, how many of each — and

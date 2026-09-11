@@ -57,6 +57,20 @@ moved can be told from a hole having moved:
 | `plate_four_holes_shifted.stp` | The whole plate moved 5mm in X. Nothing keeps its id and one displacement explains all four |
 | `plate_four_holes_one_moved.stp` | One hole moved 5mm. Three holes keep their ids, which is proof the body did not move |
 
+Patterns need holes that repeat, and each file is one arrangement a
+substitute part would have to match (ADR 0014):
+
+| File | What it is for |
+| --- | --- |
+| `flange_bolt_circle.stp` | Six Ø9 holes on a Ø60 pitch circle. The arrangement a flange is bought by |
+| `bar_hole_row.stp` | Five Ø5 holes in a line at 15mm pitch |
+| `plate_square_bolt_pattern.stp` | Four holes on a 50mm square, which is a grid *and* a bolt circle. Both readings hold, so both are stated and each names the other |
+
+`plate_four_holes.stp` above doubles as the rectangular case: a 2 × 2
+grid at 14 × 24. Its four holes are concyclic, as the corners of any
+rectangle are, and it must *not* read as a bolt circle — which is what
+the even-angular-pitch rule is for.
+
 Blends and chamfers need shapes with corners rather than holes:
 
 | File | What it is for |

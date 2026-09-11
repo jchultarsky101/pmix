@@ -69,7 +69,9 @@ fn tools() -> Value {
         {
             "name": "describe_model",
             "description": "What a shape is: the features recognised in a STEP or JT file, with \
-                their sizes and positions in millimetres, and every face no rule claimed. Call with \
+                their sizes and positions in millimetres, the patterns they form — bolt circles \
+                with their pitch circle diameter and clocking, rows and grids with their pitches — \
+                and every face no rule claimed. Call with \
                 `summary: true` first — it returns each body's id, name, face counts and a count of \
                 features by kind, without listing them — then narrow with `body` and `kind`. Counts on \
                 a body always describe the whole body, whatever a narrower view lists. A JT exported \

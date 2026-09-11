@@ -15,14 +15,15 @@ pub mod compare;
 pub mod envelope;
 pub mod jt;
 pub mod model;
+pub mod patterns;
 mod rules;
 pub mod step;
 pub mod surface;
 pub mod view;
 
 pub use model::{
-    Body, Diagnostic, Envelope, FaceCounts, Feature, FeatureDocument, Kind, SCHEMA_VERSION, Shape,
-    UnassignedFace, Units,
+    Body, Diagnostic, Envelope, FaceCounts, Feature, FeatureDocument, Kind, Pattern, PatternKind,
+    SCHEMA_VERSION, Shape, UnassignedFace, Units,
 };
 
 use crate::model::ContentId;

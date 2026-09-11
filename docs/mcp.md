@@ -130,8 +130,9 @@ Everything known about one part, gathered from all three documents.
 | `path` | required | A `.stp`, `.step`, or `.jt` file |
 | `part` | optional | Only this part, by its id or its number from `list_parts` |
 
-Identity and revision from the product document; each body's envelope
-and recognised features from the features document; and `attributes`
+Identity and revision from the product document; each body's envelope,
+recognised features and the patterns they form — bolt circles, rows,
+grids — from the features document; and `attributes`
 promoted out of the properties in the PMI document — material, mass,
 volume, density, finish, supplier, and the rest — each naming the key it
 came from and the unit that key declared.
@@ -348,6 +349,8 @@ Everything the command line will not, since it is the same library:
   meant to be there. It is listed under `unassigned`.
 - **Recognise pockets and slots**, which need volume decomposition
   ([ADR 0011](adr/0011-feature-recognition.md)).
+- **Choose between two readings of one pattern.** Four holes on a square
+  are a grid and a bolt circle; it states both and says they overlap.
 - **Detect a rotation** as a single fact; it reports the shapes as
   present and moved, and stops.
 - **Read a JT that carries no precise geometry.** It says so.

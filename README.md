@@ -204,6 +204,20 @@ A bore states the diameter it is called by and a blend states its
 radius; a fillet fills an inside corner and a round breaks an outside
 one, which is the same distinction as a bore against a shaft.
 
+Where alike features repeat, the arrangement is recognised too:
+
+```text
+body:7078688a7aeef636: 12 faces, 6 in features, 6 unassigned
+  bolt_circle  6× ⌀9 on ⌀60 PCD from 30°   pat:d0f0f93543534cca
+```
+
+A bolt circle states its pitch circle diameter and its clocking, a row
+its pitch, a grid its counts and both pitches — the numbers a substitute
+part has to match. Nothing in a file says "bolt circle", so each pattern
+states the rule that produced it, and where two readings both hold —
+four holes on a square are a grid *and* a bolt circle — both are stated
+and each names the other.
+
 Every face is accounted for: the ones no rule claimed are listed, so
 that *not recognised* is never mistaken for *not there*. Lengths are
 millimetres and angles degrees whatever the file declared, so one design
@@ -553,7 +567,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] An envelope per body: how big it is, and whether that is a measurement or a lower bound (ADR 0014)
 - [x] Material, mass and volume promoted out of the properties that carry them, with disagreement stated rather than resolved (ADR 0014)
 - [x] `list_parts` and `describe_part` over the Model Context Protocol, and the caution that travels with them (ADR 0014)
-- [ ] Hole patterns and threads, the interface a substitute part has to match (ADR 0014)
+- [x] Hole patterns: bolt circles, rows and grids, with both readings stated where both hold (ADR 0014)
+- [ ] Threads, read from AP242 where stated and parsed from notes where not (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

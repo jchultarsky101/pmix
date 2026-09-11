@@ -549,6 +549,43 @@ fn feature_line(f: &pmix::features::Feature) -> String {
 /// Ordered by how much weight each part carries: what is certain first,
 /// what is measured next, what is merely observed after that, and the
 /// leftovers last.
+/// One pattern on a line: what it is, and the numbers a catalogue would
+/// state it by.
+fn pattern_line(p: &pmix::features::Pattern) -> String {
+    use pmix::features::PatternKind;
+    let mut parts: Vec<String> = vec![format!("{}\u{d7}", p.count)];
+    if let Some(d) = p.diameter {
+        parts.push(format!("\u{2300}{d}"));
+    }
+    match p.kind {
+        PatternKind::BoltCircle => {
+            if let Some(pcd) = p.pitch_circle_diameter {
+                parts.push(format!("on \u{2300}{pcd} PCD"));
+            }
+            if let Some(c) = p.clocking {
+                parts.push(format!("from {c}\u{b0}"));
+            }
+        }
+        PatternKind::Row => {
+            if let Some(pitch) = p.pitch.first() {
+                parts.push(format!("at {pitch} pitch"));
+            }
+        }
+        PatternKind::Grid => {
+            if let [across, down] = p.counts[..] {
+                parts.push(format!("as {across}\u{d7}{down}"));
+            }
+            if let [a, b] = p.pitch[..] {
+                parts.push(format!("at {a}\u{d7}{b}"));
+            }
+        }
+    }
+    if !p.overlaps.is_empty() {
+        parts.push(format!("(also read {} other way(s))", p.overlaps.len()));
+    }
+    format!("{:<12} {}", p.kind.name(), parts.join(" "))
+}
+
 fn render_comparison(c: &pmix::features::compare::Comparison) -> String {
     use pmix::features::compare::Paired;
     use std::fmt::Write as _;
@@ -704,6 +741,9 @@ fn render_features(document: &pmix::features::FeatureDocument) -> String {
             body.faces.in_features,
             body.faces.unassigned
         );
+        for p in &body.patterns {
+            let _ = writeln!(out, "  {}  {}", pattern_line(p), p.id);
+        }
         for f in &body.features {
             let mut parts: Vec<String> = Vec::new();
             if let Some(d) = f.shape.diameter {
