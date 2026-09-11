@@ -23,11 +23,11 @@ Read [docs/adr/](docs/adr/) before changing architecture.
 - **JSON output must be deterministic** (sorted, independent of source
   entity numbering).
 - **`main` is PR-only** with all CI checks required. Squash-merge. Run
-  `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
-  and `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
-  --document-private-items --all-features` before pushing. CI runs all
-  four; the doc build is the one that catches a rustdoc link to a
-  private item, which the other three pass straight over.
+  all four checks CI runs before pushing — they are listed with their
+  exact flags in [CONTRIBUTING.md](CONTRIBUTING.md). The doc build is
+  the one that gets skipped, and the only one that catches a rustdoc
+  link to a private item; it needs `RUSTDOCFLAGS="-D warnings"` or it
+  passes where CI fails.
 - **A release is not finished until it is announced.** Pushing the tag
   publishes the binaries; it tells nobody. Every release gets a short
   note in the project's Slack channel — version, the release link, a few

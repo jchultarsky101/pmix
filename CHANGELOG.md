@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The pre-pull-request checks in `CONTRIBUTING.md` now match what CI
+  actually runs.** The doc build was listed but without
+  `RUSTDOCFLAGS="-D warnings"`, so running it as documented *passed* on
+  a rustdoc link to a private item while CI failed on it — which is
+  exactly how a pull request here went red with the other three green.
+  The clippy and test lines were missing `RUSTFLAGS` for the same
+  reason. The release checklist names the four explicitly.
+
 - **Announcing a release is part of cutting one**, recorded in
   `CONTRIBUTING.md` as a numbered checklist and in `CLAUDE.md` as a rule
   of its own. Pushing the tag publishes the binaries and tells nobody,
