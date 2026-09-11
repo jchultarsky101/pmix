@@ -309,9 +309,14 @@ fn render_product(document: &pmix::product::ProductDocument) -> String {
         if let (Some(number), Some(name)) = (&part.number, &part.name) {
             label = format!("{number} ({name})");
         }
-        match &part.revision {
+        let label = match &part.revision {
             Some(rev) => format!("{label} rev {rev}"),
             None => label,
+        };
+        match part.bodies.len() {
+            0 => label,
+            1 => format!("{label} — {}", part.bodies[0]),
+            n => format!("{label} — {n} bodies"),
         }
     };
 
@@ -356,6 +361,22 @@ fn render_product(document: &pmix::product::ProductDocument) -> String {
     for root in &document.roots {
         let _ = writeln!(out, "\n{}", named(root));
         walk(&mut out, document, &named, root, 0, &mut Vec::new());
+    }
+
+    if !document.unattached.is_empty() {
+        let _ = writeln!(
+            out,
+            "\n{} bod{} under no part:",
+            document.unattached.len(),
+            if document.unattached.len() == 1 {
+                "y"
+            } else {
+                "ies"
+            }
+        );
+        for u in &document.unattached {
+            let _ = writeln!(out, "  {}: {}", u.body, u.reason);
+        }
     }
 
     let unused: Vec<&pmix::product::Part> = document

@@ -26,6 +26,24 @@ pub use model::{
 
 use crate::model::ContentId;
 
+/// Everything recognised in `solids`, in the order the solids were
+/// given.
+///
+/// [`recognise`] sorts by id, which is what a document wants and what
+/// anything needing to know *which* solid a body came from cannot use.
+/// The product reader needs exactly that, to put each body under the
+/// part whose shape representation held its shell (ADR 0014). Both go
+/// through here, so a body has one id whichever asks for it — including
+/// the ordinal a collision gets, which depends on what else was hashed
+/// first and so on the order the solids are walked in.
+pub fn recognise_in_order(solids: &[brep::Solid]) -> Vec<Body> {
+    let mut ids = ContentId::new();
+    solids
+        .iter()
+        .map(|s| rules::recognise(s, &mut ids))
+        .collect()
+}
+
 /// Everything recognised in `solids`, as one document.
 pub fn recognise(
     source: crate::model::Source,
@@ -33,11 +51,7 @@ pub fn recognise(
     solids: &[brep::Solid],
     diagnostics: Vec<Diagnostic>,
 ) -> FeatureDocument {
-    let mut ids = ContentId::new();
-    let mut bodies: Vec<Body> = solids
-        .iter()
-        .map(|s| rules::recognise(s, &mut ids))
-        .collect();
+    let mut bodies = recognise_in_order(solids);
     bodies.sort_by(|a, b| a.id.cmp(&b.id));
     FeatureDocument {
         schema_version: SCHEMA_VERSION,

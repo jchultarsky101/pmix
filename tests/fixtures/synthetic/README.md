@@ -22,7 +22,8 @@ The committed public corpus holds no assemblies at all: not one of the 17
 NIST files states a `NEXT_ASSEMBLY_USAGE_OCCURRENCE`, so nothing there
 exercises the product reader (ADR 0014). These two files carry that
 coverage on their own. Each states a full advanced B-rep for every
-component, so the same files serve the body-to-part join.
+component, so the same files serve the body-to-part join: two parts with
+one body each, and one part whose single body carries three occurrences.
 
 | File | What it is for |
 | --- | --- |

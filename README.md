@@ -146,9 +146,12 @@ documents, for the reason those two are separate from each other: they
 answer different questions. See
 [ADR 0014](docs/adr/0014-part-description-for-sourcing.md).
 
-Note that `pmix features` reports one body per shell, so a part used four
-times is one body and four occurrences — the shape is stated once and the
-product document says how often it is used.
+Each part names the bodies it is made of, by the same ids `pmix features`
+gives them, so the two documents join. One body however many times the
+part is used: a body is a shape, and how often that shape appears is what
+the occurrence count says. The two numbers differ on purpose, and a body
+that reaches no part at all is listed as unattached with the reason
+rather than left out.
 
 ### Comparing models
 
@@ -527,7 +530,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [ ] Rotation as well as displacement, which needs orientation evidence rather than positions alone (ADR 0012)
 - [x] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
 - [x] `pmix product`: parts, revisions, occurrences and their placements, from a STEP file's assembly structure (ADR 0014)
-- [ ] Joining each body to the part it realises, so a shape has a part number beside it (ADR 0014)
+- [x] Joining each body to the part it realises, so a shape has a part number beside it (ADR 0014)
 - [ ] Owning organisation, approval, and security classification, which no file in the public corpus states (ADR 0014)
 - [ ] Envelope, volume, and material, so a part can be described as something a catalogue would recognise (ADR 0014)
 - [ ] Hole patterns and threads, the interface a substitute part has to match (ADR 0014)

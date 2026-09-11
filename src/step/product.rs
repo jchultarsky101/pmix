@@ -35,7 +35,9 @@ use std::collections::BTreeMap;
 use crate::fingerprint::Scale;
 use crate::identity::triple;
 use crate::model::{ContentId, Direction, Placement};
-use crate::product::model::{Diagnostic, Part, ProductDocument, Relation, SCHEMA_VERSION};
+use crate::product::model::{
+    Diagnostic, Part, ProductDocument, Relation, SCHEMA_VERSION, Unattached,
+};
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
 /// The entities that stand for "the whole part": a shape names its
@@ -90,12 +92,12 @@ impl Referrers {
         Self(map)
     }
 
-    /// The instances referencing `id` that have `keyword` as a type.
-    fn to<'a>(
+    /// The instances referencing `id` that are one of `family`.
+    fn to_any<'a>(
         &'a self,
         ex: &'a Exchange,
         id: Id,
-        keyword: &'a str,
+        family: &'a [&'a str],
     ) -> impl Iterator<Item = &'a Instance> {
         self.0
             .get(&id)
@@ -103,7 +105,7 @@ impl Referrers {
             .unwrap_or_default()
             .iter()
             .filter_map(move |i| ex.get(*i))
-            .filter(move |i| i.has_type(keyword))
+            .filter(move |i| is_a(i, family))
     }
 }
 
@@ -140,6 +142,30 @@ fn family_attr<'a>(inst: &'a Instance, family: &[&str], n: usize) -> Option<&'a 
     family.iter().find_map(|k| inst.attr(k, n))
 }
 
+/// What a file may wrap a shell in on the way to a representation.
+const SOLID_MODEL: &[&str] = &[
+    "MANIFOLD_SOLID_BREP",
+    "BREP_WITH_VOIDS",
+    "SHELL_BASED_SURFACE_MODEL",
+    "FACETED_BREP",
+];
+
+/// What holds a solid model and is itself defined by a product.
+const REPRESENTATION: &[&str] = &[
+    "ADVANCED_BREP_SHAPE_REPRESENTATION",
+    "MANIFOLD_SURFACE_SHAPE_REPRESENTATION",
+    "FACETED_BREP_SHAPE_REPRESENTATION",
+    "SHAPE_REPRESENTATION",
+    "REPRESENTATION",
+];
+
+/// What ties a representation to the product definition it is the shape
+/// of.
+const SHAPE_DEFINITION: &[&str] = &[
+    "SHAPE_DEFINITION_REPRESENTATION",
+    "PROPERTY_DEFINITION_REPRESENTATION",
+];
+
 /// A non-empty, trimmed string parameter.
 fn text(p: Option<&Parameter>) -> Option<String> {
     let s = p?.as_str()?.trim();
@@ -147,7 +173,15 @@ fn text(p: Option<&Parameter>) -> Option<String> {
 }
 
 /// Read the product structure of `ex`.
-pub fn read(ex: &Exchange, scale: Scale) -> (Vec<Part>, Vec<Relation>, Vec<Diagnostic>) {
+///
+/// `bodies` pairs each shell the file states with the id the features
+/// document gives the body read from it, so that each body can be put
+/// under the part whose shape holds it.
+pub fn read(
+    ex: &Exchange,
+    scale: Scale,
+    bodies: &[(Id, String)],
+) -> (Vec<Part>, Vec<Relation>, Vec<Unattached>, Vec<Diagnostic>) {
     let referrers = Referrers::of(ex);
     let mut ids = ContentId::new();
     let mut diagnostics = Vec::new();
@@ -228,7 +262,39 @@ pub fn read(ex: &Exchange, scale: Scale) -> (Vec<Part>, Vec<Relation>, Vec<Diagn
     }
     tracing::debug!(count = relations.len(), "assembly usages");
 
-    (parts, relations, diagnostics)
+    // Each body goes under the part whose shape representation holds the
+    // shell it was read from. A body that reaches no product definition
+    // is listed rather than dropped: a file can state geometry it never
+    // defines a product for, and silence would make that look like a
+    // part with no shape.
+    let mut unattached = Vec::new();
+    let by_part: BTreeMap<Id, Vec<String>> = {
+        let mut map: BTreeMap<Id, Vec<String>> = BTreeMap::new();
+        for (shell, body) in bodies {
+            match definition_holding(ex, &referrers, *shell) {
+                Some(pd) => map.entry(pd).or_default().push(body.clone()),
+                None => unattached.push(Unattached {
+                    body: body.clone(),
+                    reason: format!(
+                        "shell #{shell} reaches no product definition, so the file states this \
+                         shape without saying which part it is"
+                    ),
+                }),
+            }
+        }
+        map
+    };
+    for (pd, body_ids) in by_part {
+        let Some(part_id) = part_of.get(&pd) else {
+            continue;
+        };
+        if let Some(part) = parts.iter_mut().find(|p| &p.id == part_id) {
+            part.bodies.extend(body_ids);
+        }
+    }
+    tracing::debug!(count = unattached.len(), "bodies under no part");
+
+    (parts, relations, unattached, diagnostics)
 }
 
 /// The part one product definition describes.
@@ -279,6 +345,7 @@ fn part_from(ex: &Exchange, pd: &Instance, ids: &mut ContentId) -> Part {
         description,
         revision,
         occurrences: 0,
+        bodies: Vec::new(),
         source_refs,
     }
 }
@@ -299,8 +366,8 @@ fn placement_of(
     diagnostics: &mut Vec<Diagnostic>,
 ) -> (Option<Placement>, Vec<String>) {
     let mut refs = Vec::new();
-    for shape in referrers.to(ex, nauo, "PRODUCT_DEFINITION_SHAPE") {
-        for cdsr in referrers.to(ex, shape.id, "CONTEXT_DEPENDENT_SHAPE_REPRESENTATION") {
+    for shape in referrers.to_any(ex, nauo, &["PRODUCT_DEFINITION_SHAPE"]) {
+        for cdsr in referrers.to_any(ex, shape.id, &["CONTEXT_DEPENDENT_SHAPE_REPRESENTATION"]) {
             let Some(rel) = cdsr
                 .attr("CONTEXT_DEPENDENT_SHAPE_REPRESENTATION", 0)
                 .and_then(Parameter::as_ref)
@@ -416,11 +483,102 @@ fn placement_key(p: Option<&Placement>) -> String {
     )
 }
 
+/// The product definition whose shape holds `shell`, if the file says.
+///
+/// Up rather than down: a shell does not name the solid that holds it,
+/// the solid does not name the representation, and the representation
+/// does not name the product definition it is the shape of. Every arrow
+/// in this walk runs backwards, which is what the reverse index is for.
+///
+/// A file may also state the geometry in one representation and define
+/// the product against another, tying the two with a shape
+/// representation relationship. One hop across that is followed, which
+/// covers what real writers do without turning the walk into a search.
+fn definition_holding(ex: &Exchange, referrers: &Referrers, shell: Id) -> Option<Id> {
+    // The representations that hold this shell, directly or through the
+    // solid model that wraps it.
+    let mut reps: Vec<Id> = Vec::new();
+    for solid in referrers.to_any(ex, shell, SOLID_MODEL) {
+        reps.extend(referrers.to_any(ex, solid.id, REPRESENTATION).map(|r| r.id));
+    }
+    reps.extend(referrers.to_any(ex, shell, REPRESENTATION).map(|r| r.id));
+    reps.sort_unstable();
+    reps.dedup();
+
+    for hop in 0..2 {
+        for rep in &reps {
+            if let Some(pd) = definition_of(ex, referrers, *rep) {
+                return Some(pd);
+            }
+        }
+        if hop == 0 {
+            // Follow shape representation relationships to whatever else
+            // stands for the same shape, then try again.
+            let mut next = Vec::new();
+            for rep in &reps {
+                for rel in referrers.to_any(ex, *rep, &["SHAPE_REPRESENTATION_RELATIONSHIP"]) {
+                    for other in rel.references() {
+                        if other != *rep && ex.get(other).is_some_and(|i| is_a(i, REPRESENTATION)) {
+                            next.push(other);
+                        }
+                    }
+                }
+            }
+            next.sort_unstable();
+            next.dedup();
+            if next.is_empty() {
+                return None;
+            }
+            reps = next;
+        }
+    }
+    None
+}
+
+/// The product definition a representation is the shape of.
+fn definition_of(ex: &Exchange, referrers: &Referrers, rep: Id) -> Option<Id> {
+    for sdr in referrers.to_any(ex, rep, SHAPE_DEFINITION) {
+        let Some(shape) = family_attr(sdr, SHAPE_DEFINITION, 0)
+            .and_then(Parameter::as_ref)
+            .and_then(|id| ex.get(id))
+        else {
+            continue;
+        };
+        // A product definition shape stands for a part; the same entity
+        // pointed at an assembly usage stands for one occurrence of one,
+        // and a body belongs to the part rather than to the occurrence.
+        let Some(defined) = shape
+            .attr("PRODUCT_DEFINITION_SHAPE", 2)
+            .and_then(Parameter::as_ref)
+        else {
+            continue;
+        };
+        if ex.get(defined).is_some_and(|i| is_a(i, DEFINITION)) {
+            return Some(defined);
+        }
+    }
+    None
+}
+
 /// Build the whole document for a parsed exchange.
+///
+/// The bodies are recognised here rather than taken from a features
+/// document a caller might pass in, so that the two cannot be of
+/// different files, and through the same entry point the features
+/// document uses, so that a body has one id whichever document names it.
 pub fn document(ex: &Exchange, source: crate::model::Source) -> ProductDocument {
     let declared = super::pmi::units_of(ex);
     let scale = Scale::of(declared.length.as_deref(), declared.angle.as_deref());
-    let (parts, relations, mut diagnostics) = read(ex, scale);
+
+    let shelled = crate::features::step::solids_with_shells(ex, scale);
+    let solids: Vec<_> = shelled.iter().map(|(s, _)| s.clone()).collect();
+    let bodies: Vec<(Id, String)> = crate::features::recognise_in_order(&solids)
+        .into_iter()
+        .zip(shelled.iter())
+        .map(|(body, (_, shell))| (*shell, body.id))
+        .collect();
+
+    let (parts, relations, unattached, mut diagnostics) = read(ex, scale, &bodies);
     if parts.is_empty() {
         diagnostics.push(Diagnostic {
             message: "the file states no product definition, so it names no part".into(),
@@ -437,6 +595,7 @@ pub fn document(ex: &Exchange, source: crate::model::Source) -> ProductDocument 
         },
         parts,
         relations,
+        unattached,
         roots: Vec::new(),
         diagnostics,
     };

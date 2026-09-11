@@ -14,7 +14,7 @@
 
 pub mod model;
 
-pub use model::{Diagnostic, Part, ProductDocument, Relation, SCHEMA_VERSION};
+pub use model::{Diagnostic, Part, ProductDocument, Relation, SCHEMA_VERSION, Unattached};
 
 use std::path::Path;
 
@@ -76,6 +76,7 @@ pub fn from_jt(bytes: &[u8], file_name: &str) -> crate::Result<ProductDocument> 
         },
         parts: Vec::new(),
         relations: Vec::new(),
+        unattached: Vec::new(),
         roots: Vec::new(),
         diagnostics: vec![Diagnostic {
             message: "the JT scene graph's node hierarchy is not read yet, so this file's \

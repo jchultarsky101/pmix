@@ -8,6 +8,7 @@
 
 use std::path::{Path, PathBuf};
 
+use pmix::features;
 use pmix::product::{self, Part, ProductDocument};
 
 fn fixture(name: &str) -> PathBuf {
@@ -243,4 +244,95 @@ fn a_jt_file_says_its_structure_is_not_read_yet() {
         "the reader must say what it did not do: {:?}",
         doc.diagnostics
     );
+}
+
+// --- the body-to-part join (ADR 0014, stage 1) ---
+
+#[test]
+fn every_body_goes_under_the_part_that_has_it() {
+    let doc = read("synthetic/assembly_two_parts.stp");
+    assert!(doc.unattached.is_empty(), "{:?}", doc.unattached);
+    assert_eq!(part(&doc, "SYN-PLATE").bodies.len(), 1);
+    assert_eq!(part(&doc, "SYN-BLOCK").bodies.len(), 1);
+    // The assembly is parts, not geometry.
+    assert!(part(&doc, "SYN-ASM-2").bodies.is_empty());
+}
+
+/// The two documents have to agree, or the join names nothing. They go
+/// through one entry point so that they cannot drift apart.
+#[test]
+fn a_body_has_the_same_id_in_both_documents() {
+    let name = "synthetic/assembly_repeated_part.stp";
+    let product = read(name);
+    let shapes = features::read_path(&fixture(name)).expect("the fixture reads");
+
+    let mut from_product: Vec<String> = product
+        .parts
+        .iter()
+        .flat_map(|p| p.bodies.iter().cloned())
+        .collect();
+    from_product.sort();
+    let mut from_features: Vec<String> = shapes.bodies.iter().map(|b| b.id.clone()).collect();
+    from_features.sort();
+    assert_eq!(from_product, from_features);
+}
+
+/// A part used three times is one shape and three occurrences. The two
+/// counts differ on purpose, and a consumer that confuses them reports
+/// an assembly of three pins as an assembly of one.
+#[test]
+fn one_body_can_carry_many_occurrences() {
+    let doc = read("synthetic/assembly_repeated_part.stp");
+    let pin = part(&doc, "SYN-PIN");
+    assert_eq!(pin.bodies.len(), 1, "one shape");
+    assert_eq!(pin.occurrences, 3, "used three times");
+}
+
+#[test]
+fn a_single_part_file_puts_its_body_under_its_part() {
+    let doc = read("nist/nist_ctc_01_asme1_ap242-e1.stp");
+    assert_eq!(doc.parts[0].bodies.len(), 1);
+    assert!(doc.unattached.is_empty(), "{:?}", doc.unattached);
+}
+
+/// Nothing may go missing between the two documents: every body the
+/// features document reports is either under a part or listed as
+/// unattached with a reason.
+#[test]
+fn no_body_in_the_nist_corpus_goes_missing() {
+    let dir = fixture("nist");
+    for entry in std::fs::read_dir(&dir).expect("the corpus is there") {
+        let path = entry.expect("an entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("stp") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let doc = product::read_path(&path).expect("the file reads");
+        let shapes = features::read_path(&path).expect("the file reads");
+
+        let placed: usize = doc.parts.iter().map(|p| p.bodies.len()).sum();
+        assert_eq!(
+            placed + doc.unattached.len(),
+            shapes.bodies.len(),
+            "{name}: {} bodies, {placed} placed, {} unattached",
+            shapes.bodies.len(),
+            doc.unattached.len()
+        );
+    }
+}
+
+/// A body that reaches no product definition is stated, not dropped.
+#[test]
+fn an_unattached_body_says_why() {
+    for entry in std::fs::read_dir(fixture("nist")).expect("the corpus is there") {
+        let path = entry.expect("an entry").path();
+        if path.extension().and_then(|e| e.to_str()) != Some("stp") {
+            continue;
+        }
+        let doc = product::read_path(&path).expect("the file reads");
+        for u in &doc.unattached {
+            assert!(!u.reason.is_empty(), "an unattached body must say why");
+            assert!(u.body.starts_with("body:"), "{}", u.body);
+        }
+    }
 }

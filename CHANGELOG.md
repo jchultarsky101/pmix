@@ -27,6 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   JT files return an empty document with a diagnostic: the scene graph's
   node hierarchy is not read yet.
 
+- **Each body is joined to the part it is the shape of.** A part names
+  its bodies by the ids `pmix features` gives them, so the two documents
+  join, and both go through one entry point so a body cannot have two
+  ids. One body however many times the part is used — the shape is
+  stated once and the occurrence count says how often it appears. A body
+  that reaches no product definition is listed as unattached with the
+  reason, because a file can state geometry it never defines a product
+  for and silence would make that look like a part with no shape.
+
 ### Changed
 
 - **What a part has to state before a model can source a substitute for

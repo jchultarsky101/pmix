@@ -49,6 +49,11 @@ pub struct ProductDocument {
     pub parts: Vec<Part>,
     /// Every use of one part inside another, sorted by id.
     pub relations: Vec<Relation>,
+    /// Bodies the reader could not put under any part, sorted by body
+    /// id. Empty for most files; never omitted, because a body that
+    /// belongs to no part is a fact a consumer has to see rather than a
+    /// body that quietly went missing.
+    pub unattached: Vec<Unattached>,
     /// The parts nothing uses, sorted. A well-formed assembly has one;
     /// a file holding several unrelated parts has several, which is
     /// stated rather than resolved.
@@ -85,6 +90,15 @@ pub struct Part {
     /// either the assembly's root or a part the file states and never
     /// places.
     pub occurrences: usize,
+    /// The bodies this part is made of, by their ids in the features
+    /// document, sorted. Empty for a subassembly, which has parts rather
+    /// than geometry.
+    ///
+    /// One body however many times the part is used: a body is a shape,
+    /// and how often that shape appears is what [`Part::occurrences`]
+    /// says. The two counts differ on purpose.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bodies: Vec<String>,
     /// Source entities. Excluded from comparison.
     pub source_refs: Vec<String>,
 }
@@ -111,6 +125,15 @@ pub struct Relation {
     pub source_refs: Vec<String>,
 }
 
+/// A body that went under no part, and why.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Unattached {
+    /// The body's id in the features document.
+    pub body: String,
+    /// What stopped it being placed.
+    pub reason: String,
+}
+
 /// Something the reader could not do, said out loud.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Diagnostic {
@@ -135,8 +158,12 @@ impl ProductDocument {
             .filter(|p| p.occurrences == 0)
             .map(|p| p.id.clone())
             .collect();
+        for part in &mut self.parts {
+            part.bodies.sort();
+        }
         self.parts.sort_by(|a, b| a.id.cmp(&b.id));
         self.relations.sort_by(|a, b| a.id.cmp(&b.id));
+        self.unattached.sort_by(|a, b| a.body.cmp(&b.body));
         self.roots.sort();
     }
 }
