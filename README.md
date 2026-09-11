@@ -16,6 +16,12 @@ Run it on two or more models and `pmix diff` answers questions like "did
 the tolerances change between revision B and revision C?" or "which
 components changed material?" without opening a CAD package.
 
+`pmix product` reads a third thing: what the file *contains*. Which
+parts it names, at what revision, how many of each, and where each one
+sits — the bill of materials that turns a pile of anonymous bodies into
+components you can look up. `pmix describe` gathers all three into one
+answer to "what is this part".
+
 `pmix features` reads the geometry instead of the annotations, and
 describes the holes, counterbores, countersinks, bosses, fillets, rounds
 and chamfers a part is made of, with their sizes and positions. That is the base data for
@@ -141,6 +147,11 @@ because the three pins sit in different places and a comparison has to
 be able to say which one moved. The parts list names each part once and
 counts its uses.
 
+Both formats answer this. A STEP file states it with product
+definitions and assembly usages; a JT file states it in the scene
+graph's node hierarchy, where a part node is a part and an instance node
+is an occurrence. One document comes out either way.
+
 This is a third document, versioned separately from the PMI and features
 documents, for the reason those two are separate from each other: they
 answer different questions. See
@@ -152,6 +163,38 @@ part is used: a body is a shape, and how often that shape appears is what
 the occurrence count says. The two numbers differ on purpose, and a body
 that reaches no part at all is listed as unattached with the reason
 rather than left out.
+
+### Describing a part
+
+`pmix describe` gathers all three documents into one answer to "what is
+this part": its number and revision, how big each body is, the features
+and patterns recognised in it, and the material, mass and finish the
+file states, lifted out of its own properties into named fields.
+
+```bash
+pmix describe assembly.stp
+pmix describe assembly.stp --part SYN-BRACKET
+pmix describe assembly.jt --json --output parts.json
+```
+
+```text
+nist_mtc_assembly.jt (JT), 14 parts
+overall 347.6 × 152.4 × 101.6 mm
+
+90591A141 HEX NUT_493_..._90591A141.part  ×11  part:0890dbc4a69fb6b0
+  properties     32 more, see `pmix extract`
+  body body:005750006b307972: 8.052 × 7.326 × 3.2 mm (at least)
+    features: 4 chamfer
+    12 face(s) no rule claimed
+```
+
+Each promoted value names the key it came from, so a promotion can be
+checked rather than trusted. Where several keys claim one field and
+their values disagree — a solid volume and a bounding-box volume both
+read as "volume" — none is promoted and all are named, because a guess
+about a number is worse than no number. `(at least)` on a size means the
+box is a lower bound: the body holds a face with no closed form, so it
+can reach past everything the file locates.
 
 ### Comparing models
 
@@ -568,7 +611,9 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Material, mass and volume promoted out of the properties that carry them, with disagreement stated rather than resolved (ADR 0014)
 - [x] `list_parts` and `describe_part` over the Model Context Protocol, and the caution that travels with them (ADR 0014)
 - [x] Hole patterns: bolt circles, rows and grids, with both readings stated where both hold (ADR 0014)
-- [ ] Threads, read from AP242 where stated and parsed from notes where not (ADR 0014)
+- [x] JT product structure from the scene graph's node hierarchy: parts, occurrences and placements (ADR 0014)
+- [x] How big the whole assembly is, composed from the placements or read where a file states it (ADR 0014)
+- [ ] Threads, which neither corpus states: one designation in one NIST file, none in any real export (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

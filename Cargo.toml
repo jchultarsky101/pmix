@@ -1,9 +1,9 @@
 [package]
 name = "pmix"
-version = "0.13.0"
+version = "0.14.0"
 edition = "2024"
 rust-version = "1.85"
-description = "Extract Product Manufacturing Information (PMI) from STEP and JT files into JSON, and compare it across models"
+description = "Read STEP AP242 and JT files: their PMI and metadata, the features their shapes are made of, and the parts they contain, as stable comparable JSON"
 authors = ["Julian Chultarsky <jchultarsky@physna.com>"]
 license = "MIT"
 readme = "README.md"

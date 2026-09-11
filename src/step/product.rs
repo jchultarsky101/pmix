@@ -560,6 +560,85 @@ fn definition_of(ex: &Exchange, referrers: &Referrers, rep: Id) -> Option<Id> {
     None
 }
 
+/// The box around the whole assembly.
+///
+/// Each body's box is stated in its part's own coordinates, so every
+/// occurrence of that part puts a copy of it somewhere else. Only the
+/// translation is applied: a placement also carries directions, and
+/// turning a rotated box into an axis-aligned one needs its corners
+/// rather than its extremes. Where an occurrence *is* rotated the box is
+/// marked approximate rather than silently wrong.
+fn assembled(
+    parts: &[Part],
+    relations: &[Relation],
+    by_body: &std::collections::BTreeMap<&str, &crate::features::Envelope>,
+) -> Option<crate::features::Envelope> {
+    let mut min = [f64::INFINITY; 3];
+    let mut max = [f64::NEG_INFINITY; 3];
+    let mut approximate = false;
+    let mut any = false;
+
+    for part in parts {
+        // Where this part is used. A part nothing places is taken to sit
+        // at the origin, which is what a file holding one part means.
+        let places: Vec<[f64; 3]> = {
+            let used: Vec<[f64; 3]> = relations
+                .iter()
+                .filter(|r| r.child == part.id)
+                .map(|r| r.placement.as_ref().map(|p| p.origin).unwrap_or([0.0; 3]))
+                .collect();
+            if used.is_empty() {
+                vec![[0.0; 3]]
+            } else {
+                used
+            }
+        };
+        if relations
+            .iter()
+            .filter(|r| r.child == part.id)
+            .any(|r| r.placement.as_ref().is_some_and(is_turned))
+        {
+            approximate = true;
+        }
+        for body in &part.bodies {
+            let Some(box_) = by_body.get(body.as_str()) else {
+                continue;
+            };
+            approximate |= box_.approximate;
+            for at in &places {
+                any = true;
+                for i in 0..3 {
+                    min[i] = min[i].min(box_.min[i] + at[i]);
+                    max[i] = max[i].max(box_.max[i] + at[i]);
+                }
+            }
+        }
+    }
+
+    if !any {
+        return None;
+    }
+    let mut size = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+    size.sort_by(|a, b| b.total_cmp(a));
+    Some(crate::features::Envelope {
+        min,
+        max,
+        size,
+        approximate,
+    })
+}
+
+/// Whether a placement turns what it places, rather than only moving it.
+fn is_turned(p: &Placement) -> bool {
+    let same = |d: Option<&Direction>, to: [f64; 3]| match d {
+        None => true,
+        Some(d) => {
+            (d.x - to[0]).abs() < 1e-9 && (d.y - to[1]).abs() < 1e-9 && (d.z - to[2]).abs() < 1e-9
+        }
+    };
+    !(same(p.axis.as_ref(), [0.0, 0.0, 1.0]) && same(p.ref_direction.as_ref(), [1.0, 0.0, 0.0]))
+}
+
 /// Build the whole document for a parsed exchange.
 ///
 /// The bodies are recognised here rather than taken from a features
@@ -572,13 +651,24 @@ pub fn document(ex: &Exchange, source: crate::model::Source) -> ProductDocument 
 
     let shelled = crate::features::step::solids_with_shells(ex, scale);
     let solids: Vec<_> = shelled.iter().map(|(s, _)| s.clone()).collect();
-    let bodies: Vec<(Id, String)> = crate::features::recognise_in_order(&solids)
-        .into_iter()
+    let shapes = crate::features::recognise_in_order(&solids);
+    let bodies: Vec<(Id, String)> = shapes
+        .iter()
         .zip(shelled.iter())
-        .map(|(body, (_, shell))| (*shell, body.id))
+        .map(|(body, (_, shell))| (*shell, body.id.clone()))
         .collect();
 
     let (parts, relations, unattached, mut diagnostics) = read(ex, scale, &bodies);
+
+    // The assembly's own size: each body's box, put where its
+    // occurrences put it. A body states its shape in its own
+    // coordinates, and only the placements say where those coordinates
+    // sit (ADR 0014).
+    let by_body: std::collections::BTreeMap<&str, &crate::features::Envelope> = shapes
+        .iter()
+        .filter_map(|b| b.envelope.as_ref().map(|e| (b.id.as_str(), e)))
+        .collect();
+    let envelope = assembled(&parts, &relations, &by_body);
     if parts.is_empty() {
         diagnostics.push(Diagnostic {
             message: "the file states no product definition, so it names no part".into(),
@@ -587,6 +677,7 @@ pub fn document(ex: &Exchange, source: crate::model::Source) -> ProductDocument 
     let mut doc = ProductDocument {
         schema_version: SCHEMA_VERSION,
         source,
+        envelope,
         units: crate::features::Units {
             length: "mm".into(),
             angle: "deg".into(),

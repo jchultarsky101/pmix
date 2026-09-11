@@ -233,17 +233,77 @@ fn a_part_keys_on_its_number_name_and_revision() {
     assert_eq!(ids(&doc), ids(&shifted));
 }
 
+// --- JT product structure (ADR 0014) ---
+
+/// The same document, from the scene graph's node hierarchy instead of
+/// from product definitions and assembly usages.
 #[test]
-fn a_jt_file_says_its_structure_is_not_read_yet() {
+fn a_jt_assembly_names_its_parts_and_its_occurrences() {
     let doc = read("jt/nist_mtc_assembly.jt");
-    assert!(doc.parts.is_empty());
+    assert_eq!(doc.parts.len(), 14);
+    assert_eq!(doc.relations.len(), 57);
+    assert!(doc.diagnostics.is_empty(), "{:?}", doc.diagnostics);
     assert!(
-        doc.diagnostics
-            .iter()
-            .any(|d| d.message.contains("not read yet")),
-        "the reader must say what it did not do: {:?}",
-        doc.diagnostics
+        doc.parts.iter().all(|p| p.number.is_some()),
+        "every part should be named"
     );
+}
+
+/// The occurrence suffix a writer appends is that *use* of the part, not
+/// the part, and it changes between exports. A part's identity must not.
+#[test]
+fn a_jt_part_name_drops_the_occurrence_suffix() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    for part in &doc.parts {
+        let name = part.number.as_deref().unwrap_or_default();
+        assert!(!name.contains(';'), "{name} still carries its occurrence");
+    }
+}
+
+/// The scene graph's transforms are in the unit the file declares, not
+/// in JT's base unit of metres. Reading them as metres puts a 148mm
+/// assembly 22 metres from the origin.
+#[test]
+fn jt_placements_are_inside_the_assembly() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    assert_eq!(doc.units.declared_length.as_deref(), Some("mm"));
+    let placed: Vec<&[f64; 3]> = doc
+        .relations
+        .iter()
+        .filter_map(|r| r.placement.as_ref().map(|p| &p.origin))
+        .collect();
+    // Not every occurrence states one: an instance with no geometric
+    // transform attribute sits at its parent's origin, and the document
+    // says the file stated no transformation rather than inventing an
+    // identity for it. This file carries 36 transforms for 57 uses.
+    assert_eq!(placed.len(), 36);
+    for origin in placed {
+        for v in origin {
+            assert!(
+                v.abs() < 1000.0,
+                "a placement of {v} is metres read as millimetres: {origin:?}"
+            );
+        }
+    }
+}
+
+/// A part used many times is one part and many occurrences, in JT as in
+/// STEP. This assembly bolts the same screw in eleven places.
+#[test]
+fn a_jt_part_used_many_times_is_counted_once() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    let most = doc
+        .parts
+        .iter()
+        .max_by_key(|p| p.occurrences)
+        .expect("a part");
+    assert!(
+        most.occurrences > 5,
+        "the most-used part is used {} times",
+        most.occurrences
+    );
+    let total: usize = doc.parts.iter().map(|p| p.occurrences).sum();
+    assert_eq!(total, doc.relations.len());
 }
 
 // --- the body-to-part join (ADR 0014, stage 1) ---
@@ -333,6 +393,87 @@ fn an_unattached_body_says_why() {
         for u in &doc.unattached {
             assert!(!u.reason.is_empty(), "an unattached body must say why");
             assert!(u.body.starts_with("body:"), "{}", u.body);
+        }
+    }
+}
+
+// --- how big the whole model is (ADR 0014) ---
+
+/// A body states its shape in its own coordinates; only the placements
+/// say where those coordinates sit. The pins stand 10 tall on a 6-thick
+/// plate, so the assembly is 16 tall even though no body is.
+#[test]
+fn the_assembly_is_as_big_as_where_its_parts_are_put() {
+    let doc = read("synthetic/assembly_repeated_part.stp");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size, [60.0, 24.0, 16.0]);
+    assert!(!envelope.approximate);
+}
+
+#[test]
+fn a_second_part_placed_above_the_first_raises_the_assembly() {
+    let doc = read("synthetic/assembly_two_parts.stp");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    // A 40 x 24 x 6 plate with an 18-tall block standing on it.
+    assert_eq!(envelope.size, [40.0, 24.0, 24.0]);
+}
+
+/// JT states the box itself, on the partition node. Reading it beats
+/// computing one, and it is there even in a file exported without
+/// precise geometry, where there is no body to measure.
+#[test]
+fn a_jt_file_states_its_own_envelope() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    assert!(
+        !envelope.approximate,
+        "the file states it, so nothing is derived"
+    );
+    // 347.6 x 152.4 x 101.6 mm, which is 13.7 x 6 x 4 inches.
+    assert!(
+        (envelope.size[1] - 152.4).abs() < 0.01,
+        "{:?}",
+        envelope.size
+    );
+    assert!(
+        (envelope.size[2] - 101.6).abs() < 0.01,
+        "{:?}",
+        envelope.size
+    );
+}
+
+/// A part whose own box is a lower bound makes the assembly's one too.
+#[test]
+fn an_approximate_body_makes_the_assembly_approximate() {
+    let doc = read("nist/nist_ctc_01_asme1_ap242-e1.stp");
+    let envelope = doc.envelope.as_ref().expect("an envelope");
+    assert!(envelope.approximate);
+}
+
+/// A JT part node points at its own topology segment through a
+/// late-loaded property, so the body join is the mapping the file
+/// already states rather than a walk up the graph.
+#[test]
+fn jt_bodies_go_under_the_parts_that_hold_them() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    let placed: usize = doc.parts.iter().map(|p| p.bodies.len()).sum();
+    let shapes = features::read_path(&fixture("jt/nist_mtc_assembly.jt")).expect("it reads");
+    assert_eq!(
+        placed + doc.unattached.len(),
+        shapes.bodies.len(),
+        "no body may go missing between the two documents"
+    );
+    assert!(placed > 0, "some body should be placed");
+
+    // And the ids agree, or the join names nothing.
+    let from_features: std::collections::BTreeSet<&str> =
+        shapes.bodies.iter().map(|b| b.id.as_str()).collect();
+    for part in &doc.parts {
+        for body in &part.bodies {
+            assert!(
+                from_features.contains(body.as_str()),
+                "{body} is not a body"
+            );
         }
     }
 }

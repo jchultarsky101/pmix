@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-11
+
+`pmix` answers a third question: what a file *contains*. Until now it
+could say what a file states and what its shapes are, and a body had no
+part number beside it — which is enough to compare two revisions and not
+enough to look anything up. `pmix product` and `pmix describe` close
+that, for STEP and for JT, and two new tools give a language model the
+same reach. The work is ADR 0014's first two stages; the record is
+amended four times with what building it contradicted.
+
 ### Added
 
 - **`pmix product`**, a third document saying what a file *contains*
@@ -100,6 +110,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a mass is worse than none. On a real corpus that is the difference
   between silently reporting a bounding-box volume as the part's volume
   and saying that the file states two volumes.
+
+- **`pmix describe`**, one command for "what is this part": identity and
+  revision, each body's size, the features and patterns recognised in
+  it, and the material, mass and finish the file states, promoted into
+  named fields. It is the command line's half of what `describe_part`
+  gives a model, and it degrades gracefully — a file that states
+  geometry and no product still gets its shapes described, with a line
+  saying they have no part number.
+
+- **JT bodies are joined to their parts too.** A JT part node points at
+  its own topology segment through a late-loaded property, so the
+  mapping is the one the file already states.
+
+- **The whole model states how big it is.** A body's box is in its own
+  coordinates; what turns a hundred of those into one assembly is the
+  placements, so the size of the thing itself belongs to the product
+  document. A JT file states the box on its partition node and it is
+  read rather than computed — which is the case that works even when the
+  file was exported without precise geometry and there is no body to
+  measure. For STEP it is composed from the bodies and their
+  occurrences; where an occurrence is rotated the box is marked
+  approximate rather than stated wrongly.
+
+- **`pmix product` reads JT files too** (ADR 0014). JT states its
+  structure in the logical scene graph's node hierarchy, which this
+  reader now parses: a part node is a part, an instance node is an
+  occurrence, and a geometric transform attribute says where. The NIST
+  MTC assembly comes out as 14 parts and 57 occurrences with their
+  placements.
+
+  Two things the file taught, both now encoded:
+
+  - **A partition node carries a version number the specification's
+    figure 23 does not show**, between its children and its flags.
+    Without it the file name's character count reads as 6656 instead of
+    26. The seventh place this format disagrees with its own figures.
+  - **The scene graph's numbers are in the unit the file declares**, not
+    in JT's base unit of metres. The topology table *is* in metres, and
+    reading the scene graph the same way puts a 148mm assembly 22 metres
+    from the origin.
+
+  A JT part node carries its material, its surface area and its centre
+  of gravity — and not its name. The name is on the instance node that
+  wraps it, with an occurrence suffix appended, which is dropped because
+  it changes between exports and a part's identity must not.
 
 ### Changed
 
@@ -736,7 +791,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/jchultarsky101/pmix/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/jchultarsky101/pmix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/jchultarsky101/pmix/compare/v0.10.0...v0.11.0
