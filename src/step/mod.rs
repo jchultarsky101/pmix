@@ -4,10 +4,13 @@
 //!   graph. It knows nothing about any application protocol.
 //! - [`pmi`] interprets AP242 PMI entities on top of that graph and fills
 //!   the [`crate::model`].
+//! - [`product`] reads the assembly structure: which parts the file
+//!   names, and where each one is used.
 //! - [`StepReader`] ties the two together behind [`crate::Reader`].
 
 pub mod p21;
 pub mod pmi;
+pub mod product;
 
 use crate::model::PmiDocument;
 use crate::{ExtractOptions, Reader, Result};

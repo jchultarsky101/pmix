@@ -79,6 +79,8 @@ fn the_tools_are_listed_with_schemas() {
         [
             "describe_model",
             "compare_models",
+            "list_parts",
+            "describe_part",
             "extract_pmi",
             "diff_pmi"
         ]
@@ -319,4 +321,128 @@ fn a_tool_that_cannot_do_what_was_asked_says_so_as_its_result() {
             .unwrap()
             .contains("unrecognised file format")
     );
+}
+
+// --- the product tools (ADR 0014) ---
+
+#[test]
+fn listing_parts_counts_occurrences_without_listing_them() {
+    let replies = run(&[call(
+        1,
+        "list_parts",
+        json!({ "path": fixture("synthetic/assembly_repeated_part.stp") }),
+    )]);
+    let doc = structured(&replies[0]);
+    let parts = doc["parts"].as_array().unwrap();
+    assert_eq!(parts.len(), 3);
+
+    let pin = parts
+        .iter()
+        .find(|p| p["number"] == "SYN-PIN")
+        .expect("the pin");
+    assert_eq!(pin["occurrences"], 3);
+    assert_eq!(pin["bodies"].as_array().unwrap().len(), 1, "one shape");
+
+    // The occurrences themselves are a lot of JSON to spend on a
+    // question about which parts there are, so the count stays and the
+    // list goes until it is asked for.
+    assert!(doc["relations"].is_null());
+    assert_eq!(doc["relations_omitted"]["count"], 4);
+}
+
+#[test]
+fn the_tree_is_there_when_it_is_asked_for() {
+    let replies = run(&[call(
+        1,
+        "list_parts",
+        json!({ "path": fixture("synthetic/assembly_repeated_part.stp"), "tree": true }),
+    )]);
+    let doc = structured(&replies[0]);
+    let relations = doc["relations"].as_array().unwrap();
+    assert_eq!(relations.len(), 4);
+    assert!(
+        relations.iter().all(|r| r["placement"].is_object()),
+        "every occurrence states where it sits"
+    );
+}
+
+#[test]
+fn describing_a_part_gathers_all_three_documents() {
+    let replies = run(&[call(
+        1,
+        "describe_part",
+        json!({ "path": fixture("synthetic/assembly_repeated_part.stp"), "part": "SYN-PIN" }),
+    )]);
+    let doc = structured(&replies[0]);
+    let parts = doc["parts"].as_array().unwrap();
+    assert_eq!(parts.len(), 1, "narrowed to one part");
+
+    let pin = &parts[0];
+    // From the product document.
+    assert_eq!(pin["revision"], "C");
+    assert_eq!(pin["occurrences"], 3);
+    // From the features document.
+    let envelope = &pin["bodies"][0]["envelope"];
+    assert_eq!(envelope["size"], json!([10.0, 4.0, 4.0]));
+    assert_eq!(envelope["approximate"], false);
+}
+
+#[test]
+fn a_promoted_value_names_the_key_it_came_from() {
+    let replies = run(&[call(
+        1,
+        "describe_part",
+        json!({ "path": fixture("synthetic/assembly_properties.stp") }),
+    )]);
+    let doc = structured(&replies[0]);
+    let bracket = doc["parts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["number"] == "SYN-BRACKET")
+        .expect("the bracket");
+
+    let attributes = bracket["attributes"].as_array().unwrap();
+    let material = attributes
+        .iter()
+        .find(|a| a["field"] == "material")
+        .expect("a material");
+    assert_eq!(material["value"]["value"], "SYN-ALLOY-17");
+    assert_eq!(
+        material["from"], "Material",
+        "a promotion names its source so it can be checked"
+    );
+
+    let mass = attributes
+        .iter()
+        .find(|a| a["field"] == "mass")
+        .expect("a mass");
+    assert_eq!(mass["unit"], "g", "the unit the key named");
+}
+
+#[test]
+fn asking_for_a_part_a_file_does_not_have_says_so() {
+    let replies = run(&[call(
+        1,
+        "describe_part",
+        json!({ "path": fixture("synthetic/assembly_repeated_part.stp"), "part": "NOT-A-PART" }),
+    )]);
+    assert_eq!(replies[0]["result"]["isError"], true);
+    let text = replies[0]["result"]["content"][0]["text"].as_str().unwrap();
+    assert!(text.contains("list_parts"), "{text}");
+}
+
+/// The one paragraph a client shows a model before it picks a tool has
+/// to carry what a transport must not be able to strip (ADR 0013): here,
+/// that these files may be confidential (ADR 0014).
+#[test]
+fn the_instructions_say_not_to_send_the_data_anywhere() {
+    let replies = run(&[json!({
+        "jsonrpc": "2.0", "id": 1, "method": "initialize",
+        "params": { "protocolVersion": "2025-06-18", "capabilities": {},
+                    "clientInfo": { "name": "t", "version": "1" } }
+    })]);
+    let instructions = replies[0]["result"]["instructions"].as_str().unwrap();
+    assert!(instructions.contains("confidential"), "{instructions}");
+    assert!(instructions.contains("web search"), "{instructions}");
 }

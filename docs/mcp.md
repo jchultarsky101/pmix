@@ -48,7 +48,32 @@ can read.
 ## How a session goes
 
 A model with a context budget should ask narrow questions, and the tools
-are shaped so that it can. The pattern that works:
+are shaped so that it can. Which pattern to use depends on the question.
+
+### Identifying or sourcing a part
+
+1. **`list_parts`** on the file. Every part it names, with its number,
+   revision, how many times the assembly uses it, and the bodies it is
+   made of. This is what turns a pile of anonymous bodies into
+   components that can be looked up. Occurrences are counted but not
+   listed; pass `tree: true` when the arrangement matters.
+2. **`describe_part`**, with `part` to narrow to one. Everything known
+   about it from all three documents: identity and revision, how big
+   each body is, the features recognised in them, and the material,
+   mass, volume and finish the file states, promoted out of its own
+   properties into named fields.
+3. **`extract_pmi`** when the promoted fields are not enough. Every
+   property is still there; `other_properties` on each part says how
+   many were not promoted.
+
+Two fields decide how much weight the answer carries. Each promoted
+attribute names the key it came from, so a promotion can be checked
+rather than trusted. And `ambiguous` lists any field more than one key
+claimed with values that disagree — a solid volume and a bounding-box
+volume both read as "volume" — where nothing is promoted, because a
+guess about a number is worse than no number.
+
+### Comparing two revisions
 
 1. **`describe_model` with `summary: true`** on each file. This returns
    every body's id, name, face counts, and a count of features by kind —
@@ -70,6 +95,58 @@ chooses a tool; it says the above, and it says the one thing a reader of
 a comparison has to know, covered [below](#reading-a-comparison).
 
 ## The tools
+
+### `list_parts`
+
+What a file contains: every part it names, and how the assembly uses
+them.
+
+| argument | | |
+| --- | --- | --- |
+| `path` | required | A `.stp`, `.step`, or `.jt` file |
+| `tree` | optional | Include every occurrence with its placement, not just the parts |
+
+Each part carries its number, name, description, revision, how many
+times the file uses it (`occurrences`), and the ids of the bodies it is
+made of. `roots` names the part nothing uses, which is the assembly
+itself. `unattached` lists any body that reached no part, with the
+reason.
+
+**The occurrence count and the body count differ on purpose.** A part
+used four times is one shape used four times: one body, four
+occurrences. A reader that confuses them reports an assembly of four
+pins as an assembly of one.
+
+A JT file states its structure in the scene graph's node hierarchy,
+which this does not read yet; the document comes back empty and says so
+in `diagnostics`.
+
+### `describe_part`
+
+Everything known about one part, gathered from all three documents.
+
+| argument | | |
+| --- | --- | --- |
+| `path` | required | A `.stp`, `.step`, or `.jt` file |
+| `part` | optional | Only this part, by its id or its number from `list_parts` |
+
+Identity and revision from the product document; each body's envelope,
+recognised features and the patterns they form — bolt circles, rows,
+grids — from the features document; and `attributes`
+promoted out of the properties in the PMI document — material, mass,
+volume, density, finish, supplier, and the rest — each naming the key it
+came from and the unit that key declared.
+
+Read `ambiguous` alongside `attributes`: a field there had more than one
+key claiming it with values that disagree, and none was promoted. Read
+`approximate` on an envelope too — a box so marked is the smallest the
+body can be, not the size it is.
+
+**These files may describe confidential designs.** A part number,
+drawing number, material specification or supplier name read from one is
+the user's own data. The server's `instructions` say so, and a model
+should not send such an identifier to a web search or any other service
+unless the user has asked it to.
 
 ### `describe_model`
 
@@ -272,9 +349,22 @@ Everything the command line will not, since it is the same library:
   meant to be there. It is listed under `unassigned`.
 - **Recognise pockets and slots**, which need volume decomposition
   ([ADR 0011](adr/0011-feature-recognition.md)).
+- **Choose between two readings of one pattern.** Four holes on a square
+  are a grid and a bolt circle; it states both and says they overlap.
 - **Detect a rotation** as a single fact; it reports the shapes as
   present and moved, and stops.
 - **Read a JT that carries no precise geometry.** It says so.
+- **Read a JT file's product structure.** It lives in the scene graph's
+  node hierarchy, which this does not parse yet. It says so.
+- **Compute a volume or a surface area.** Both need the trimmed patch of
+  each face, which this reader does not hold; both are read where a file
+  states them and absent where it does not
+  ([ADR 0014](adr/0014-part-description-for-sourcing.md)).
+- **Decide between two keys that disagree** about a part's material or
+  mass. It names both.
+- **Search for a substitute part, or judge one.** It supplies what a
+  part is; whether something else would do is engineering judgment, and
+  it is the model's to make with the user, not this tool's.
 - **Write anything.**
 
 ## Trying it by hand

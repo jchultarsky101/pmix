@@ -35,6 +35,7 @@ pub mod identity;
 pub mod jt;
 pub mod mcp;
 pub mod model;
+pub mod product;
 pub mod reader;
 pub mod step;
 pub mod units;

@@ -116,6 +116,43 @@ Include the full coordinates and triangles when you need them:
 pmix extract part.stp --presentation-geometry
 ```
 
+### Reading the product structure
+
+`pmix product` says what a file *contains*: which parts it names, at what
+revision, how many times each is used, and where each occurrence sits.
+
+```bash
+pmix product assembly.stp
+pmix product assembly.stp --json --output assembly.product.json
+```
+
+```text
+assembly.stp (STEP), 3 parts, 4 occurrences
+
+SYN-ASM-3 (repeated_part_assembly) rev A
+  SYN-PLATE (base_plate) rev A [plate_1] at 0,0,0
+  SYN-PIN (locating_pin) rev C [pin_left] at 8,10,6
+  SYN-PIN (locating_pin) rev C [pin_middle] at 28,10,6
+  SYN-PIN (locating_pin) rev C [pin_right] at 48,10,6
+```
+
+Occurrences are stated one by one rather than rolled into a quantity,
+because the three pins sit in different places and a comparison has to
+be able to say which one moved. The parts list names each part once and
+counts its uses.
+
+This is a third document, versioned separately from the PMI and features
+documents, for the reason those two are separate from each other: they
+answer different questions. See
+[ADR 0014](docs/adr/0014-part-description-for-sourcing.md).
+
+Each part names the bodies it is made of, by the same ids `pmix features`
+gives them, so the two documents join. One body however many times the
+part is used: a body is a shape, and how often that shape appears is what
+the occurrence count says. The two numbers differ on purpose, and a body
+that reaches no part at all is listed as unattached with the reason
+rather than left out.
+
 ### Comparing models
 
 Diff the PMI of two models, or of JSON documents written by `pmix extract`:
@@ -167,10 +204,34 @@ A bore states the diameter it is called by and a blend states its
 radius; a fillet fills an inside corner and a round breaks an outside
 one, which is the same distinction as a bore against a shaft.
 
+Where alike features repeat, the arrangement is recognised too:
+
+```text
+body:7078688a7aeef636: 12 faces, 6 in features, 6 unassigned
+  bolt_circle  6× ⌀9 on ⌀60 PCD from 30°   pat:d0f0f93543534cca
+```
+
+A bolt circle states its pitch circle diameter and its clocking, a row
+its pitch, a grid its counts and both pitches — the numbers a substitute
+part has to match. Nothing in a file says "bolt circle", so each pattern
+states the rule that produced it, and where two readings both hold —
+four holes on a square are a grid *and* a bolt circle — both are stated
+and each names the other.
+
 Every face is accounted for: the ones no rule claimed are listed, so
 that *not recognised* is never mistaken for *not there*. Lengths are
 millimetres and angles degrees whatever the file declared, so one design
 exported in inches and in millimetres gives one document.
+
+Each body also states how big it is — an axis-aligned box and the
+overall size, largest dimension first, so the three numbers do not
+depend on how the part was oriented when it was exported. Where the file
+states a face with no closed form, the box is the smallest the body can
+be rather than the size it is, and `approximate` says so. Volume and
+surface area are read from the file's own properties where it states
+them and left absent where it does not: computing them needs the
+trimmed patch of each face, which this reader does not hold
+([ADR 0014](docs/adr/0014-part-description-for-sourcing.md)).
 
 ### Comparing what a shape is
 
@@ -225,13 +286,21 @@ or, in a client's configuration file:
 { "mcpServers": { "pmix": { "command": "pmix", "args": ["mcp"] } } }
 ```
 
-It offers four tools — `describe_model`, `compare_models`, `extract_pmi`,
-`diff_pmi` — each a call into the library and nothing more. They are
-shaped for a context window rather than for completeness: `describe_model`
-with `summary: true` returns each body's counts without listing anything,
-and `body`, `kind`, and `only_changed` narrow the rest, with counts always
-describing the whole body whatever a view lists. The tools read files and
-change nothing.
+It offers six tools — `list_parts`, `describe_part`, `describe_model`,
+`compare_models`, `extract_pmi`, `diff_pmi` — each a call into the
+library and nothing more. They are shaped for a context window rather
+than for completeness: `list_parts` counts a part's occurrences without
+listing them, `describe_model` with `summary: true` returns each body's
+counts without listing anything, and `part`, `body`, `kind`, `tree` and
+`only_changed` narrow the rest, with counts always describing the whole
+body whatever a view lists. The tools read files and change nothing.
+
+To identify or source a part, start with `list_parts` and then
+`describe_part`: a body means nothing to a catalogue until it has a part
+number and a revision beside it. The server's instructions tell a model
+that these files may describe confidential designs and that identifiers
+read from one are not to be sent to a web search or any other service
+unless the user asked.
 
 What the model adds is what this project deliberately does not: naming a
 pattern in four moved holes, joining a changed diameter to the tolerance
@@ -492,6 +561,14 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Comparing two feature documents: exact pairing, a displacement stated once, and candidates as observations (ADR 0012)
 - [ ] Rotation as well as displacement, which needs orientation evidence rather than positions alone (ADR 0012)
 - [x] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
+- [x] `pmix product`: parts, revisions, occurrences and their placements, from a STEP file's assembly structure (ADR 0014)
+- [x] Joining each body to the part it realises, so a shape has a part number beside it (ADR 0014)
+- [ ] Owning organisation, approval, and security classification, which no file in the public corpus states (ADR 0014)
+- [x] An envelope per body: how big it is, and whether that is a measurement or a lower bound (ADR 0014)
+- [x] Material, mass and volume promoted out of the properties that carry them, with disagreement stated rather than resolved (ADR 0014)
+- [x] `list_parts` and `describe_part` over the Model Context Protocol, and the caution that travels with them (ADR 0014)
+- [x] Hole patterns: bolt circles, rows and grids, with both readings stated where both hold (ADR 0014)
+- [ ] Threads, read from AP242 where stated and parsed from notes where not (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

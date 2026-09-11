@@ -139,6 +139,19 @@ fn edge_curve(oe: &Instance) -> Option<Id> {
 /// names it, so that a file which states a shell alone still yields the
 /// faces it holds rather than nothing.
 pub fn solids(ex: &Exchange, scale: Scale) -> Vec<Solid> {
+    solids_with_shells(ex, scale)
+        .into_iter()
+        .map(|(solid, _)| solid)
+        .collect()
+}
+
+/// The same, each paired with the shell the file stated it as.
+///
+/// Recognition does not care which entity a solid came from, but the
+/// product reader does: the only way from a body to the part that has it
+/// is up from the shell, through the representation that holds it, to
+/// the product definition that representation defines (ADR 0014).
+pub fn solids_with_shells(ex: &Exchange, scale: Scale) -> Vec<(Solid, Id)> {
     let mut out = Vec::new();
     for shell in ex
         .instances()
@@ -231,7 +244,7 @@ pub fn solids(ex: &Exchange, scale: Scale) -> Vec<Solid> {
             across: BTreeMap::new(),
         };
         solid.link();
-        out.push(solid);
+        out.push((solid, shell.id));
     }
     out
 }

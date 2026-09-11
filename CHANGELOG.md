@@ -7,6 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`pmix product`**, a third document saying what a file *contains*
+  (ADR 0014): the parts it names, their revisions, and every occurrence
+  of each with the placement that puts it where it sits. Occurrences are
+  stated one by one rather than rolled into a quantity, because two uses
+  of one part sit in different places; each part counts its own uses so
+  that nothing has to tally the list. Sorted, content-keyed, and in
+  millimetres whatever the file declared.
+
+  A part keys on its number, name and revision, which is what a person
+  would call it — not on its geometry, because a subassembly has none.
+  Where a file states none of the three, the id can only rest on the
+  order the file lists them in, and the document says so rather than
+  letting a reader discover it by diffing two exports. One NIST model
+  does exactly this.
+
+  JT files return an empty document with a diagnostic: the scene graph's
+  node hierarchy is not read yet.
+
+- **Each body is joined to the part it is the shape of.** A part names
+  its bodies by the ids `pmix features` gives them, so the two documents
+  join, and both go through one entry point so a body cannot have two
+  ids. One body however many times the part is used — the shape is
+  stated once and the occurrence count says how often it appears. A body
+  that reaches no product definition is listed as unattached with the
+  reason, because a file can state geometry it never defines a product
+  for and silence would make that look like a part with no shape.
+
+- **Every body states how big it is.** An axis-aligned box and the
+  overall size that box implies, largest dimension first so that the
+  three numbers do not depend on how the part happened to be oriented
+  when it was exported. It is the first thing a catalogue asks for and
+  the last thing `pmix` could say.
+
+  A box is decided by extremes, and for the shapes this reads the
+  extremes are all on something the B-rep states: a vertex, a full
+  circle, or a sphere. An arc bulges past its own endpoints but never
+  outside the circle it lies on, so an arc that stays inside the box
+  everything else made — a rounded corner, the mouth of a hole — leaves
+  the measurement exact. Where a face has no closed form at all, the box
+  is the smallest the body can be rather than the size it is, and
+  `approximate` says which of the two is being given.
+
+  Volume and surface area are *not* computed: those need the trimmed
+  patch of each face, which this B-rep does not hold. ADR 0014 is amended
+  accordingly.
+
+- **Patterns in the features a body holds**: bolt circles with their
+  pitch circle diameter and clocking, rows with their pitch, and filled
+  rectangular grids with their counts and both pitches. Four holes are
+  four facts; that they sit on a 24 by 14 rectangle is the one that
+  answers whether a substitute would bolt where the old one bolted, and
+  nothing else in either document answered it.
+
+  Nothing in a file says "bolt circle", so each pattern states the rule
+  that produced it. Members must be alike and parallel — same kind, same
+  size, same axis — and a pattern needs three members, because two of
+  anything lie on a line at an even pitch.
+
+  Where two readings both hold, both are stated and each names the
+  other, as ADR 0011 settled for features: four holes at the corners of
+  a square are a grid and a bolt circle. Four on a *rectangle* are only
+  a grid, though they are concyclic, which is what the even-angular-pitch
+  rule is for.
+
+- **`list_parts` and `describe_part`**, two new Model Context Protocol
+  tools (ADR 0013, ADR 0014). `list_parts` gives a model the bill of
+  materials — which parts, what revision, how many of each — and
+  `describe_part` gathers all three documents into one answer to "what
+  is this part": its number and revision, how big each body is, the
+  features recognised in them, and the material, mass and finish the
+  file states. `describe_model` stays geometry-only.
+
+  The server's instructions now say that these files may describe
+  confidential designs and that a part number or material spec read from
+  one is not to be sent to a web search or any other service unless the
+  user asked. That paragraph is the one thing a client shows a model
+  before it picks a tool, and it is where a caution cannot be stripped
+  by a transport that renders only the fields it understands.
+
+- **Material, mass, volume and the rest are promoted out of the
+  properties that carry them**, into named fields that say which key
+  they came from. Matching is by what a key *says* — ordinary words for
+  the thing — rather than by a table of keys copied from one exporter.
+
+  Nothing is lost: an unmatched key stays exactly where it was, and each
+  part counts what was not promoted. Where several keys claim one field
+  the values decide it — agreement promotes once, disagreement promotes
+  nothing and shows every candidate, because a guess about a material or
+  a mass is worse than none. On a real corpus that is the difference
+  between silently reporting a bounding-box volume as the part's volume
+  and saying that the file states two volumes.
+
+### Changed
+
+- **What a part has to state before a model can source a substitute for
+  it** is recorded in [ADR 0014](docs/adr/0014-part-description-for-sourcing.md),
+  proposed: product structure and part identity first, then envelope,
+  volume and material, then the hole patterns and threads a replacement
+  has to match. No behaviour changes yet — the roadmap and the ADR index
+  name the stages.
+
 ## [0.13.0] - 2026-09-10
 
 `pmix mcp` serves the documents to a language model over the Model

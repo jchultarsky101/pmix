@@ -16,6 +16,24 @@ proprietary data: part numbers and values are invented.
 | `assembly_properties.stp` | Components stating the same property names, which collide unless the part is part of the key |
 | `datum_targets.stp` | A datum established by targets, none of which the file gives geometry |
 
+## Product structure
+
+The committed public corpus holds no assemblies at all: not one of the 17
+NIST files states a `NEXT_ASSEMBLY_USAGE_OCCURRENCE`, so nothing there
+exercises the product reader (ADR 0014). These two files carry that
+coverage on their own. Each states a full advanced B-rep for every
+component, so the same files serve the body-to-part join: two parts with
+one body each, and one part whose single body carries three occurrences.
+
+| File | What it is for |
+| --- | --- |
+| `assembly_two_parts.stp` | Two different parts, each placed once, at different revisions. The simplest bill of materials that is not a single part |
+| `assembly_repeated_part.stp` | One part used three times at three placements. A reader that collapses occurrences reports one pin here instead of three, which is the failure this file exists to catch |
+
+Both are written by hand rather than exported, which means they encode
+what the reader expects rather than confirming it against a real writer.
+Verify product-structure changes against real exports as well.
+
 ## Feature recognition
 
 One plate, and three single deliberate changes to it. Each is a question
@@ -38,6 +56,20 @@ moved can be told from a hole having moved:
 | `plate_four_holes.stp` | Four mounting holes; the baseline for comparisons |
 | `plate_four_holes_shifted.stp` | The whole plate moved 5mm in X. Nothing keeps its id and one displacement explains all four |
 | `plate_four_holes_one_moved.stp` | One hole moved 5mm. Three holes keep their ids, which is proof the body did not move |
+
+Patterns need holes that repeat, and each file is one arrangement a
+substitute part would have to match (ADR 0014):
+
+| File | What it is for |
+| --- | --- |
+| `flange_bolt_circle.stp` | Six Ø9 holes on a Ø60 pitch circle. The arrangement a flange is bought by |
+| `bar_hole_row.stp` | Five Ø5 holes in a line at 15mm pitch |
+| `plate_square_bolt_pattern.stp` | Four holes on a 50mm square, which is a grid *and* a bolt circle. Both readings hold, so both are stated and each names the other |
+
+`plate_four_holes.stp` above doubles as the rectangular case: a 2 × 2
+grid at 14 × 24. Its four holes are concyclic, as the corners of any
+rectangle are, and it must *not* read as a bolt circle — which is what
+the even-angular-pitch rule is for.
 
 Blends and chamfers need shapes with corners rather than holes:
 

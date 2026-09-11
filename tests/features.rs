@@ -543,3 +543,190 @@ mod comparing {
         }
     }
 }
+
+// --- how big a body is (ADR 0014) ---
+
+/// The plate is 40 by 30 by 10 and the document says so exactly. A box
+/// is decided by extremes, and a plate's extremes are its corners.
+#[test]
+fn a_plate_states_its_size_exactly() {
+    let doc = read("synthetic/plate_one_hole.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size, [40.0, 30.0, 10.0]);
+    assert_eq!(envelope.min, [0.0, 0.0, 0.0]);
+    assert_eq!(envelope.max, [40.0, 30.0, 10.0]);
+    assert!(!envelope.approximate, "every face of a plate is analytic");
+}
+
+/// Largest first, so that the three numbers do not depend on how the
+/// part happened to be oriented when it was exported.
+#[test]
+fn the_size_is_stated_largest_first() {
+    for name in [
+        "synthetic/plate_one_hole.stp",
+        "synthetic/shaft_chamfered.stp",
+        "synthetic/plate_four_holes.stp",
+    ] {
+        let doc = read(name);
+        for body in &doc.bodies {
+            let Some(e) = &body.envelope else { continue };
+            assert!(
+                e.size[0] >= e.size[1] && e.size[1] >= e.size[2],
+                "{name}: {:?}",
+                e.size
+            );
+        }
+    }
+}
+
+/// A shaft's widest point is on no vertex: it is the circle capping the
+/// cylinder. A reader that only looked at vertices would report a
+/// diameter of zero here.
+#[test]
+fn a_round_body_is_measured_by_its_circles() {
+    let doc = read("synthetic/shaft_chamfered.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size[1], 20.0, "the shaft is 20 across");
+    assert_eq!(envelope.size[2], 20.0);
+    assert!(!envelope.approximate);
+}
+
+/// An arc bulges past its own endpoints, but never outside the circle it
+/// lies on. A rounded corner well inside the part therefore leaves the
+/// measurement exact rather than turning it into a lower bound.
+#[test]
+fn an_arc_inside_the_box_does_not_make_it_approximate() {
+    let doc = read("synthetic/plate_corner_round.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size, [40.0, 30.0, 10.0]);
+    assert!(!envelope.approximate);
+}
+
+/// Where the file states a face with no closed form, the box is the
+/// smallest the body can be rather than the size it is, and the document
+/// says which of those it is giving.
+#[test]
+fn a_body_the_reader_cannot_bound_says_so() {
+    let doc = read("nist/nist_ftc_06_asme1_ap242-e2.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert!(
+        envelope.approximate,
+        "this part has faces with no closed form"
+    );
+    // Still useful: a part that is roughly a foot across says so.
+    assert!(envelope.size[0] > 300.0 && envelope.size[0] < 310.0);
+}
+
+/// One design in two units is one document (ADR 0004), and the envelope
+/// must not be the field that breaks that.
+#[test]
+fn the_same_design_in_inches_states_the_same_size() {
+    let mm = read("synthetic/plate_one_hole.stp");
+    let inches = read("synthetic/plate_one_hole_inches.stp");
+    assert_eq!(
+        mm.bodies[0].envelope, inches.bodies[0].envelope,
+        "millimetres and inches must give one envelope"
+    );
+}
+
+// --- patterns (ADR 0014) ---
+
+/// Four holes are four facts; that they sit on a 24 by 14 rectangle is
+/// the one that answers whether a substitute would bolt where the old
+/// one bolted.
+#[test]
+fn four_holes_on_a_rectangle_are_a_grid() {
+    let doc = read("synthetic/plate_four_holes.stp");
+    let patterns = &doc.bodies[0].patterns;
+    assert_eq!(patterns.len(), 1, "{patterns:?}");
+    let grid = &patterns[0];
+    assert_eq!(grid.kind, features::PatternKind::Grid);
+    assert_eq!(grid.count, 4);
+    assert_eq!(grid.counts, vec![2, 2]);
+    assert_eq!(grid.pitch, vec![14.0, 24.0]);
+    assert_eq!(grid.diameter, Some(6.0));
+    assert!(!grid.rule.is_empty(), "a recognition states its rule");
+}
+
+#[test]
+fn six_holes_on_a_circle_are_a_bolt_circle() {
+    let doc = read("synthetic/flange_bolt_circle.stp");
+    let patterns = &doc.bodies[0].patterns;
+    assert_eq!(patterns.len(), 1, "{patterns:?}");
+    let bolts = &patterns[0];
+    assert_eq!(bolts.kind, features::PatternKind::BoltCircle);
+    assert_eq!(bolts.count, 6);
+    assert_eq!(bolts.pitch_circle_diameter, Some(60.0));
+    assert_eq!(bolts.centre, Some([40.0, 40.0, 0.0]));
+    // Two flanges with one pitch circle and different clocking do not
+    // interchange, so the clocking is stated.
+    assert!(bolts.clocking.is_some());
+}
+
+#[test]
+fn holes_in_a_line_are_a_row_with_a_pitch() {
+    let doc = read("synthetic/bar_hole_row.stp");
+    let patterns = &doc.bodies[0].patterns;
+    assert_eq!(patterns.len(), 1, "{patterns:?}");
+    assert_eq!(patterns[0].kind, features::PatternKind::Row);
+    assert_eq!(patterns[0].count, 5);
+    assert_eq!(patterns[0].pitch, vec![15.0]);
+}
+
+/// Four holes at the corners of a square are a grid *and* a bolt circle.
+/// Neither reading is wrong, so both are stated and each names the other
+/// (ADR 0011).
+#[test]
+fn a_square_pattern_is_read_both_ways_and_says_so() {
+    let doc = read("synthetic/plate_square_bolt_pattern.stp");
+    let patterns = &doc.bodies[0].patterns;
+    assert_eq!(patterns.len(), 2, "{patterns:?}");
+
+    let kinds: BTreeSet<&str> = patterns.iter().map(|p| p.kind.name()).collect();
+    assert_eq!(
+        kinds,
+        BTreeSet::from(["bolt_circle", "grid"]),
+        "both readings"
+    );
+    for p in patterns {
+        assert_eq!(p.overlaps.len(), 1, "each names the other: {p:?}");
+        assert!(patterns.iter().any(|o| o.id == p.overlaps[0]));
+    }
+}
+
+/// Three points lie on a line whether or not anybody meant them to, and
+/// two lie on one always. A rule that claims every pair claims nothing.
+#[test]
+fn a_single_hole_is_not_a_pattern() {
+    let doc = read("synthetic/plate_one_hole.stp");
+    assert!(doc.bodies[0].patterns.is_empty());
+}
+
+/// Members of one pattern are alike: same kind, same size, same axis.
+/// The NIST parts are the check, because they hold several sets of
+/// holes at different diameters and a reader that ignored size would
+/// merge them.
+#[test]
+fn a_pattern_is_made_of_features_that_are_alike() {
+    let doc = read("nist/nist_ctc_01_asme1_ap242-e1.stp");
+    for body in &doc.bodies {
+        for pattern in &body.patterns {
+            let sizes: BTreeSet<String> = pattern
+                .features
+                .iter()
+                .filter_map(|id| body.features.iter().find(|f| &f.id == id))
+                .map(|f| format!("{:?}/{:?}", f.kind, f.shape.diameter))
+                .collect();
+            assert_eq!(sizes.len(), 1, "{pattern:?} mixes {sizes:?}");
+            assert_eq!(pattern.count, pattern.features.len());
+        }
+    }
+}
+
+/// One design in two units is one document (ADR 0004).
+#[test]
+fn a_pattern_keys_the_same_in_either_unit() {
+    let mm = read("synthetic/plate_one_hole.stp");
+    let inches = read("synthetic/plate_one_hole_inches.stp");
+    assert_eq!(mm.bodies[0].patterns, inches.bodies[0].patterns);
+}

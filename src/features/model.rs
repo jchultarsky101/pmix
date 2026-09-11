@@ -70,11 +70,48 @@ pub struct Body {
     pub name: Option<String>,
     /// How many faces went into features and how many did not.
     pub faces: FaceCounts,
+    /// How big the body is, in millimetres. Absent when the file locates
+    /// nothing, as a tessellation-only export does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<Envelope>,
     /// What was recognised, sorted by id.
     pub features: Vec<Feature>,
+    /// Arrangements of those features that a rule recognised: bolt
+    /// circles, rows, grids. Sorted by id, empty when nothing repeats.
+    ///
+    /// Derived, not read — no file says "bolt circle" — so each states
+    /// the rule that produced it (ADR 0014).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub patterns: Vec<Pattern>,
     /// Every face that went into no feature, sorted by id. This is not a
     /// diagnostic: it is part of the answer.
     pub unassigned: Vec<UnassignedFace>,
+}
+
+/// The box around a body, and how big that makes it.
+///
+/// Stated in the body's own coordinates, so a part exported on its own
+/// and the same part inside an assembly describe themselves the same
+/// way; where the occurrence sits is the product document's business
+/// (ADR 0014).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Envelope {
+    /// The low corner of the axis-aligned box.
+    pub min: [f64; 3],
+    /// The high corner.
+    pub max: [f64; 3],
+    /// The box's three dimensions, largest first — the three numbers a
+    /// catalogue asks for, in an order that does not depend on how the
+    /// part happened to be oriented when it was exported.
+    pub size: [f64; 3],
+    /// Whether the box is a lower bound rather than the true extent.
+    ///
+    /// True when the body holds something that can reach past everything
+    /// the file locates: an arc bulging beyond its own endpoints, a
+    /// torus, or a face stated with no closed form. The box is then the
+    /// smallest the body can be, not the size it is, and saying so is
+    /// the difference between a measurement and a guess.
+    pub approximate: bool,
 }
 
 /// How much of a body was recognised.
@@ -200,6 +237,99 @@ pub struct Shape {
     /// The full angle at the apex of a cone, in degrees.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub angle: Option<f64>,
+}
+
+/// An arrangement of alike features.
+///
+/// The question a substitute part has to pass is whether it bolts where
+/// the old one bolted, and four separate hole positions do not answer
+/// it. This does.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Pattern {
+    /// Identity, derived from the members, which are themselves
+    /// content-derived (ADR 0004).
+    pub id: String,
+    pub kind: PatternKind,
+    /// The features this is made of, by their own ids, sorted.
+    pub features: Vec<String>,
+    pub count: usize,
+    /// The size the members share, in millimetres.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diameter: Option<f64>,
+    /// The direction the members run in, which they all share.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub axis: Option<[f64; 3]>,
+    /// A bolt circle's pitch circle diameter, in millimetres: the
+    /// number a catalogue states it by.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pitch_circle_diameter: Option<f64>,
+    /// Where a bolt circle turns about.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub centre: Option<[f64; 3]>,
+    /// Where the first hole of a bolt circle sits, in degrees. Two
+    /// flanges with the same pitch circle and different clocking do not
+    /// interchange, so it is stated rather than left out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clocking: Option<f64>,
+    /// The spacing, in millimetres: one for a row, two for a grid.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pitch: Vec<f64>,
+    /// How many in each direction.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub counts: Vec<usize>,
+    /// What settled it. A recognition states its rule, so that a reader
+    /// can weigh it rather than take it (ADR 0011).
+    pub rule: String,
+    /// Patterns sharing a feature with this one. Four holes at the
+    /// corners of a square are a grid and a bolt circle, and both
+    /// readings are stated rather than one being chosen.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub overlaps: Vec<String>,
+}
+
+impl Pattern {
+    /// A pattern with nothing filled in but its kind, for a recogniser
+    /// to build on.
+    pub(crate) fn empty() -> Self {
+        Self {
+            id: String::new(),
+            kind: PatternKind::Row,
+            features: Vec::new(),
+            count: 0,
+            diameter: None,
+            axis: None,
+            pitch_circle_diameter: None,
+            centre: None,
+            clocking: None,
+            pitch: Vec::new(),
+            counts: Vec::new(),
+            rule: String::new(),
+            overlaps: Vec::new(),
+        }
+    }
+}
+
+/// The arrangements this recognises.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PatternKind {
+    /// Alike features on one circle at an even angular pitch — a bolt
+    /// circle, in the sense a flange has one.
+    BoltCircle,
+    /// Alike features on one line at an even pitch.
+    Row,
+    /// Alike features on a filled rectangular lattice.
+    Grid,
+}
+
+impl PatternKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::BoltCircle => "bolt_circle",
+            Self::Row => "row",
+            Self::Grid => "grid",
+        }
+    }
 }
 
 /// Something the reader could not do, said out loud.
