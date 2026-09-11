@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Configuring the MCP server in Claude Desktop is documented** in
+  `docs/mcp.md`: where the file is on macOS and Windows, the entry with
+  an absolute path and why a desktop application needs one, merging into
+  an existing file, restarting, verifying, and the log to read when the
+  tools do not appear. Claude Code and Claude Desktop keep separate
+  configurations, and the guide now says so. The README's snippet no
+  longer suggests `"command": "pmix"`, which fails silently in a GUI.
+
+- **Corrected in the 0.14.0 notes**: the `pmix product` entry said JT
+  files come back empty because the scene graph's node hierarchy is not
+  read. The JT reader landed later in the same release, so that sentence
+  was wrong the moment it shipped.
+
 ## [0.14.0] - 2026-09-11
 
 `pmix` answers a third question: what a file *contains*. Until now it
@@ -34,8 +49,8 @@ amended four times with what building it contradicted.
   letting a reader discover it by diffing two exports. One NIST model
   does exactly this.
 
-  JT files return an empty document with a diagnostic: the scene graph's
-  node hierarchy is not read yet.
+  Both formats answer this — see the JT entry below, which landed in the
+  same release.
 
 - **Each body is joined to the part it is the shape of.** A part names
   its bodies by the ids `pmix features` gives them, so the two documents
