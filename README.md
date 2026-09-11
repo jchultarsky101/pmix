@@ -209,6 +209,16 @@ that *not recognised* is never mistaken for *not there*. Lengths are
 millimetres and angles degrees whatever the file declared, so one design
 exported in inches and in millimetres gives one document.
 
+Each body also states how big it is — an axis-aligned box and the
+overall size, largest dimension first, so the three numbers do not
+depend on how the part was oriented when it was exported. Where the file
+states a face with no closed form, the box is the smallest the body can
+be rather than the size it is, and `approximate` says so. Volume and
+surface area are read from the file's own properties where it states
+them and left absent where it does not: computing them needs the
+trimmed patch of each face, which this reader does not hold
+([ADR 0014](docs/adr/0014-part-description-for-sourcing.md)).
+
 ### Comparing what a shape is
 
 Give `pmix features` two models and it compares them:
@@ -532,7 +542,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] `pmix product`: parts, revisions, occurrences and their placements, from a STEP file's assembly structure (ADR 0014)
 - [x] Joining each body to the part it realises, so a shape has a part number beside it (ADR 0014)
 - [ ] Owning organisation, approval, and security classification, which no file in the public corpus states (ADR 0014)
-- [ ] Envelope, volume, and material, so a part can be described as something a catalogue would recognise (ADR 0014)
+- [x] An envelope per body: how big it is, and whether that is a measurement or a lower bound (ADR 0014)
+- [ ] Material, mass and volume promoted out of the properties that carry them (ADR 0014)
 - [ ] Hole patterns and threads, the interface a substitute part has to match (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 

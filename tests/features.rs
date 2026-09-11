@@ -543,3 +543,88 @@ mod comparing {
         }
     }
 }
+
+// --- how big a body is (ADR 0014) ---
+
+/// The plate is 40 by 30 by 10 and the document says so exactly. A box
+/// is decided by extremes, and a plate's extremes are its corners.
+#[test]
+fn a_plate_states_its_size_exactly() {
+    let doc = read("synthetic/plate_one_hole.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size, [40.0, 30.0, 10.0]);
+    assert_eq!(envelope.min, [0.0, 0.0, 0.0]);
+    assert_eq!(envelope.max, [40.0, 30.0, 10.0]);
+    assert!(!envelope.approximate, "every face of a plate is analytic");
+}
+
+/// Largest first, so that the three numbers do not depend on how the
+/// part happened to be oriented when it was exported.
+#[test]
+fn the_size_is_stated_largest_first() {
+    for name in [
+        "synthetic/plate_one_hole.stp",
+        "synthetic/shaft_chamfered.stp",
+        "synthetic/plate_four_holes.stp",
+    ] {
+        let doc = read(name);
+        for body in &doc.bodies {
+            let Some(e) = &body.envelope else { continue };
+            assert!(
+                e.size[0] >= e.size[1] && e.size[1] >= e.size[2],
+                "{name}: {:?}",
+                e.size
+            );
+        }
+    }
+}
+
+/// A shaft's widest point is on no vertex: it is the circle capping the
+/// cylinder. A reader that only looked at vertices would report a
+/// diameter of zero here.
+#[test]
+fn a_round_body_is_measured_by_its_circles() {
+    let doc = read("synthetic/shaft_chamfered.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size[1], 20.0, "the shaft is 20 across");
+    assert_eq!(envelope.size[2], 20.0);
+    assert!(!envelope.approximate);
+}
+
+/// An arc bulges past its own endpoints, but never outside the circle it
+/// lies on. A rounded corner well inside the part therefore leaves the
+/// measurement exact rather than turning it into a lower bound.
+#[test]
+fn an_arc_inside_the_box_does_not_make_it_approximate() {
+    let doc = read("synthetic/plate_corner_round.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert_eq!(envelope.size, [40.0, 30.0, 10.0]);
+    assert!(!envelope.approximate);
+}
+
+/// Where the file states a face with no closed form, the box is the
+/// smallest the body can be rather than the size it is, and the document
+/// says which of those it is giving.
+#[test]
+fn a_body_the_reader_cannot_bound_says_so() {
+    let doc = read("nist/nist_ftc_06_asme1_ap242-e2.stp");
+    let envelope = doc.bodies[0].envelope.as_ref().expect("an envelope");
+    assert!(
+        envelope.approximate,
+        "this part has faces with no closed form"
+    );
+    // Still useful: a part that is roughly a foot across says so.
+    assert!(envelope.size[0] > 300.0 && envelope.size[0] < 310.0);
+}
+
+/// One design in two units is one document (ADR 0004), and the envelope
+/// must not be the field that breaks that.
+#[test]
+fn the_same_design_in_inches_states_the_same_size() {
+    let mm = read("synthetic/plate_one_hole.stp");
+    let inches = read("synthetic/plate_one_hole_inches.stp");
+    assert_eq!(
+        mm.bodies[0].envelope, inches.bodies[0].envelope,
+        "millimetres and inches must give one envelope"
+    );
+}

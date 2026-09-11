@@ -70,11 +70,41 @@ pub struct Body {
     pub name: Option<String>,
     /// How many faces went into features and how many did not.
     pub faces: FaceCounts,
+    /// How big the body is, in millimetres. Absent when the file locates
+    /// nothing, as a tessellation-only export does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub envelope: Option<Envelope>,
     /// What was recognised, sorted by id.
     pub features: Vec<Feature>,
     /// Every face that went into no feature, sorted by id. This is not a
     /// diagnostic: it is part of the answer.
     pub unassigned: Vec<UnassignedFace>,
+}
+
+/// The box around a body, and how big that makes it.
+///
+/// Stated in the body's own coordinates, so a part exported on its own
+/// and the same part inside an assembly describe themselves the same
+/// way; where the occurrence sits is the product document's business
+/// (ADR 0014).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Envelope {
+    /// The low corner of the axis-aligned box.
+    pub min: [f64; 3],
+    /// The high corner.
+    pub max: [f64; 3],
+    /// The box's three dimensions, largest first — the three numbers a
+    /// catalogue asks for, in an order that does not depend on how the
+    /// part happened to be oriented when it was exported.
+    pub size: [f64; 3],
+    /// Whether the box is a lower bound rather than the true extent.
+    ///
+    /// True when the body holds something that can reach past everything
+    /// the file locates: an arc bulging beyond its own endpoints, a
+    /// torus, or a face stated with no closed form. The box is then the
+    /// smallest the body can be, not the size it is, and saying so is
+    /// the difference between a measurement and a guess.
+    pub approximate: bool,
 }
 
 /// How much of a body was recognised.

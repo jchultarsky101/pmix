@@ -36,6 +36,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reason, because a file can state geometry it never defines a product
   for and silence would make that look like a part with no shape.
 
+- **Every body states how big it is.** An axis-aligned box and the
+  overall size that box implies, largest dimension first so that the
+  three numbers do not depend on how the part happened to be oriented
+  when it was exported. It is the first thing a catalogue asks for and
+  the last thing `pmix` could say.
+
+  A box is decided by extremes, and for the shapes this reads the
+  extremes are all on something the B-rep states: a vertex, a full
+  circle, or a sphere. An arc bulges past its own endpoints but never
+  outside the circle it lies on, so an arc that stays inside the box
+  everything else made — a rounded corner, the mouth of a hole — leaves
+  the measurement exact. Where a face has no closed form at all, the box
+  is the smallest the body can be rather than the size it is, and
+  `approximate` says which of the two is being given.
+
+  Volume and surface area are *not* computed: those need the trimmed
+  patch of each face, which this B-rep does not hold. ADR 0014 is amended
+  accordingly.
+
 ### Changed
 
 - **What a part has to state before a model can source a substitute for

@@ -12,6 +12,7 @@
 
 pub mod brep;
 pub mod compare;
+pub mod envelope;
 pub mod jt;
 pub mod model;
 mod rules;
@@ -20,7 +21,7 @@ pub mod surface;
 pub mod view;
 
 pub use model::{
-    Body, Diagnostic, FaceCounts, Feature, FeatureDocument, Kind, SCHEMA_VERSION, Shape,
+    Body, Diagnostic, Envelope, FaceCounts, Feature, FeatureDocument, Kind, SCHEMA_VERSION, Shape,
     UnassignedFace, Units,
 };
 

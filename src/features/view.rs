@@ -119,6 +119,7 @@ pub fn narrow(doc: &FeatureDocument, filter: Filter) -> Narrowed {
             id: b.id.clone(),
             name: b.name.clone(),
             faces: b.faces,
+            envelope: b.envelope.clone(),
             features: b
                 .features
                 .iter()
@@ -285,6 +286,7 @@ mod tests {
                 Body {
                     id: "body:a".into(),
                     name: None,
+                    envelope: None,
                     faces: FaceCounts {
                         total: 9,
                         in_features: 3,
@@ -305,6 +307,7 @@ mod tests {
                 Body {
                     id: "body:b".into(),
                     name: Some("pin".into()),
+                    envelope: None,
                     faces: FaceCounts {
                         total: 3,
                         in_features: 1,
