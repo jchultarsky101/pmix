@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-09-11
+
+Documentation only: no code changed and no output moved. Three of these
+are corrections to instructions that were wrong rather than merely
+missing — a checklist that could not reproduce the failure it existed to
+catch, a document sending people after the wrong test file, and a design
+record marked Proposed after two releases had built it. Each was capable
+of costing someone real time.
+
 ### Changed
 
 - **The pre-pull-request checks in `CONTRIBUTING.md` now match what CI
@@ -880,7 +889,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/jchultarsky101/pmix/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/jchultarsky101/pmix/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/jchultarsky101/pmix/compare/v0.12.0...v0.13.0
