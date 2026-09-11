@@ -212,6 +212,36 @@ A curated identity block follows the same rule — `part_number`,
 `supplier`, `manufacturer_part_number`, each naming the raw key it was
 promoted from.
 
+### Amended 2026-09-11, on building stages 3 and 4
+
+**Sheet metal is not recognised, and the class list is shorter for it.**
+Stage 3 asks for a shape class including "constant-wall shell with
+bends". The constant-thickness test that phrase means needs each face
+matched against an offset of another — the same trimmed-surface work
+that puts volume out of reach. Guessing it from a pair of parallel
+planes would call every flat plate sheet metal. So the classes are
+`turned`, `prismatic` and `free_form`, each settled by the surfaces
+themselves, and a body no rule settles is left unclassified rather than
+labelled. A rule that named everything would be telling nobody anything.
+
+**Surface finish is not read, for the reason threads are not parsed.**
+Stage 4 asks for surface texture requirements. Neither corpus holds a
+single one: zero surface-texture entities across the seventeen NIST
+files and across two hundred real exports. A reader for them would be
+written against the specification alone with nothing to check it, which
+is the objection already recorded against stage 1's identity extras and
+against threads.
+
+**The tolerance ranking is by width and for the whole file.** It ranks
+and does not judge: whether a narrow zone *matters* depends on the
+assembly, which is not in the file. And it is stated per document rather
+than per part, because a dimension names the features it controls and
+those are not attributed to a part (ADR 0007) — attributing them would
+need a join the PMI document does not carry. An ISO 286 fit states a
+grade rather than a width, so fits are ranked among themselves and ahead
+of stated widths, carrying the code rather than a number invented for
+them.
+
 ### Stage 3 — interface and class
 
 Two recognitions, both derived, both stated as recognitions.

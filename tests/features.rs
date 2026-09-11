@@ -730,3 +730,63 @@ fn a_pattern_keys_the_same_in_either_unit() {
     let inches = read("synthetic/plate_one_hole_inches.stp");
     assert_eq!(mm.bodies[0].patterns, inches.bodies[0].patterns);
 }
+
+// --- what a body is made of (ADR 0014) ---
+
+/// A lathe cuts surfaces of revolution about one axis and faces flats
+/// square to it. This bar is exactly that.
+#[test]
+fn a_bar_with_a_chamfer_is_turned() {
+    let doc = read("synthetic/shaft_chamfered.stp");
+    let body = &doc.bodies[0];
+    assert_eq!(body.shape_class, Some(features::ShapeClass::Turned));
+    assert_eq!(body.surfaces.counts.get("cylinder"), Some(&1));
+    assert_eq!(body.surfaces.counts.get("cone"), Some(&1));
+    assert_eq!(body.surfaces.without_closed_form, 0);
+}
+
+/// Flats and holes that all run one way: what can be cut from one
+/// direction.
+#[test]
+fn a_plate_with_holes_through_it_is_prismatic() {
+    for name in [
+        "synthetic/plate_one_hole.stp",
+        "synthetic/plate_four_holes.stp",
+        "synthetic/flange_bolt_circle.stp",
+    ] {
+        let doc = read(name);
+        assert_eq!(
+            doc.bodies[0].shape_class,
+            Some(features::ShapeClass::Prismatic),
+            "{name}"
+        );
+    }
+}
+
+/// A part with holes entering from several directions is neither, and
+/// the document says nothing rather than guessing. A rule that labelled
+/// everything would not be telling anyone anything.
+#[test]
+fn a_part_no_rule_settles_is_left_unclassified() {
+    let doc = read("nist/nist_ctc_01_asme1_ap242-e1.stp");
+    assert_eq!(doc.bodies[0].shape_class, None);
+    // But the inventory is still there, because counting always works.
+    assert!(doc.bodies[0].surfaces.counts.values().sum::<usize>() > 50);
+}
+
+/// Every face is counted, whether a rule claimed it or not, so the
+/// inventory always accounts for the whole body.
+#[test]
+fn the_surface_inventory_counts_every_face() {
+    for name in [
+        "synthetic/plate_four_holes.stp",
+        "synthetic/shaft_chamfered.stp",
+        "nist/nist_ctc_03_asme1_ap242-e2.stp",
+    ] {
+        let doc = read(name);
+        for body in &doc.bodies {
+            let counted: usize = body.surfaces.counts.values().sum();
+            assert_eq!(counted, body.faces.total, "{name}");
+        }
+    }
+}

@@ -120,6 +120,8 @@ pub fn narrow(doc: &FeatureDocument, filter: Filter) -> Narrowed {
             name: b.name.clone(),
             faces: b.faces,
             envelope: b.envelope.clone(),
+            surfaces: b.surfaces.clone(),
+            shape_class: b.shape_class,
             // Patterns are about the features as a whole, so a view
             // narrowed to one kind would misrepresent them.
             patterns: if filter.kind.is_some() {
@@ -294,6 +296,8 @@ mod tests {
                     id: "body:a".into(),
                     name: None,
                     envelope: None,
+                    surfaces: Default::default(),
+                    shape_class: None,
                     patterns: Vec::new(),
                     faces: FaceCounts {
                         total: 9,
@@ -316,6 +320,8 @@ mod tests {
                     id: "body:b".into(),
                     name: Some("pin".into()),
                     envelope: None,
+                    surfaces: Default::default(),
+                    shape_class: None,
                     patterns: Vec::new(),
                     faces: FaceCounts {
                         total: 3,

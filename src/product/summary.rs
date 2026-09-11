@@ -97,6 +97,13 @@ pub struct BodySummary {
     pub name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub envelope: Option<Envelope>,
+    /// What kind of shape it is, where a rule settles it. This is the
+    /// vocabulary a search needs: "a turned steel shaft" is something a
+    /// catalogue holds, "a body with 47 faces" is not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape_class: Option<crate::features::ShapeClass>,
+    /// What its faces lie on.
+    pub surfaces: crate::features::Surfaces,
     /// How many features of each kind, by the kind's name.
     pub features: std::collections::BTreeMap<String, usize>,
     /// Faces no rule claimed. Stated so that *not recognised* is not
@@ -167,6 +174,8 @@ pub fn summarise(
                         id: body.id.clone(),
                         name: body.name.clone(),
                         envelope: body.envelope.clone(),
+                        shape_class: body.shape_class,
+                        surfaces: body.surfaces.clone(),
                         features,
                         unassigned_faces: body.faces.unassigned,
                         patterns: body.patterns.clone(),

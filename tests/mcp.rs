@@ -446,3 +446,42 @@ fn the_instructions_say_not_to_send_the_data_anywhere() {
     assert!(instructions.contains("confidential"), "{instructions}");
     assert!(instructions.contains("web search"), "{instructions}");
 }
+
+/// The tolerances a substitute has to hold, ranked by how narrow they
+/// are (ADR 0014).
+#[test]
+fn describing_a_part_ranks_the_tightest_tolerances_first() {
+    let replies = run(&[call(
+        1,
+        "describe_part",
+        json!({ "path": fixture("nist/nist_ctc_01_asme1_ap242-e1.stp") }),
+    )]);
+    let doc = structured(&replies[0]);
+    let critical = doc["fit_critical"].as_array().expect("a ranking");
+    assert!(critical.len() > 3, "{critical:?}");
+
+    let widths: Vec<f64> = critical
+        .iter()
+        .filter_map(|c| c["width"]["value"].as_f64())
+        .collect();
+    assert!(
+        widths.windows(2).all(|w| w[0] <= w[1]),
+        "tightest first: {widths:?}"
+    );
+    // The subtraction is rounded, so no 0.15000000000000002 reaches a
+    // reader.
+    assert_eq!(widths[0], 0.15);
+}
+
+#[test]
+fn a_body_says_what_kind_of_shape_it_is() {
+    let replies = run(&[call(
+        1,
+        "describe_model",
+        json!({ "path": fixture("synthetic/shaft_chamfered.stp") }),
+    )]);
+    // A narrowed view wraps the document beside the filter that made it.
+    let body = &structured(&replies[0])["document"]["bodies"][0];
+    assert_eq!(body["shape_class"], "turned");
+    assert_eq!(body["surfaces"]["counts"]["cylinder"], 1);
+}

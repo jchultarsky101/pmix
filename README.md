@@ -188,6 +188,19 @@ overall 347.6 × 152.4 × 101.6 mm
     12 face(s) no rule claimed
 ```
 
+```text
+tightest tolerances:
+  0.15mm     ⌀20 -0.1/+0.05           dim:40dd540bb0115101
+  0.2mm      ⏥ 0.2                    tol:380949b31983525c
+  0.3mm      ⌀25 ±0.15                dim:f64195ad311966bd
+```
+
+A drawing states every tolerance as an equal and they are not: a bore
+held to ±0.005 is the fit, a ±0.5 on an overall length is the stock it
+was cut from, and a substitute has to hold the first. The ranking is by
+width, not by importance — whether a narrow zone matters depends on the
+assembly, which is not in the file.
+
 Each promoted value names the key it came from, so a promotion can be
 checked rather than trusted. Where several keys claim one field and
 their values disagree — a solid volume and a bounding-box volume both
@@ -246,6 +259,12 @@ body:376fae1082b3ebc9 (PartBody): 117 faces, 59 in features, 58 unassigned
 A bore states the diameter it is called by and a blend states its
 radius; a fillet fills an inside corner and a round breaks an outside
 one, which is the same distinction as a bore against a shaft.
+
+Each body also says what kind of shape it is — `turned` when every
+surface turns about one line, `prismatic` when it could be cut from one
+direction, `free form` when the file states a face with no closed form —
+and what its faces lie on. A body no rule settles is left unclassified
+rather than labelled.
 
 Where alike features repeat, the arrangement is recognised too:
 
@@ -615,7 +634,10 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Hole patterns: bolt circles, rows and grids, with both readings stated where both hold (ADR 0014)
 - [x] JT product structure from the scene graph's node hierarchy: parts, occurrences and placements (ADR 0014)
 - [x] How big the whole assembly is, composed from the placements or read where a file states it (ADR 0014)
+- [x] What kind of shape a body is — turned, prismatic, free form — and what its faces lie on (ADR 0014)
+- [x] The tightest tolerances ranked, which are the ones a substitute has to hold (ADR 0014)
 - [ ] Threads, which neither corpus states: one designation in one NIST file, none in any real export (ADR 0014)
+- [ ] Surface finish, which neither corpus states either: no surface-texture entity in any of the 218 files (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design

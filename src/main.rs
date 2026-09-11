@@ -450,6 +450,13 @@ fn describe(
     let pmi = pmix::load(&input).ok();
     let shapes = pmix::features::read_path(&input).ok();
     let mut parts = pmix::product::summarise(&product, pmi.as_ref(), shapes.as_ref());
+    // The tolerances a substitute has to hold, tightest first. Stated
+    // for the file rather than per part: a dimension names the features
+    // it controls, and those are not attributed to a part (ADR 0007).
+    let critical = pmi
+        .as_ref()
+        .map(|d| pmix::critical::tightest(d, 8))
+        .unwrap_or_default();
 
     if let Some(wanted) = &part {
         parts.retain(|p| &p.id == wanted || p.number.as_deref() == Some(wanted.as_str()));
@@ -465,7 +472,7 @@ fn describe(
     let text = match (json, compact) {
         (true, true) => serde_json::to_string(&parts)?,
         (true, false) => serde_json::to_string_pretty(&parts)?,
-        (false, _) => render_parts(&product, &parts, shapes.as_ref()),
+        (false, _) => render_parts(&product, &parts, shapes.as_ref(), &critical),
     };
     match output {
         Some(path) => std::fs::write(&path, text)
@@ -480,6 +487,7 @@ fn render_parts(
     document: &pmix::product::ProductDocument,
     parts: &[pmix::product::PartSummary],
     shapes: Option<&pmix::features::FeatureDocument>,
+    critical: &[pmix::critical::Critical],
 ) -> String {
     use std::fmt::Write as _;
     let mut out = String::new();
@@ -563,6 +571,15 @@ fn render_parts(
                 );
             }
             let _ = writeln!(out);
+            if let Some(class) = body.shape_class {
+                let kinds: Vec<String> = body
+                    .surfaces
+                    .counts
+                    .iter()
+                    .map(|(k, n)| format!("{n} {k}"))
+                    .collect();
+                let _ = writeln!(out, "    {} of {}", class.name(), kinds.join(", "));
+            }
             for p in &body.patterns {
                 let _ = writeln!(out, "    {}", pattern_line(p));
             }
@@ -618,6 +635,32 @@ fn render_parts(
                     let _ = writeln!(out, "    features: {}", listed.join(", "));
                 }
             }
+        }
+    }
+
+    if !critical.is_empty() {
+        let _ = writeln!(
+            out,
+            "\ntightest tolerances{}:",
+            if parts.len() > 1 {
+                " (for the file; a dimension does not say which part it is on)"
+            } else {
+                ""
+            }
+        );
+        for c in critical {
+            let held = match (&c.fit, &c.width) {
+                (Some(fit), _) => fit.clone(),
+                (None, Some(w)) => format!("{}{}", w.value, w.unit),
+                (None, None) => String::new(),
+            };
+            let _ = writeln!(
+                out,
+                "  {:<10} {:<24} {}",
+                held,
+                c.text.as_deref().unwrap_or(""),
+                c.id
+            );
         }
     }
 
@@ -978,6 +1021,15 @@ fn render_features(document: &pmix::features::FeatureDocument) -> String {
             body.faces.in_features,
             body.faces.unassigned
         );
+        if let Some(class) = body.shape_class {
+            let kinds: Vec<String> = body
+                .surfaces
+                .counts
+                .iter()
+                .map(|(k, n)| format!("{n} {k}"))
+                .collect();
+            let _ = writeln!(out, "  {} of {}", class.name(), kinds.join(", "));
+        }
         for p in &body.patterns {
             let _ = writeln!(out, "  {}  {}", pattern_line(p), p.id);
         }
