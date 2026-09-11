@@ -449,3 +449,31 @@ fn an_approximate_body_makes_the_assembly_approximate() {
     let envelope = doc.envelope.as_ref().expect("an envelope");
     assert!(envelope.approximate);
 }
+
+/// A JT part node points at its own topology segment through a
+/// late-loaded property, so the body join is the mapping the file
+/// already states rather than a walk up the graph.
+#[test]
+fn jt_bodies_go_under_the_parts_that_hold_them() {
+    let doc = read("jt/nist_mtc_assembly.jt");
+    let placed: usize = doc.parts.iter().map(|p| p.bodies.len()).sum();
+    let shapes = features::read_path(&fixture("jt/nist_mtc_assembly.jt")).expect("it reads");
+    assert_eq!(
+        placed + doc.unattached.len(),
+        shapes.bodies.len(),
+        "no body may go missing between the two documents"
+    );
+    assert!(placed > 0, "some body should be placed");
+
+    // And the ids agree, or the join names nothing.
+    let from_features: std::collections::BTreeSet<&str> =
+        shapes.bodies.iter().map(|b| b.id.as_str()).collect();
+    for part in &doc.parts {
+        for body in &part.bodies {
+            assert!(
+                from_features.contains(body.as_str()),
+                "{body} is not a body"
+            );
+        }
+    }
+}

@@ -101,6 +101,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   between silently reporting a bounding-box volume as the part's volume
   and saying that the file states two volumes.
 
+- **`pmix describe`**, one command for "what is this part": identity and
+  revision, each body's size, the features and patterns recognised in
+  it, and the material, mass and finish the file states, promoted into
+  named fields. It is the command line's half of what `describe_part`
+  gives a model, and it degrades gracefully — a file that states
+  geometry and no product still gets its shapes described, with a line
+  saying they have no part number.
+
+- **JT bodies are joined to their parts too.** A JT part node points at
+  its own topology segment through a late-loaded property, so the
+  mapping is the one the file already states.
+
 - **The whole model states how big it is.** A body's box is in its own
   coordinates; what turns a hundred of those into one assembly is the
   placements, so the size of the thing itself belongs to the product

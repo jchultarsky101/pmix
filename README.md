@@ -158,6 +158,38 @@ the occurrence count says. The two numbers differ on purpose, and a body
 that reaches no part at all is listed as unattached with the reason
 rather than left out.
 
+### Describing a part
+
+`pmix describe` gathers all three documents into one answer to "what is
+this part": its number and revision, how big each body is, the features
+and patterns recognised in it, and the material, mass and finish the
+file states, lifted out of its own properties into named fields.
+
+```bash
+pmix describe assembly.stp
+pmix describe assembly.stp --part SYN-BRACKET
+pmix describe assembly.jt --json --output parts.json
+```
+
+```text
+nist_mtc_assembly.jt (JT), 14 parts
+overall 347.6 × 152.4 × 101.6 mm
+
+90591A141 HEX NUT_493_..._90591A141.part  ×11  part:0890dbc4a69fb6b0
+  properties     32 more, see `pmix extract`
+  body body:005750006b307972: 8.052 × 7.326 × 3.2 mm (at least)
+    features: 4 chamfer
+    12 face(s) no rule claimed
+```
+
+Each promoted value names the key it came from, so a promotion can be
+checked rather than trusted. Where several keys claim one field and
+their values disagree — a solid volume and a bounding-box volume both
+read as "volume" — none is promoted and all are named, because a guess
+about a number is worse than no number. `(at least)` on a size means the
+box is a lower bound: the body holds a face with no closed form, so it
+can reach past everything the file locates.
+
 ### Comparing models
 
 Diff the PMI of two models, or of JSON documents written by `pmix extract`:

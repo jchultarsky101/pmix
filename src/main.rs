@@ -105,6 +105,37 @@ enum Command {
         compact: bool,
     },
 
+    /// Describe a part: what it is, how big it is, and what it is made of.
+    ///
+    /// Gathers all three documents into one answer — identity and
+    /// revision, each body's size and the features and patterns
+    /// recognised in it, and the material, mass and finish the file
+    /// states, lifted out of its own properties into named fields.
+    ///
+    /// This is the view to reach for when the question is what a part
+    /// *is*, rather than what its shape is or what its file says. Use
+    /// `pmix product` first to see what parts a file holds.
+    Describe {
+        /// Path to the model (.stp, .step, or .jt).
+        input: PathBuf,
+
+        /// Only this part, by its id or its part number.
+        #[arg(short, long)]
+        part: Option<String>,
+
+        /// Where to write the output. Defaults to standard output.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Emit JSON instead of text.
+        #[arg(long)]
+        json: bool,
+
+        /// Emit compact JSON instead of pretty-printed JSON.
+        #[arg(long, requires = "json")]
+        compact: bool,
+    },
+
     /// Compare the PMI of two or more models.
     ///
     /// Inputs are model files (extracted on the fly) or JSON documents
@@ -229,6 +260,13 @@ fn run(cli: Cli) -> Result<ExitCode> {
             json,
             compact,
         } => product(input, output, json, compact),
+        Command::Describe {
+            input,
+            part,
+            output,
+            json,
+            compact,
+        } => describe(input, part, output, json, compact),
         Command::Diff { inputs, json } => diff(inputs, json),
         Command::Mcp => {
             tracing::info!("serving over standard input and output");
@@ -391,6 +429,205 @@ fn render_product(document: &pmix::product::ProductDocument) -> String {
         }
     }
 
+    for d in &document.diagnostics {
+        let _ = writeln!(out, "\nnote: {}", d.message);
+    }
+    out
+}
+
+fn describe(
+    input: PathBuf,
+    part: Option<String>,
+    output: Option<PathBuf>,
+    json: bool,
+    compact: bool,
+) -> Result<ExitCode> {
+    tracing::info!(input = %input.display(), "describing");
+    let product = pmix::product::read_path(&input)
+        .with_context(|| format!("failed to read `{}`", input.display()))?;
+    // A part's material is in the PMI document and its size is in the
+    // features document; what a part *is* needs all three (ADR 0014).
+    let pmi = pmix::load(&input).ok();
+    let shapes = pmix::features::read_path(&input).ok();
+    let mut parts = pmix::product::summarise(&product, pmi.as_ref(), shapes.as_ref());
+
+    if let Some(wanted) = &part {
+        parts.retain(|p| &p.id == wanted || p.number.as_deref() == Some(wanted.as_str()));
+        if parts.is_empty() {
+            anyhow::bail!(
+                "`{}` names no part `{wanted}`; run `pmix product {}` to see what it holds",
+                input.display(),
+                input.display()
+            );
+        }
+    }
+
+    let text = match (json, compact) {
+        (true, true) => serde_json::to_string(&parts)?,
+        (true, false) => serde_json::to_string_pretty(&parts)?,
+        (false, _) => render_parts(&product, &parts, shapes.as_ref()),
+    };
+    match output {
+        Some(path) => std::fs::write(&path, text)
+            .with_context(|| format!("failed to write `{}`", path.display()))?,
+        None => print!("{text}"),
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// What each part is, as a person would want to read it.
+fn render_parts(
+    document: &pmix::product::ProductDocument,
+    parts: &[pmix::product::PartSummary],
+    shapes: Option<&pmix::features::FeatureDocument>,
+) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::new();
+    let _ = writeln!(
+        out,
+        "{} ({}), {} part{}",
+        document.source.file_name,
+        document.source.format,
+        parts.len(),
+        if parts.len() == 1 { "" } else { "s" }
+    );
+    if let Some(e) = &document.envelope {
+        let _ = writeln!(
+            out,
+            "overall {} \u{d7} {} \u{d7} {} mm{}",
+            e.size[0],
+            e.size[1],
+            e.size[2],
+            if e.approximate { " (at least)" } else { "" }
+        );
+    }
+
+    for part in parts {
+        let name = part
+            .number
+            .clone()
+            .or_else(|| part.name.clone())
+            .unwrap_or_else(|| part.id.clone());
+        let _ = write!(out, "\n{name}");
+        if let Some(rev) = &part.revision {
+            let _ = write!(out, " rev {rev}");
+        }
+        let _ = writeln!(out, "  \u{d7}{}  {}", part.occurrences.max(1), part.id);
+        if let Some(d) = &part.description {
+            let _ = writeln!(out, "  {d}");
+        }
+        for a in &part.attributes {
+            let unit = a.unit.as_deref().unwrap_or("");
+            let _ = writeln!(
+                out,
+                "  {:<14} {}{}   (from {})",
+                a.field,
+                a.value.canonical(),
+                unit,
+                a.from
+            );
+        }
+        for a in &part.ambiguous {
+            let _ = writeln!(
+                out,
+                "  {:<14} not stated: {} keys disagree ({})",
+                a.field,
+                a.candidates.len(),
+                a.candidates
+                    .iter()
+                    .map(|c| c.key.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+        }
+        if part.other_properties > 0 {
+            let _ = writeln!(
+                out,
+                "  {:<14} {} more, see `pmix extract`",
+                "properties", part.other_properties
+            );
+        }
+        for body in &part.bodies {
+            let _ = write!(out, "  body {}", body.id);
+            if let Some(n) = &body.name {
+                let _ = write!(out, " ({n})");
+            }
+            if let Some(e) = &body.envelope {
+                let _ = write!(
+                    out,
+                    ": {} \u{d7} {} \u{d7} {} mm{}",
+                    e.size[0],
+                    e.size[1],
+                    e.size[2],
+                    if e.approximate { " (at least)" } else { "" }
+                );
+            }
+            let _ = writeln!(out);
+            for p in &body.patterns {
+                let _ = writeln!(out, "    {}", pattern_line(p));
+            }
+            if !body.features.is_empty() {
+                let kinds: Vec<String> = body
+                    .features
+                    .iter()
+                    .map(|(k, n)| format!("{n} {k}"))
+                    .collect();
+                let _ = writeln!(out, "    features: {}", kinds.join(", "));
+            }
+            if body.unassigned_faces > 0 {
+                let _ = writeln!(out, "    {} face(s) no rule claimed", body.unassigned_faces);
+            }
+        }
+    }
+    // A file can state geometry and never define a product for it — a
+    // part exported on its own often does. The shapes are still worth
+    // describing; what is missing is the part number beside them, and
+    // saying that is better than an empty answer.
+    if parts.is_empty() {
+        if let Some(shapes) = shapes.filter(|s| !s.bodies.is_empty()) {
+            let _ = writeln!(
+                out,
+                "\nThis file states no part, so these shapes have no part number:"
+            );
+            for body in &shapes.bodies {
+                let _ = write!(out, "\n  body {}", body.id);
+                if let Some(n) = &body.name {
+                    let _ = write!(out, " ({n})");
+                }
+                if let Some(e) = &body.envelope {
+                    let _ = write!(
+                        out,
+                        ": {} \u{d7} {} \u{d7} {} mm{}",
+                        e.size[0],
+                        e.size[1],
+                        e.size[2],
+                        if e.approximate { " (at least)" } else { "" }
+                    );
+                }
+                let _ = writeln!(out);
+                for p in &body.patterns {
+                    let _ = writeln!(out, "    {}", pattern_line(p));
+                }
+                let mut kinds: std::collections::BTreeMap<&str, usize> = Default::default();
+                for f in &body.features {
+                    *kinds.entry(f.kind.name()).or_default() += 1;
+                }
+                if !kinds.is_empty() {
+                    let listed: Vec<String> =
+                        kinds.iter().map(|(k, n)| format!("{n} {k}")).collect();
+                    let _ = writeln!(out, "    features: {}", listed.join(", "));
+                }
+            }
+        }
+    }
+
+    // When nothing was named, the line above already said why; listing
+    // every body again as "unattached" would be the same fact twice.
+    if !parts.is_empty() {
+        for u in &document.unattached {
+            let _ = writeln!(out, "\nunattached {}: {}", u.body, u.reason);
+        }
+    }
     for d in &document.diagnostics {
         let _ = writeln!(out, "\nnote: {}", d.message);
     }

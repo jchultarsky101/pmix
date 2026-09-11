@@ -79,7 +79,26 @@ pub fn document(jt: &Jt<'_>, source: Source) -> ProductDocument {
     let declared_length = declared.and_then(property::unit_name).map(str::to_owned);
     let scale = scale_of(declared_length.as_deref());
 
-    let (parts, relations) = build(&graph, &scene, scale, &mut diagnostics);
+    let (mut parts, relations) = build(&graph, &scene, scale, &mut diagnostics);
+
+    // Each body under the part that holds it. A part node points at its
+    // own topology segment through a late-loaded property, so the
+    // mapping is the one the file already states — no walk needed, which
+    // is the one thing easier here than in STEP (ADR 0014).
+    let mut unattached = Vec::new();
+    for (owner, body) in bodies(jt, &scene, &mut diagnostics) {
+        let under = owner
+            .and_then(|node| part_id_of(&graph, &scene, node, &parts))
+            .and_then(|id| parts.iter_mut().find(|p| p.id == id));
+        match under {
+            Some(part) => part.bodies.push(body),
+            None => unattached.push(crate::product::model::Unattached {
+                body,
+                reason: "no part node points at the topology segment this shape was read from"
+                    .into(),
+            }),
+        }
+    }
 
     // A partition node states the box around everything beneath it.
     // Reading it beats computing one, and it is there even in a file
@@ -124,12 +143,73 @@ pub fn document(jt: &Jt<'_>, source: Source) -> ProductDocument {
         },
         parts,
         relations,
-        unattached: Vec::new(),
+        unattached,
         roots: Vec::new(),
         diagnostics,
     };
     doc.settle();
     doc
+}
+
+/// Every body the file holds, with the node that points at it.
+///
+/// Read the same way [`crate::features::from_jt`] reads them, and in the
+/// same order, so that a body has one id whichever document names it.
+fn bodies(
+    jt: &Jt<'_>,
+    scene: &Properties,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<(Option<i32>, String)> {
+    use super::stt;
+    use crate::features::brep::Solid;
+
+    let mut solids: Vec<Solid> = Vec::new();
+    let mut owners: Vec<Option<i32>> = Vec::new();
+    for segment in jt.segments().iter().filter(|s| s.kind == SegmentKind::Stt) {
+        let Ok(data) = jt.segment_data(segment) else {
+            diagnostics.push(Diagnostic {
+                message: format!("topology segment {} could not be read", segment.id),
+            });
+            continue;
+        };
+        for element in crate::jt::Elements::new(&data) {
+            if element.object_type != stt::STT_ELEMENT {
+                continue;
+            }
+            if let Ok(t) = stt::parse(element.data) {
+                solids.push(crate::features::jt::solid(&t));
+                owners.push(scene.owner_of(segment.id));
+            }
+        }
+    }
+
+    crate::features::recognise_in_order(&solids)
+        .into_iter()
+        .zip(owners)
+        .map(|(body, owner)| (owner, body.id))
+        .collect()
+}
+
+/// The part a node belongs to: itself when it is a part node, or the
+/// part above it.
+fn part_id_of(graph: &Graph, scene: &Properties, node: i32, parts: &[Part]) -> Option<String> {
+    let n = graph.nodes.get(&node)?;
+    let at = if n.kind == NodeKind::Part || n.kind == NodeKind::Partition {
+        node
+    } else {
+        let mut parent: BTreeMap<i32, i32> = BTreeMap::new();
+        for node in graph.nodes.values() {
+            for child in &node.children {
+                parent.entry(*child).or_insert(node.id);
+            }
+        }
+        part_above(graph, &parent, node, REACH)?
+    };
+    let name = part_name(graph, scene, at)?;
+    parts
+        .iter()
+        .find(|p| p.number.as_deref() == Some(name.as_str()))
+        .map(|p| p.id.clone())
 }
 
 /// The parts and the occurrences the graph describes.
