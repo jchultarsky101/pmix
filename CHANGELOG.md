@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-09-11
+
+`pmix` answers a third question: what a file *contains*. Until now it
+could say what a file states and what its shapes are, and a body had no
+part number beside it — which is enough to compare two revisions and not
+enough to look anything up. `pmix product` and `pmix describe` close
+that, for STEP and for JT, and two new tools give a language model the
+same reach. The work is ADR 0014's first two stages; the record is
+amended four times with what building it contradicted.
+
 ### Added
 
 - **`pmix product`**, a third document saying what a file *contains*
@@ -781,7 +791,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/jchultarsky101/pmix/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/jchultarsky101/pmix/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/jchultarsky101/pmix/compare/v0.10.0...v0.11.0

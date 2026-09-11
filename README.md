@@ -16,6 +16,12 @@ Run it on two or more models and `pmix diff` answers questions like "did
 the tolerances change between revision B and revision C?" or "which
 components changed material?" without opening a CAD package.
 
+`pmix product` reads a third thing: what the file *contains*. Which
+parts it names, at what revision, how many of each, and where each one
+sits — the bill of materials that turns a pile of anonymous bodies into
+components you can look up. `pmix describe` gathers all three into one
+answer to "what is this part".
+
 `pmix features` reads the geometry instead of the annotations, and
 describes the holes, counterbores, countersinks, bosses, fillets, rounds
 and chamfers a part is made of, with their sizes and positions. That is the base data for
