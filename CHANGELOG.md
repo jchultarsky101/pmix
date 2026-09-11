@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Announcing a release is part of cutting one**, recorded in
+  `CONTRIBUTING.md` as a numbered checklist and in `CLAUDE.md` as a rule
+  of its own. Pushing the tag publishes the binaries and tells nobody,
+  and the step after it has been missed more than once — 0.14.0 shipped
+  unannounced.
+
 - **ADR 0014 is accepted**, having been built across 0.14.0 and 0.15.0
   and amended four times with what building it contradicted.
 

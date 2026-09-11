@@ -83,10 +83,25 @@ Once approved and green in CI, a maintainer will merge it.
 
 ## Releases
 
-Releases are cut by the maintainers. The version in `Cargo.toml` is bumped,
-`CHANGELOG.md` gets a new dated section, and a `vX.Y.Z` tag is pushed;
-cargo-dist then builds the binaries and installers and attaches them to the
-GitHub release ([ADR 0006](docs/adr/0006-distribution.md)).
+Releases are cut by the maintainers, in this order:
+
+1. Bump the version in `Cargo.toml`.
+2. Move `## [Unreleased]` in `CHANGELOG.md` into a new dated section, with
+   a short paragraph saying what the release is *for*, and add the
+   comparison link at the foot of the file.
+3. Open a pull request for the two, and merge it once the checks pass.
+4. Push a `vX.Y.Z` tag. cargo-dist builds the binaries and installers and
+   attaches them to the GitHub release
+   ([ADR 0006](docs/adr/0006-distribution.md)). **The tag is what
+   publishes** — nothing is released until it is pushed.
+5. **Announce it.** Post a short note to the team's Slack channel: the
+   version, the release link, a few bullets of what changed, and any
+   action users must take. Mention breaking changes explicitly and say
+   "no action needed" when there are none.
+
+Step 5 is the one that gets forgotten, because step 4 makes the release
+*exist* and it is easy to stop there. A release nobody is told about is a
+release nobody uses.
 
 ## Licence
 
