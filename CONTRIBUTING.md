@@ -29,14 +29,21 @@ cargo build
 cargo test
 ```
 
-Before opening a pull request, run the same checks CI runs:
+Before opening a pull request, run the same checks CI runs — all four,
+with the same environment, because two of them only fail when warnings
+are denied:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-features
-cargo doc --no-deps --document-private-items
+RUSTFLAGS="-D warnings" cargo clippy --all-targets --all-features -- -D warnings
+RUSTFLAGS="-D warnings" cargo test --all-features
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --document-private-items --all-features
 ```
+
+The `RUSTDOCFLAGS` on the last one is not decoration. Without it the doc
+build *passes* on a rustdoc link to a private item, and CI fails on it —
+which is exactly how a pull request in this repository went red with the
+other three green.
 
 ## Making changes
 
@@ -89,7 +96,8 @@ Releases are cut by the maintainers, in this order:
 2. Move `## [Unreleased]` in `CHANGELOG.md` into a new dated section, with
    a short paragraph saying what the release is *for*, and add the
    comparison link at the foot of the file.
-3. Open a pull request for the two, and merge it once the checks pass.
+3. Open a pull request for the two. Run the four checks above locally
+   first — the docs build included — and merge once CI is green.
 4. Push a `vX.Y.Z` tag. cargo-dist builds the binaries and installers and
    attaches them to the GitHub release
    ([ADR 0006](docs/adr/0006-distribution.md)). **The tag is what
