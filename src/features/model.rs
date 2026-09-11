@@ -74,6 +74,13 @@ pub struct Body {
     /// nothing, as a tessellation-only export does.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub envelope: Option<Envelope>,
+    /// What the body's faces lie on.
+    pub surfaces: Surfaces,
+    /// What kind of shape it is, where a rule settles it (ADR 0014).
+    /// Absent when none does, which is not a failure: plenty of parts
+    /// are neither turned nor prismatic and saying so would be a guess.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape_class: Option<ShapeClass>,
     /// What was recognised, sorted by id.
     pub features: Vec<Feature>,
     /// Arrangements of those features that a rule recognised: bolt
@@ -112,6 +119,53 @@ pub struct Envelope {
     /// smallest the body can be, not the size it is, and saying so is
     /// the difference between a measurement and a guess.
     pub approximate: bool,
+}
+
+/// What a body's faces lie on.
+///
+/// The coarsest description of a shape there is, and the one a person
+/// reaches for first: a body of 40 planes and 12 cylinders is a milled
+/// bracket, and one of 200 faces with no closed form is a casting.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct Surfaces {
+    /// How many faces lie on each kind of surface, by the kind's name.
+    pub counts: std::collections::BTreeMap<String, usize>,
+    /// How many of them the file gives no closed form for. Counted
+    /// separately because it is the number that says how much of the
+    /// shape this reader cannot describe.
+    pub without_closed_form: usize,
+}
+
+/// What a body is, as its surfaces decide it.
+///
+/// Deliberately short, for the reason [`Kind`] is: a class is here only
+/// where a local rule settles it (ADR 0011). Sheet metal is absent on
+/// purpose — the constant-thickness test people mean by it needs each
+/// face matched against an offset of another, and guessing it from a
+/// pair of parallel planes would be wrong on every flat plate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ShapeClass {
+    /// Every surface turns about one line and every flat is square to
+    /// it: what a lathe makes.
+    Turned,
+    /// Every face is flat, or a wall running the same way as every
+    /// other wall: what can be cut from one direction.
+    Prismatic,
+    /// At least one face the file states with no closed form. Nothing
+    /// further can be concluded about a shape this reader cannot
+    /// describe the surface of.
+    FreeForm,
+}
+
+impl ShapeClass {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Turned => "turned",
+            Self::Prismatic => "prismatic",
+            Self::FreeForm => "free form",
+        }
+    }
 }
 
 /// How much of a body was recognised.

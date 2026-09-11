@@ -586,6 +586,8 @@ pub fn recognise(solid: &Solid, ids: &mut ContentId) -> Body {
             unassigned: unassigned.len(),
         },
         envelope: super::envelope::of(solid),
+        surfaces: super::form::surfaces(solid),
+        shape_class: super::form::class_of(solid),
         patterns: super::patterns::recognise(&features, ids),
         features,
         unassigned,

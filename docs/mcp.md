@@ -197,6 +197,12 @@ promoted out of the properties in the PMI document — material, mass,
 volume, density, finish, supplier, and the rest — each naming the key it
 came from and the unit that key declared.
 
+`fit_critical` ranks the file's tolerances by how narrow they are,
+tightest first — the ones a replacement has to hold. It is ranked by
+width, not by importance, and stated for the whole file rather than per
+part, because a dimension names the features it controls and those are
+not attributed to a part.
+
 Read `ambiguous` alongside `attributes`: a field there had more than one
 key claiming it with values that disagree, and none was promoted. Read
 `approximate` on an envelope too — a box so marked is the smallest the
@@ -411,6 +417,13 @@ Everything the command line will not, since it is the same library:
   ([ADR 0011](adr/0011-feature-recognition.md)).
 - **Choose between two readings of one pattern.** Four holes on a square
   are a grid and a bolt circle; it states both and says they overlap.
+- **Recognise sheet metal**, whose constant-thickness test needs each
+  face matched against an offset of another. The shape classes are
+  `turned`, `prismatic` and `free_form`, and a body no rule settles is
+  left unclassified.
+- **Read a surface finish, or a thread designation.** Neither is in any
+  file this has been tested against
+  ([ADR 0014](adr/0014-part-description-for-sourcing.md)).
 - **Detect a rotation** as a single fact; it reports the shapes as
   present and moved, and stops.
 - **Read a JT that carries no precise geometry.** It says so.

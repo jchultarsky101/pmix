@@ -26,6 +26,7 @@
 //! identity scheme; records named for design intent, such as datums and
 //! saved views, get the same id from either format.
 
+pub mod critical;
 pub mod diff;
 pub mod features;
 pub mod fingerprint;

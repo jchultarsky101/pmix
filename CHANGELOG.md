@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Every body says what kind of shape it is** and what its faces lie
+  on (ADR 0014). `turned` when every surface turns about one line and
+  every flat is square to it; `prismatic` when every face is flat or a
+  wall running the same way as every other; `free_form` when the file
+  states a face with no closed form. A body no rule settles is left
+  unclassified rather than labelled — a rule that named everything would
+  be telling nobody anything.
+
+  This is the vocabulary a catalogue search needs: "a turned steel
+  shaft" is a thing a supplier stocks, "a body with 47 faces" is not.
+  Sheet metal is deliberately absent; see the ADR.
+
+- **The tightest tolerances are ranked**, in `pmix describe` and in
+  `describe_part`. A drawing states every tolerance as an equal and they
+  are not: a bore held to ±0.005 is the fit, a ±0.5 on an overall length
+  is the stock it was cut from, and a substitute has to hold the first.
+  ISO 286 fits are ranked by grade, ahead of stated widths, carrying
+  their code rather than a number invented for them. Widths are rounded
+  as every other measured number is, so no 0.15000000000000002 reaches a
+  reader.
+
+  It ranks and does not judge: whether a narrow zone matters depends on
+  the assembly, which is not in the file.
+
 ### Changed
 
 - **Configuring the MCP server in Claude Desktop is documented** in

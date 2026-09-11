@@ -13,6 +13,7 @@
 pub mod brep;
 pub mod compare;
 pub mod envelope;
+pub mod form;
 pub mod jt;
 pub mod model;
 pub mod patterns;
@@ -23,7 +24,7 @@ pub mod view;
 
 pub use model::{
     Body, Diagnostic, Envelope, FaceCounts, Feature, FeatureDocument, Kind, Pattern, PatternKind,
-    SCHEMA_VERSION, Shape, UnassignedFace, Units,
+    SCHEMA_VERSION, Shape, ShapeClass, Surfaces, UnassignedFace, Units,
 };
 
 use crate::model::ContentId;
