@@ -272,13 +272,21 @@ or, in a client's configuration file:
 { "mcpServers": { "pmix": { "command": "pmix", "args": ["mcp"] } } }
 ```
 
-It offers four tools — `describe_model`, `compare_models`, `extract_pmi`,
-`diff_pmi` — each a call into the library and nothing more. They are
-shaped for a context window rather than for completeness: `describe_model`
-with `summary: true` returns each body's counts without listing anything,
-and `body`, `kind`, and `only_changed` narrow the rest, with counts always
-describing the whole body whatever a view lists. The tools read files and
-change nothing.
+It offers six tools — `list_parts`, `describe_part`, `describe_model`,
+`compare_models`, `extract_pmi`, `diff_pmi` — each a call into the
+library and nothing more. They are shaped for a context window rather
+than for completeness: `list_parts` counts a part's occurrences without
+listing them, `describe_model` with `summary: true` returns each body's
+counts without listing anything, and `part`, `body`, `kind`, `tree` and
+`only_changed` narrow the rest, with counts always describing the whole
+body whatever a view lists. The tools read files and change nothing.
+
+To identify or source a part, start with `list_parts` and then
+`describe_part`: a body means nothing to a catalogue until it has a part
+number and a revision beside it. The server's instructions tell a model
+that these files may describe confidential designs and that identifiers
+read from one are not to be sent to a web search or any other service
+unless the user asked.
 
 What the model adds is what this project deliberately does not: naming a
 pattern in four moved holes, joining a changed diameter to the tolerance
@@ -543,7 +551,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Joining each body to the part it realises, so a shape has a part number beside it (ADR 0014)
 - [ ] Owning organisation, approval, and security classification, which no file in the public corpus states (ADR 0014)
 - [x] An envelope per body: how big it is, and whether that is a measurement or a lower bound (ADR 0014)
-- [ ] Material, mass and volume promoted out of the properties that carry them (ADR 0014)
+- [x] Material, mass and volume promoted out of the properties that carry them, with disagreement stated rather than resolved (ADR 0014)
+- [x] `list_parts` and `describe_part` over the Model Context Protocol, and the caution that travels with them (ADR 0014)
 - [ ] Hole patterns and threads, the interface a substitute part has to match (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 

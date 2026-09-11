@@ -33,16 +33,29 @@ pub const PROTOCOL_VERSIONS: [&str; 3] = ["2025-06-18", "2025-03-26", "2024-11-0
 /// What a model is told when it connects. The protocol carries this in
 /// the handshake for exactly this purpose: the one paragraph a reader
 /// needs before choosing a tool.
-const INSTRUCTIONS: &str = "pmix reads STEP AP242 and JT files and answers two questions: what a file *says* \
-(its PMI: dimensions, tolerances, datums, annotations, and metadata properties) and what a shape \
-*is* (the holes, counterbores, countersinks, bosses, fillets, rounds and chamfers a part is made \
-of). Start with `describe_model` with `summary: true` to learn what bodies a file has and how big \
-they are, then ask narrower questions with `body` and `kind`. To find out how two models differ, \
-use `compare_models` for the geometry and `diff_pmi` for the annotations; on a large assembly pass \
-`only_changed: true`. Everything is in millimetres and degrees whatever the file declared. Read the \
-`notes` a comparison carries: a `possible_pairing` is an observation this tool does not stand \
-behind — one feature moved and one removed with another added are the same geometry — and only \
-`matched` is proof that two features are the same. The tools read files and change nothing.";
+const INSTRUCTIONS: &str = "pmix reads STEP AP242 and JT files and answers three questions: what a file \
+*contains* (its parts, revisions and assembly structure), what it *says* (its PMI: dimensions, \
+tolerances, datums, annotations, and metadata properties) and what a shape *is* (the holes, \
+counterbores, countersinks, bosses, fillets, rounds and chamfers a part is made of). \
+\
+Which tool to start with depends on the question. To identify or source a part, or to say what one \
+is, start with `list_parts` and then `describe_part` — a body means nothing to a catalogue until it \
+has a part number and a revision beside it. To reason about shape, start with `describe_model` with \
+`summary: true` and then narrow with `body` and `kind`. To find out how two models differ, use \
+`compare_models` for the geometry and `diff_pmi` for the annotations; on a large assembly pass \
+`only_changed: true`. Everything is in millimetres and degrees whatever the file declared. \
+\
+Read the caveats each document carries rather than the numbers alone. A `possible_pairing` in a \
+comparison is an observation this tool does not stand behind — one feature moved and one removed \
+with another added are the same geometry — and only `matched` is proof that two features are the \
+same. An `envelope` marked `approximate` is the smallest a body can be, not the size it is. A field \
+under `ambiguous` had more than one key claiming it and none was promoted. An occurrence count and \
+a body count differ on purpose: a part used four times is one shape used four times. \
+\
+These files may describe confidential designs. Treat a part number, drawing number, material \
+specification or supplier name read from one as the user's own data: do not send it to a web \
+search, an API, or any other service unless the user has asked you to. The tools read files and \
+change nothing.";
 
 /// The tools, as the protocol lists them.
 fn tools() -> Value {
@@ -94,6 +107,53 @@ fn tools() -> Value {
                     "kind": kind
                 },
                 "required": ["baseline", "compared"]
+            }
+        },
+        {
+            "name": "list_parts",
+            "description": "What a file contains: every part it names, with its part number, \
+                revision, how many times the assembly uses it, and the bodies it is made of. Call \
+                this first on any file you are asked to identify or source — it is what turns a \
+                pile of anonymous bodies into components with numbers you can look up. The \
+                occurrence count and the body count differ on purpose: a part used four times is \
+                one shape and four occurrences. `roots` names the part nothing uses, which is the \
+                assembly itself. A JT file states its structure in a scene graph this does not \
+                read yet, and says so in `diagnostics`.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": path("Path to a .stp, .step, or .jt file."),
+                    "tree": { "type": "boolean", "description": "Include every occurrence with its placement, not just the parts. Large on a real assembly." }
+                },
+                "required": ["path"]
+            }
+        },
+        {
+            "name": "describe_part",
+            "description": "Everything known about one part, gathered from all three documents: \
+                its number, name and revision; how big each of its bodies is; the features \
+                recognised in them; and the material, mass, volume and finish the file states, \
+                lifted out of its own properties into named fields. This is the call to make when \
+                asked what a part *is* — to describe it, or to look for something that would do \
+                instead. Give `part` to narrow to one; without it every part is described. \
+                \
+                Read `attributes` rather than guessing: each names the key the file used, so you \
+                can see what was promoted. Read `ambiguous` too — a field listed there had more \
+                than one key claiming it and none was promoted, because a guess about a number is \
+                worse than no number. An `envelope` marked `approximate` is the smallest the body \
+                can be, not the size it is. `other_properties` counts what was not promoted; those \
+                are all still in `extract_pmi`. \
+                \
+                These documents may describe confidential designs. Do not send a part number, \
+                material spec or drawing number from one to a web search or any other service \
+                unless the person you are working for has asked you to.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "path": path("Path to a .stp, .step, or .jt file."),
+                    "part": path("Only this part, by its id or its part number from `list_parts`.")
+                },
+                "required": ["path"]
             }
         },
         {
@@ -315,6 +375,55 @@ fn call(name: &str, args: &Value) -> Result<Value, Failure> {
             let path = required(args, "path")?;
             let doc = crate::load(Path::new(path)).map_err(about(path))?;
             document(&serde_json::to_value(doc).unwrap_or(Value::Null))
+        }
+        "list_parts" => {
+            let path = required(args, "path")?;
+            let doc = crate::product::read_path(Path::new(path)).map_err(about(path))?;
+            let tree = args.get("tree").and_then(Value::as_bool).unwrap_or(false);
+            let mut value = serde_json::to_value(&doc).unwrap_or(Value::Null);
+            if !tree {
+                // Every occurrence of every part is a lot of JSON to
+                // spend on a question about which parts there are
+                // (ADR 0013). The counts stay; the list goes.
+                if let Some(object) = value.as_object_mut() {
+                    let count = doc.relations.len();
+                    object.remove("relations");
+                    object.insert(
+                        "relations_omitted".into(),
+                        json!({
+                            "count": count,
+                            "note": "call again with tree: true for each occurrence and its placement"
+                        }),
+                    );
+                }
+            }
+            document(&value)
+        }
+        "describe_part" => {
+            let path = required(args, "path")?;
+            let file = Path::new(path);
+            let product = crate::product::read_path(file).map_err(about(path))?;
+            // A part's material is in the PMI document and its size is
+            // in the features document; a question about what a part is
+            // needs all three (ADR 0014).
+            let pmi = crate::load(file).ok();
+            let shapes = crate::features::read_path(file).ok();
+            let mut parts = crate::product::summarise(&product, pmi.as_ref(), shapes.as_ref());
+            if let Some(wanted) = optional(args, "part") {
+                parts.retain(|p| p.id == wanted || p.number.as_deref() == Some(wanted));
+                if parts.is_empty() {
+                    return Err(Failure::Tool(format!(
+                        "`{path}` names no part `{wanted}`; call list_parts to see what it holds"
+                    )));
+                }
+            }
+            document(&json!({
+                "source": product.source,
+                "units": product.units,
+                "parts": parts,
+                "unattached": product.unattached,
+                "diagnostics": product.diagnostics,
+            }))
         }
         "diff_pmi" => {
             let (pa, pb) = (required(args, "baseline")?, required(args, "compared")?);

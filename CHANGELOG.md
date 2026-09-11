@@ -55,6 +55,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   patch of each face, which this B-rep does not hold. ADR 0014 is amended
   accordingly.
 
+- **`list_parts` and `describe_part`**, two new Model Context Protocol
+  tools (ADR 0013, ADR 0014). `list_parts` gives a model the bill of
+  materials — which parts, what revision, how many of each — and
+  `describe_part` gathers all three documents into one answer to "what
+  is this part": its number and revision, how big each body is, the
+  features recognised in them, and the material, mass and finish the
+  file states. `describe_model` stays geometry-only.
+
+  The server's instructions now say that these files may describe
+  confidential designs and that a part number or material spec read from
+  one is not to be sent to a web search or any other service unless the
+  user asked. That paragraph is the one thing a client shows a model
+  before it picks a tool, and it is where a caution cannot be stripped
+  by a transport that renders only the fields it understands.
+
+- **Material, mass, volume and the rest are promoted out of the
+  properties that carry them**, into named fields that say which key
+  they came from. Matching is by what a key *says* — ordinary words for
+  the thing — rather than by a table of keys copied from one exporter.
+
+  Nothing is lost: an unmatched key stays exactly where it was, and each
+  part counts what was not promoted. Where several keys claim one field
+  the values decide it — agreement promotes once, disagreement promotes
+  nothing and shows every candidate, because a guess about a material or
+  a mass is worse than none. On a real corpus that is the difference
+  between silently reporting a bounding-box volume as the part's volume
+  and saying that the file states two volumes.
+
 ### Changed
 
 - **What a part has to state before a model can source a substitute for
