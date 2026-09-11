@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-09-11
+
+Two things a sourcing question needs that the documents held the makings
+of and never said: what kind of shape a body is, and which of a file's
+tolerances are the tight ones. Both are ADR 0014's last two stages, and
+both are deliberately partial — sheet metal and surface finish are left
+out, each because building them would mean encoding assumptions nothing
+available could check.
+
 ### Added
 
 - **Every body says what kind of shape it is** and what its faces lie
@@ -832,7 +841,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/jchultarsky101/pmix/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/jchultarsky101/pmix/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/jchultarsky101/pmix/compare/v0.11.0...v0.12.0
