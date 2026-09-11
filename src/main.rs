@@ -874,8 +874,9 @@ fn inspect_jt(input: PathBuf, opts: InspectOptions) -> Result<()> {
             error: None,
             elements: Vec::new(),
         };
-        // Only segments carrying PMI are decoded; geometry is listed only.
-        if segment.kind.carries_pmi() {
+        // Segments whose elements are worth listing are decoded; geometry
+        // is listed only.
+        if segment.kind.carries_elements() {
             match jt.segment_data(segment) {
                 Ok(data) => {
                     report.decoded_length = Some(data.len());

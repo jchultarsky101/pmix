@@ -101,6 +101,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   between silently reporting a bounding-box volume as the part's volume
   and saying that the file states two volumes.
 
+- **`pmix product` reads JT files too** (ADR 0014). JT states its
+  structure in the logical scene graph's node hierarchy, which this
+  reader now parses: a part node is a part, an instance node is an
+  occurrence, and a geometric transform attribute says where. The NIST
+  MTC assembly comes out as 14 parts and 57 occurrences with their
+  placements.
+
+  Two things the file taught, both now encoded:
+
+  - **A partition node carries a version number the specification's
+    figure 23 does not show**, between its children and its flags.
+    Without it the file name's character count reads as 6656 instead of
+    26. The seventh place this format disagrees with its own figures.
+  - **The scene graph's numbers are in the unit the file declares**, not
+    in JT's base unit of metres. The topology table *is* in metres, and
+    reading the scene graph the same way puts a 148mm assembly 22 metres
+    from the origin.
+
+  A JT part node carries its material, its surface area and its centre
+  of gravity — and not its name. The name is on the instance node that
+  wraps it, with an occurrence suffix appended, which is dropped because
+  it changes between exports and a part's identity must not.
+
 ### Changed
 
 - **What a part has to state before a model can source a substitute for

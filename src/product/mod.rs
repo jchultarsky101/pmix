@@ -54,38 +54,17 @@ pub fn from_step(bytes: &[u8], file_name: &str) -> crate::Result<ProductDocument
 
 /// Read the product structure of a JT file.
 ///
-/// Not yet: JT states its structure in the logical scene graph's node
-/// hierarchy, which this reader does not parse. The document comes back
-/// empty with a diagnostic saying so, rather than the call failing,
-/// because "this file names no parts I can read" is an answer and a
-/// missing subcommand is not.
+/// JT states its structure in the logical scene graph's node hierarchy:
+/// a part node is a part and an instance node is an occurrence of one
+/// (ADR 0014).
 pub fn from_jt(bytes: &[u8], file_name: &str) -> crate::Result<ProductDocument> {
     let jt = crate::jt::file::Jt::parse(bytes)?;
-    let mut doc = ProductDocument {
-        schema_version: SCHEMA_VERSION,
-        source: crate::model::Source {
-            file_name: file_name.to_owned(),
-            format: "JT".into(),
-            schema: Some(jt.header.version.clone()),
-            writer: None,
-            time_stamp: None,
-        },
-        units: crate::features::Units {
-            length: "mm".into(),
-            angle: "deg".into(),
-            declared_length: None,
-            declared_angle: None,
-        },
-        parts: Vec::new(),
-        relations: Vec::new(),
-        unattached: Vec::new(),
-        roots: Vec::new(),
-        diagnostics: vec![Diagnostic {
-            message: "the JT scene graph's node hierarchy is not read yet, so this file's \
-                      product structure is not stated"
-                .into(),
-        }],
+    let source = crate::model::Source {
+        file_name: file_name.to_owned(),
+        format: "JT".into(),
+        schema: Some(jt.header.version.clone()),
+        writer: None,
+        time_stamp: None,
     };
-    doc.settle();
-    Ok(doc)
+    Ok(crate::jt::product::document(&jt, source))
 }

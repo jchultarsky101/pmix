@@ -172,6 +172,16 @@ impl SegmentKind {
         matches!(self, Self::PmiData | Self::MetaData)
     }
 
+    /// Whether the segment's payload is an element stream worth listing.
+    ///
+    /// The scene graph is one as well as the PMI segments: its elements
+    /// are the nodes that say which parts the file holds and how they
+    /// are arranged (ADR 0014). Geometry segments are listed but not
+    /// decoded, because their elements are megabytes of vertices.
+    pub fn carries_elements(&self) -> bool {
+        self.carries_pmi() || matches!(self, Self::LogicalSceneGraph)
+    }
+
     /// Name used in output.
     pub fn as_str(&self) -> String {
         match self {

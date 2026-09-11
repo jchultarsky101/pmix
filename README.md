@@ -141,6 +141,11 @@ because the three pins sit in different places and a comparison has to
 be able to say which one moved. The parts list names each part once and
 counts its uses.
 
+Both formats answer this. A STEP file states it with product
+definitions and assembly usages; a JT file states it in the scene
+graph's node hierarchy, where a part node is a part and an instance node
+is an occurrence. One document comes out either way.
+
 This is a third document, versioned separately from the PMI and features
 documents, for the reason those two are separate from each other: they
 answer different questions. See
@@ -568,7 +573,8 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] Material, mass and volume promoted out of the properties that carry them, with disagreement stated rather than resolved (ADR 0014)
 - [x] `list_parts` and `describe_part` over the Model Context Protocol, and the caution that travels with them (ADR 0014)
 - [x] Hole patterns: bolt circles, rows and grids, with both readings stated where both hold (ADR 0014)
-- [ ] Threads, read from AP242 where stated and parsed from notes where not (ADR 0014)
+- [x] JT product structure from the scene graph's node hierarchy: parts, occurrences and placements (ADR 0014)
+- [ ] Threads, which neither corpus states: one designation in one NIST file, none in any real export (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 
 ## Design
