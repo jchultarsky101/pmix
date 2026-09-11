@@ -223,7 +223,7 @@ fn resolve_target(ctx: &mut Ctx<'_>, target: Id) -> Target {
 
 /// The name of the product a product-level target belongs to.
 ///
-/// The walk up to the product is [`crate::step::product::product_at`],
+/// The walk up to the product is `crate::step::product::product_at`,
 /// shared with the product-structure reader so that the two cannot come
 /// to different conclusions about which part a thing belongs to.
 fn product_of(ex: &Exchange, target: Id) -> Option<String> {

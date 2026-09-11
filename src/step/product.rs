@@ -3,8 +3,8 @@
 //! The PMI side of this reader already climbs part of this chain: a
 //! property attached to a product definition is attributed to the part
 //! by following shape → definition → formation → product (ADR 0007).
-//! That walk is [`product_at`] below, which the property reader now
-//! calls rather than keeping a second copy of.
+//! That walk is `product_at` below, which the property reader now calls
+//! rather than keeping a second copy of.
 //!
 //! What is new here is the rest of the graph. A product definition is a
 //! part; a `NEXT_ASSEMBLY_USAGE_OCCURRENCE` says one part is used inside
