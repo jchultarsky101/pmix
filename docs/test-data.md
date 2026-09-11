@@ -12,6 +12,16 @@ compartments, a dimension with a plus-minus tolerance, and so on. They are
 authored by the project, so they are MIT like the code. They are the proof
 that a specific behaviour works; every extractor feature ships with one.
 
+They carry more weight than "controlled tests" suggests for **product
+structure** (ADR 0014). Not one of the 17 NIST models states an assembly
+usage, so `assembly_two_parts.stp` and `assembly_repeated_part.stp` are the
+*only* committed coverage of parts, occurrences and placements — and they
+encode what the reader expects rather than confirming it against a real
+writer. Verify product-structure changes against a real export as well.
+`flange_bolt_circle.stp`, `bar_hole_row.stp` and
+`plate_square_bolt_pattern.stp` do the same job for hole patterns; see that
+directory's README for what each one is for.
+
 The JT fixture is `tests/fixtures/jt/nist_mtc_assembly.jt`, public domain
 from NIST; see that directory's README.
 
@@ -74,23 +84,27 @@ their original provenance is unstated. Use for local experiments only.
 
 ## What is still wanted
 
-One thing, and it is worth stating exactly because it is what we have to
-ask a supplier or a colleague for:
+Three things, stated exactly, because they are what we have to ask a
+supplier or a colleague for.
 
-> **one design exported to both STEP and JT, with the JT written with
-> precise geometry.**
+**1. The STEP counterpart of the JT assembly.** The cross-format identity
+check needs one design in both formats. Half of it is already here:
+`tests/fixtures/jt/nist_mtc_assembly.jt` carries precise geometry — eight
+topology segments, eight bodies — so it is the *STEP* half that is
+missing, not the JT.
 
-Not PMI. Since [ADR 0011](adr/0011-feature-recognition.md) a recognised
-feature is keyed on geometry alone, so two *feature* documents of one
-design test the shared identity recipe directly — and geometry-bearing
-files are far commoner than PMI-bearing ones. That removes the constraint
-that blocked this for months.
+> This corrects what this document said before 2026-09-11, which was that
+> every JT reaching the project had been tessellation-only and a
+> geometry-bearing JT was the thing to hunt for. That was true of the
+> customer exports and stopped being true when the NIST MTC assembly
+> arrived. Anyone acting on the old sentence would have gone looking for
+> the wrong file.
 
-The catch is that a JT can legitimately carry no geometry at all: an
-exporter set to write tessellation only produces a file with no topology
-segment and nothing to fingerprint. Every JT that has reached this project
-so far has been of that kind. Check any candidate in one command before
-building anything on it:
+Since [ADR 0011](adr/0011-feature-recognition.md) a recognised feature is
+keyed on geometry alone, so two *feature* documents of one design test the
+shared identity recipe directly; PMI is not needed. A JT can still
+legitimately carry no geometry at all, so check any candidate in one
+command before building anything on it:
 
 ```bash
 pmix features candidate.jt
@@ -100,6 +114,26 @@ It answers "the file holds no topology segment" when there is nothing
 there. See [ADR 0004](adr/0004-identity.md) for what the check would
 settle.
 
+**2. A model that states a thread.** Threads are the one thing a fastener
+is ordered by and nothing here carries them: one designation (`M12x1.75-6H`)
+in one of the seventeen NIST files, reaching the reader as a property value
+rather than as PMI, and none at all in two hundred real exports. What files
+do carry is a *name* on a shape aspect — "Thread Cylinder", "Radial Hole
+and Thread Callout" — which says a thread exists and not which one. Until a
+file states a designation properly, a parser for them would encode its
+author's assumptions with nothing to check them against
+([ADR 0014](adr/0014-part-description-for-sourcing.md)).
+
+**3. A model that states an approval, an owner, or a security
+classification.** Same shape of problem: `PERSON_AND_ORGANIZATION`,
+`APPROVAL` and `SECURITY_CLASSIFICATION` appear in neither corpus, and the
+last of those gates a caution ADR 0014 puts on part numbers leaving the
+machine. A single file with them would let that be built and tested rather
+than assumed.
+
+The same check applies to surface finish, which is also absent everywhere:
+not one surface-texture entity across all 218 files tested against.
+
 ## Local data
 
 The `data/` directory is ignored by git and **may hold proprietary customer
@@ -108,6 +142,15 @@ an issue or pull request, and never quote a part name, part number, or any
 other value out of one. Nothing in the test suite depends on it; it is for
 exploring the readers by hand, for example with `pmix inspect`, and for
 checking a change against real parts before release.
+
+It is also where the **scale test** lives. The committed fixtures are
+small; a real master assembly is not, and anything touching the STEP
+reader should be run against one before release. The largest to hand is
+about 158 MB and three million lines, with several hundred product
+definitions and over a thousand assembly usages; `pmix product` reads it
+in under ten seconds. That is the shape of file that proves the reverse
+index in `step/product.rs` was necessary, because `Exchange::referrers`
+is a linear scan and a per-part lookup would be quadratic there.
 
 Everything under `tests/fixtures/` is different: it is public-domain NIST
 data and synthetic fixtures written for this project, and it is committed

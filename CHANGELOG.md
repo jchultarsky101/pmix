@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **ADR 0014 is accepted**, having been built across 0.14.0 and 0.15.0
+  and amended four times with what building it contradicted.
+
+- **`docs/test-data.md` said the wrong thing was missing.** It recorded
+  that every JT reaching the project had been tessellation-only, so a
+  geometry-bearing JT was the file to hunt for. That stopped being true
+  when the NIST MTC assembly arrived: it carries eight topology segments
+  and yields eight bodies, so the missing half of the cross-format pair
+  is the *STEP*, not the JT. Anyone acting on the old sentence would
+  have gone looking for the wrong file. The README's roadmap said it too
+  and is corrected with it.
+
+  The same document now states the other two files worth asking for — one
+  that states a thread, and one that states an approval or a security
+  classification — and records that the synthetic assemblies are the only
+  committed coverage of product structure, because no NIST model states
+  an assembly usage.
+
+- **`CLAUDE.md` named three checks where CI runs four.** The docs build
+  is the fourth, and it is the one that catches a rustdoc link to a
+  private item; the other three pass straight over it. It caught a pull
+  request once.
+
 ## [0.15.0] - 2026-09-11
 
 Two things a sourcing question needs that the documents held the makings

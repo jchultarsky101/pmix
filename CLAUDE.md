@@ -23,8 +23,11 @@ Read [docs/adr/](docs/adr/) before changing architecture.
 - **JSON output must be deterministic** (sorted, independent of source
   entity numbering).
 - **`main` is PR-only** with all CI checks required. Squash-merge. Run
-  `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
-  before pushing.
+  `cargo fmt`, `cargo clippy --all-targets -- -D warnings`, `cargo test`,
+  and `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+  --document-private-items --all-features` before pushing. CI runs all
+  four; the doc build is the one that catches a rustdoc link to a
+  private item, which the other three pass straight over.
 - **`data/` may hold proprietary customer models.** It is gitignored.
   Never commit, attach, or quote anything from it. `tests/fixtures/` is
   public-domain NIST data and synthetic fixtures, and is committed.

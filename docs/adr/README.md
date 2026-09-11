@@ -19,4 +19,4 @@ never rewritten; a superseding decision gets a new record that links back.
 | [0011](0011-feature-recognition.md) | Recognising manufacturing features from geometry | Accepted |
 | [0012](0012-geometric-comparison.md) | Describing how two models differ | Accepted |
 | [0013](0013-mcp-server.md) | Serving the documents to a language model | Accepted |
-| [0014](0014-part-description-for-sourcing.md) | Describing a part well enough to source a substitute | Proposed |
+| [0014](0014-part-description-for-sourcing.md) | Describing a part well enough to source a substitute | Accepted |
