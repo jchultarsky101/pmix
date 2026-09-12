@@ -29,7 +29,7 @@ answering the question people actually bring to two CAD files: not
 whether they differ, but *how* — the same hole, bored wider; the
 mounting holes, five millimetres off.
 
-> **Status: 0.15.1.** `pmix` answers three questions about a STEP AP242
+> **Status: 0.16.0.** `pmix` answers three questions about a STEP AP242
 > or JT file. **What it says:** `pmix extract` emits the semantic layer
 > (units, features, dimensions with tolerances, geometric tolerances with
 > zones, modifiers and composites, datums with targets, datum reference
@@ -42,8 +42,10 @@ mounting holes, five millimetres off.
 > and chamfers from the B-rep of either format, the bolt circles, rows
 > and grids they form, and how big each body is, and lists every face
 > that went into none of them. **What it contains:** `pmix product` reads
-> the parts, revisions and occurrences, and `pmix describe` gathers all
-> three documents into one answer to "what is this part". Everything is
+> the parts, revisions and occurrences — and who owns each, who approved
+> it, and how it is classified — and `pmix describe` gathers all three
+> documents into one answer to "what is this part", the thread
+> designations its text states included. Everything is
 > in millimetres and degrees whatever the file states, and ids are
 > derived from content, so one design keys the same way however it was
 > exported. `pmix mcp` serves the lot to a language model over the Model
