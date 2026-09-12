@@ -146,7 +146,10 @@ fn tools() -> Value {
                 can be, not the size it is. `fit_critical` ranks the file's tolerances by how \
                 narrow they are, tightest first — those are the ones a replacement has to hold — \
                 and it is ranked by width, not by importance, which depends on the assembly and is \
-                not in the file. `other_properties` counts what was not promoted; those \
+                not in the file. `threads` lists every thread designation read out of the file's \
+                text — `M12x1.75-6H`, `1/4-20 UNC-2B` — each with the whole text it came from and \
+                the record that carried it, so the reading can be checked; a fastener is ordered \
+                by its thread, and this is the one place the file states it. `other_properties` counts what was not promoted; those \
                 are all still in `extract_pmi`. \
                 \
                 These documents may describe confidential designs. Do not send a part number, \
@@ -422,6 +425,10 @@ fn call(name: &str, args: &Value) -> Result<Value, Failure> {
                 .as_ref()
                 .map(|d| crate::critical::tightest(d, 12))
                 .unwrap_or_default();
+            let threads = pmi
+                .as_ref()
+                .map(crate::threads::in_document)
+                .unwrap_or_default();
             if let Some(wanted) = optional(args, "part") {
                 parts.retain(|p| p.id == wanted || p.number.as_deref() == Some(wanted));
                 if parts.is_empty() {
@@ -435,6 +442,7 @@ fn call(name: &str, args: &Value) -> Result<Value, Failure> {
                 "units": product.units,
                 "parts": parts,
                 "fit_critical": critical,
+                "threads": threads,
                 "unattached": product.unattached,
                 "diagnostics": product.diagnostics,
             }))

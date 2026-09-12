@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Thread designations are read out of a file's text** (ADR 0014):
+  `M12x1.75-6H`, `1/4-20 UNC-2B`, `#10-32 UNF`, `1/2-14 NPT`, wherever
+  they appear — a validation property, a note, a dimension's displayed
+  text. Each carries the whole text it came from and the record that
+  held it, so the reading can be checked rather than taken. The major
+  diameter is computed by the standard's own rules where the standard
+  gives one, and left out where it does not — a pipe thread's size names
+  a bore, not a diameter. In `pmix describe` and in `describe_part`.
+
+  This reverses a deferral made twice, and the reason is recorded in the
+  ADR: the grammar is ISO 965 and ASME B1.1, not an exporter's habit, so
+  a parser for it is not a guess even with one real file to check it
+  against — and there is one, already in the corpus.
+
 ### Changed
 
 - **`docs/test-data.md` records where the test data is not**, after a

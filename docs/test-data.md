@@ -116,7 +116,7 @@ minor diameter, thread count and side — it is in the schema and nobody
 writes it.
 
 What does exist is designations as *text*, and that is what `pmix` reads
-(ADR 0014). `nist_ctc_04_asme1_ap242-e1.stp`, already in this corpus,
+(ADR 0014). `nist_ctc_04_asme1_ap242-e2.stp`, already in this corpus,
 states `4X M12x1.75-6H` in a CAx-IF validation property. It is the only
 designation in the public corpus.
 

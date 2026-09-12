@@ -199,6 +199,13 @@ tightest tolerances:
   0.3mm      ⌀25 ±0.15                dim:f64195ad311966bd
 ```
 
+Thread designations are read out of whatever text carries them:
+
+```text
+threads:
+  4× M12x1.75-6H ⌀12 pitch 1.75   metric       from property equivalent unicode string
+```
+
 A drawing states every tolerance as an equal and they are not: a bore
 held to ±0.005 is the fit, a ±0.5 on an overall length is the stock it
 was cut from, and a substitute has to hold the first. The ranking is by
@@ -640,7 +647,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] How big the whole assembly is, composed from the placements or read where a file states it (ADR 0014)
 - [x] What kind of shape a body is — turned, prismatic, free form — and what its faces lie on (ADR 0014)
 - [x] The tightest tolerances ranked, which are the ones a substitute has to hold (ADR 0014)
-- [ ] Threads, which neither corpus states: one designation in one NIST file, none in any real export (ADR 0014)
+- [x] Thread designations read out of a file's text, by the ISO 965 and ASME B1.1 grammars; semantic AP242 threads wait for Edition 5 (ADR 0014)
 - [ ] Surface finish, which neither corpus states either: no surface-texture entity in any of the 218 files (ADR 0014)
 - [x] Binaries and installers for macOS, Linux, and Windows from GitHub releases (ADR 0006)
 

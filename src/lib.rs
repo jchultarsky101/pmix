@@ -39,6 +39,7 @@ pub mod model;
 pub mod product;
 pub mod reader;
 pub mod step;
+pub mod threads;
 pub mod units;
 
 pub use format::Format;

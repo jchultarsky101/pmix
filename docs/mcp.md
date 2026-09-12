@@ -197,6 +197,11 @@ promoted out of the properties in the PMI document — material, mass,
 volume, density, finish, supplier, and the rest — each naming the key it
 came from and the unit that key declared.
 
+`threads` lists every thread designation read out of the file's text,
+each with the whole text it came from and the record that carried it.
+A fastener is ordered by its thread, and this is the one place a file
+states it today: semantic AP242 threads arrive with Edition 5.
+
 `fit_critical` ranks the file's tolerances by how narrow they are,
 tightest first — the ones a replacement has to hold. It is ranked by
 width, not by importance, and stated for the whole file rather than per
@@ -421,9 +426,10 @@ Everything the command line will not, since it is the same library:
   face matched against an offset of another. The shape classes are
   `turned`, `prismatic` and `free_form`, and a body no rule settles is
   left unclassified.
-- **Read a surface finish, or a thread designation.** Neither is in any
-  file this has been tested against
-  ([ADR 0014](adr/0014-part-description-for-sourcing.md)).
+- **Read a surface finish.** It is in no file this has been tested
+  against ([ADR 0014](adr/0014-part-description-for-sourcing.md)).
+- **Read a thread the way AP242 Edition 5 will state one.** It reads
+  designations as text, which is what files carry today.
 - **Detect a rotation** as a single fact; it reports the shapes as
   present and moved, and stops.
 - **Read a JT that carries no precise geometry.** It says so.
