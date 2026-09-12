@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`docs/test-data.md` records where the test data is not**, after a
+  thorough search: which sources were checked, what each licence
+  permits, and why none of them yields a committable file beyond what is
+  already here. It also states the one thing that changed the picture —
+  semantic screw threads arrive with AP242 Edition 5, first tested in
+  the summer 2026 interoperability round against a schema not yet
+  published, so "wait for a file" was an open-ended wait rather than a
+  short one.
+
 - **A JT with B-rep but no topology table is no longer reported as
   having no precise geometry**, because it has some. The table is, in
   the specification's words, "a lightweight abstraction of the existing

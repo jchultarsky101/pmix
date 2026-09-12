@@ -84,67 +84,71 @@ their original provenance is unstated. Use for local experiments only.
 
 ## What is still wanted
 
-Three things, stated exactly, because they are what we have to ask a
-supplier or a colleague for.
+Searched thoroughly on 2026-09-12; this section records both what to ask
+for and where it is already known not to be, so nobody repeats the hunt.
 
-**1. The STEP counterpart of the JT assembly.** The cross-format identity
-check needs one design in both formats. Half of it is already here:
-`tests/fixtures/jt/nist_mtc_assembly.jt` carries precise geometry — eight
-topology segments, eight bodies — so it is the *STEP* half that is
-missing, not the JT.
+**1. A JT and a STEP of one design, where the JT exposes its geometry
+through the topology table.** Note the wording: not "a JT with precise
+geometry", which is what this said before and sent people after the
+wrong thing twice. `tests/fixtures/jt/nist_mtc_assembly.jt` has a
+topology table and reads. A JT can also carry precise geometry as
+Parasolid XT with *no* table, in which case `pmix features` says so and
+names how many B-rep segments it found — that file does not need
+replacing, it needs re-exporting by something that writes the table.
 
-> This corrects what this document said before 2026-09-11, which was that
-> every JT reaching the project had been tessellation-only and a
-> geometry-bearing JT was the thing to hunt for. That was true of the
-> customer exports and stopped being true when the NIST MTC assembly
-> arrived. Anyone acting on the old sentence would have gone looking for
-> the wrong file.
+The nearest thing to a public pair is NIST's MTC assembly: the JT is
+published, and STEP Tools' gallery showcases an AP242 STEP of the same
+design (`NIST_MTC_CRADA_ASSEMBLY_REV-D.STP`) which is not downloadable.
+Worth asking for — the content is public-domain NIST data even though
+the hosting is not. One caution before relying on it: the published JT
+is an NX export and that STEP is a SolidWorks export, and whether the
+two native model sets are geometrically identical or independently
+remodelled is unverified. If they were remodelled, a key mismatch would
+prove nothing about the readers.
 
-Since [ADR 0011](adr/0011-feature-recognition.md) a recognised feature is
-keyed on geometry alone, so two *feature* documents of one design test the
-shared identity recipe directly; PMI is not needed. A JT can still
-legitimately carry no geometry at all, so check any candidate in one
-command before building anything on it:
+**2. A model that states a thread the way AP242 will eventually state
+one.** There is no such public file and there will not be one soon.
+Semantic screw threads arrive with **AP242 Edition 5**; the MBx-IF's
+Round 58J (summer 2026) is the first round to test them, against a
+schema that is not yet published. Edition 3 already defines
+`ENTITY thread SUBTYPE OF (feature_definition)` with major diameter,
+minor diameter, thread count and side — it is in the schema and nobody
+writes it.
 
-```bash
-pmix features candidate.jt
-```
-
-It distinguishes the two cases, and the difference decides what to ask
-for. A file with **neither** a topology table nor a B-rep segment is
-tessellation-only and no export setting will save it. A file with B-rep
-segments but **no topology table** has its precise geometry — as
-Parasolid XT — and `pmix` cannot reach it: the table is described by the
-specification (section 11.14) as "a lightweight abstraction of the
-existing precise B-Rep data", and it is optional. That file does not
-need replacing, it needs re-exporting by something that writes the
-table.
-
-One of the JT files to hand is exactly that second case, which is why
-the distinction is worth stating: it looked like a tessellation-only
-export for months and is not one.
-
-See [ADR 0004](adr/0004-identity.md) for what the check would settle.
-
-**2. A model that states a thread.** Threads are the one thing a fastener
-is ordered by and nothing here carries them: one designation (`M12x1.75-6H`)
-in one of the seventeen NIST files, reaching the reader as a property value
-rather than as PMI, and none at all in two hundred real exports. What files
-do carry is a *name* on a shape aspect — "Thread Cylinder", "Radial Hole
-and Thread Callout" — which says a thread exists and not which one. Until a
-file states a designation properly, a parser for them would encode its
-author's assumptions with nothing to check them against
-([ADR 0014](adr/0014-part-description-for-sourcing.md)).
+What does exist is designations as *text*, and that is what `pmix` reads
+(ADR 0014). `nist_ctc_04_asme1_ap242-e1.stp`, already in this corpus,
+states `4X M12x1.75-6H` in a CAx-IF validation property. It is the only
+designation in the public corpus.
 
 **3. A model that states an approval, an owner, or a security
-classification.** Same shape of problem: `PERSON_AND_ORGANIZATION`,
-`APPROVAL` and `SECURITY_CLASSIFICATION` appear in neither corpus, and the
-last of those gates a caution ADR 0014 puts on part numbers leaving the
-machine. A single file with them would let that be built and tested rather
-than assumed.
+classification with values in it.** Structure is now available: the
+**NIST D2MI models** (`https://www.nist.gov/document/nist-d2mi-modelszip`,
+5.2 MB) are explicitly public domain under 17 USC §105 and carry
+`APPROVAL`, `PERSON_AND_ORGANIZATION` and `SECURITY_CLASSIFICATION` with
+real roles — `classification_officer`, `design_owner`, `design_supplier`.
+Their *values* are blank (`SECURITY_CLASSIFICATION(' ',' ',…)`), so they
+exercise the walk and not the output. A file whose classification
+actually says something is still wanted; failing that, a synthetic
+fixture covers the second half.
 
-The same check applies to surface finish, which is also absent everywhere:
-not one surface-texture entity across all 218 files tested against.
+Surface finish is in the same position: not one surface-texture entity
+in any of the 218 files tested against.
+
+### Where we have already looked
+
+Recorded so the search is not repeated. None of these yields a
+committable file with PMI beyond what is already here.
+
+| Source | Why not |
+| --- | --- |
+| CAx-IF / MBx-IF test rounds | Members-only by explicit policy — test cases "may not be publicly released for any purpose". The NIST models are the sole carve-out, and we have them. |
+| STEP Tools sample files | Cover threads, surface texture *and* approvals, in AP224 and AP203e2. Every page is "All Rights Reserved" with no redistribution grant. Worth asking for permission; do not commit without it. |
+| Open CASCADE test data | The richest single file for threads and finish together is a CAx-IF member-company round file. Not in the official repository, and the project states its test data is confidential. |
+| ABC dataset, MFCAD, MFCAD++ | Geometry and face labels only. No PMI. |
+| Fusion 360 Gallery | Non-commercial research only, redistribution forbidden. Ruled out on licence whatever it contains. |
+| NIST HTC and MTC | Published as native CAD only. HTC's holes are plain, counterbore, countersink and counterdrill — no threads at all. |
+| JT generally | No permissively licensed JT with PMI exists. JT2Go samples are view-only freeware; the JT Open Toolkit is commercial. |
+| LLNL `axom_data` (BSD-3) | Has the management entities, but as exporter boilerplate over re-exported ABC shapes. Weak as a realism test. |
 
 ## Local data
 
