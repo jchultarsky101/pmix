@@ -457,6 +457,12 @@ fn describe(
         .as_ref()
         .map(|d| pmix::critical::tightest(d, 8))
         .unwrap_or_default();
+    // Thread designations, read out of whatever text carried them: a
+    // note, a dimension, a validation property (ADR 0014).
+    let threads = pmi
+        .as_ref()
+        .map(pmix::threads::in_document)
+        .unwrap_or_default();
 
     if let Some(wanted) = &part {
         parts.retain(|p| &p.id == wanted || p.number.as_deref() == Some(wanted.as_str()));
@@ -472,7 +478,7 @@ fn describe(
     let text = match (json, compact) {
         (true, true) => serde_json::to_string(&parts)?,
         (true, false) => serde_json::to_string_pretty(&parts)?,
-        (false, _) => render_parts(&product, &parts, shapes.as_ref(), &critical),
+        (false, _) => render_parts(&product, &parts, shapes.as_ref(), &critical, &threads),
     };
     match output {
         Some(path) => std::fs::write(&path, text)
@@ -488,6 +494,7 @@ fn render_parts(
     parts: &[pmix::product::PartSummary],
     shapes: Option<&pmix::features::FeatureDocument>,
     critical: &[pmix::critical::Critical],
+    threads: &[pmix::threads::Thread],
 ) -> String {
     use std::fmt::Write as _;
     let mut out = String::new();
@@ -635,6 +642,34 @@ fn render_parts(
                     let _ = writeln!(out, "    features: {}", listed.join(", "));
                 }
             }
+        }
+    }
+
+    if !threads.is_empty() {
+        let _ = writeln!(out, "\nthreads:");
+        for t in threads {
+            let mut parts: Vec<String> = Vec::new();
+            if let Some(n) = t.count {
+                parts.push(format!("{n}\u{d7}"));
+            }
+            parts.push(t.designation.clone());
+            if let Some(d) = t.major_diameter {
+                parts.push(format!("\u{2300}{d}"));
+            }
+            if let Some(p) = t.pitch {
+                parts.push(format!("pitch {p}"));
+            }
+            if let Some(tpi) = t.threads_per_inch {
+                parts.push(format!("{tpi} tpi"));
+            }
+            let _ = writeln!(
+                out,
+                "  {:<28} {:<12} from {} {}",
+                parts.join(" "),
+                t.standard.name(),
+                t.found_in.kind,
+                t.found_in.id
+            );
         }
     }
 

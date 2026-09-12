@@ -242,6 +242,28 @@ grade rather than a width, so fits are ranked among themselves and ahead
 of stated widths, carrying the code rather than a number invented for
 them.
 
+### Amended 2026-09-12, reversing the thread deferral
+
+**Threads are parsed after all, and the earlier objection was wrong in
+one respect.** It said a parser built on one example would encode its
+author's assumptions with nothing to check them against — the same
+objection rightly made against the identity extras. But that objection
+applies to a reader for an *entity nobody writes*, and a thread
+designation is not one. `M12x1.75-6H` means what ISO 965 says it means
+and `1/4-20 UNC-2B` what ASME B1.1 says, in any file from any exporter.
+A parser for a published grammar is not a guess. What varies between
+files is only *where* the string lives — a validation property, a note,
+a dimension's text — and the reader takes it from all of them, carrying
+the whole text and the record it came from so the reading can be
+checked.
+
+Two facts settled it. Semantic AP242 threads arrive with Edition 5,
+first tested in the summer 2026 interoperability round against a schema
+not yet published — so "wait for a file that states one properly" was
+an open-ended wait, not a short one. And the designations that exist
+are text: one in the public corpus, and in real exports commonly inside
+the part's own name. Text is what this reader can work with now.
+
 ### Stage 3 — interface and class
 
 Two recognitions, both derived, both stated as recognitions.
