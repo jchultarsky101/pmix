@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-12
+
+The two stages of ADR 0014 that were deferred for want of data, built
+once the data question was settled — in both cases by finding that the
+objection did not hold. Thread designations are read out of a file's
+text, because their grammar is a published standard rather than an
+exporter's habit. Who owns a part, who approved it and how it is
+classified are read from AP203 and AP242 alike, against public-domain
+NIST models that turned out to state exactly those entities. With this,
+nothing in the plan remains unbuilt.
+
+Also: a JT that carries B-rep without a topology table is no longer
+told it has no precise geometry, and the search for test data — what
+was found, what was not, and under what licence — is written down so it
+is not repeated.
+
 ### Added
 
 - **Who owns a part, who approved it, and how it is classified** are
@@ -956,7 +972,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/jchultarsky101/pmix/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/jchultarsky101/pmix/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/jchultarsky101/pmix/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/jchultarsky101/pmix/compare/v0.13.0...v0.14.0
