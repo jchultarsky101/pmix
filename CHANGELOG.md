@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`docs/mcp.md` no longer says the JT scene graph is unread.** Two
+  passages still described the node hierarchy as "not read yet" and
+  "not parse[d] yet" — true until 0.14.0 and false since. One now
+  describes what the reader does with it; the other names what it
+  actually will not do with a JT, which is read Parasolid XT geometry
+  that has no topology table beside it.
+
 ## [0.16.0] - 2026-09-12
 
 The two stages of ADR 0014 that were deferred for want of data, built
