@@ -121,15 +121,17 @@ states `4X M12x1.75-6H` in a CAx-IF validation property. It is the only
 designation in the public corpus.
 
 **3. A model that states an approval, an owner, or a security
-classification with values in it.** Structure is now available: the
-**NIST D2MI models** (`https://www.nist.gov/document/nist-d2mi-modelszip`,
-5.2 MB) are explicitly public domain under 17 USC §105 and carry
-`APPROVAL`, `PERSON_AND_ORGANIZATION` and `SECURITY_CLASSIFICATION` with
-real roles — `classification_officer`, `design_owner`, `design_supplier`.
-Their *values* are blank (`SECURITY_CLASSIFICATION(' ',' ',…)`), so they
-exercise the walk and not the output. A file whose classification
-actually says something is still wanted; failing that, a synthetic
-fixture covers the second half.
+classification with values in it.** The structure is covered: two of
+the **NIST D2MI models** are committed under `tests/fixtures/d2mi/`
+(public domain under 17 USC §105; see that README) and carry `APPROVAL`,
+`PERSON_AND_ORGANIZATION` and `SECURITY_CLASSIFICATION` with real roles.
+Their names, people and organisations are blank (the classification
+level does say `confidential`), so
+`tests/fixtures/synthetic/part_identity.stp` supplies a full set of
+values. A real file whose classification actually says
+something would still be worth having, for the same reason a real
+assembly would: a synthetic fixture confirms what the reader expects, not
+what a writer does.
 
 Surface finish is in the same position: not one surface-texture entity
 in any of the 218 files tested against.

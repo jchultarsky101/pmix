@@ -1,0 +1,54 @@
+ISO-10303-21;
+HEADER;
+FILE_DESCRIPTION(('pmix synthetic fixture: one part with an owner, a creator, a supplier, a dated approval and a security classification, stated with the AP242 assignment entities'),'2;1');
+FILE_NAME('part_identity.stp','2026-09-12T00:00:00',('pmix'),('pmix'),'pmix synthetic','pmix','');
+FILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }'));
+ENDSEC;
+DATA;
+/* contexts */
+#1=(LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.));
+#2=(NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.));
+#3=(GEOMETRIC_REPRESENTATION_CONTEXT(3) GLOBAL_UNIT_ASSIGNED_CONTEXT((#1,#2)) REPRESENTATION_CONTEXT('','3D'));
+#4=APPLICATION_CONTEXT('managed model based 3d engineering');
+#5=PRODUCT_DEFINITION_CONTEXT('part definition',#4,'design');
+#6=PRODUCT_CONTEXT('',#4,'mechanical');
+/* the part: one product, one revision, one definition */
+#10=PRODUCT('SYN-BRKT-100','mounting_bracket','Bracket, mounting, left hand',(#6));
+#11=PRODUCT_DEFINITION_FORMATION('C','',#10);
+#12=PRODUCT_DEFINITION('design','',#11,#5);
+#13=PRODUCT_RELATED_PRODUCT_CATEGORY('detail','',(#10));
+/* who: the assignments deliberately hang off three different levels -
+   the definition, the formation and the product - and all must reach
+   the one part */
+#20=ORGANIZATION('SYN-ORG','Synthetic Engineering Works','A fixture organisation');
+#21=PERSON('P1','Sample','Ada',$,$,$);
+#22=PERSON_AND_ORGANIZATION(#21,#20);
+#23=PERSON_AND_ORGANIZATION_ROLE('design_owner');
+#24=APPLIED_PERSON_AND_ORGANIZATION_ASSIGNMENT(#22,#23,(#12));
+#25=PERSON('P2','Fixture','Bo',$,$,$);
+#26=PERSON_AND_ORGANIZATION(#25,#20);
+#27=PERSON_AND_ORGANIZATION_ROLE('creator');
+#28=APPLIED_PERSON_AND_ORGANIZATION_ASSIGNMENT(#26,#27,(#11));
+#29=ORGANIZATION('SYN-SUP','Synthetic Castings Ltd','A fixture supplier');
+#30=PERSON('P3','Vendor','Cy',$,$,$);
+#31=PERSON_AND_ORGANIZATION(#30,#29);
+#32=PERSON_AND_ORGANIZATION_ROLE('design_supplier');
+#33=APPLIED_PERSON_AND_ORGANIZATION_ASSIGNMENT(#31,#32,(#10));
+/* an approval, dated, with the person who gave it. CALENDAR_DATE is
+   year, DAY, month: this is the eleventh of September */
+#40=APPROVAL_STATUS('approved');
+#41=APPROVAL(#40,'Released for production');
+#42=APPLIED_APPROVAL_ASSIGNMENT(#41,(#12));
+#43=CALENDAR_DATE(2026,11,9);
+#44=COORDINATED_UNIVERSAL_TIME_OFFSET(0,0,.AHEAD.);
+#45=LOCAL_TIME(10,30,$,#44);
+#46=DATE_AND_TIME(#43,#45);
+#47=APPROVAL_DATE_TIME(#46,#41);
+#48=APPROVAL_ROLE('Authorise release');
+#49=APPROVAL_PERSON_ORGANIZATION(#22,#41,#48);
+/* the classification, with a level that says something */
+#50=SECURITY_CLASSIFICATION_LEVEL('confidential');
+#51=SECURITY_CLASSIFICATION('SYN-C1','commercial in confidence',#50);
+#52=APPLIED_SECURITY_CLASSIFICATION_ASSIGNMENT(#51,(#12));
+ENDSEC;
+END-ISO-10303-21;

@@ -477,3 +477,132 @@ fn jt_bodies_go_under_the_parts_that_hold_them() {
         }
     }
 }
+
+// --- who owns it, who approved it, how it is classified (ADR 0014) ---
+
+/// The values reach the document, from assignments hung off three
+/// different levels — the definition, the formation and the product —
+/// all resolving to the one part.
+#[test]
+fn a_part_states_its_owner_its_approval_and_its_marking() {
+    let doc = read("synthetic/part_identity.stp");
+    let part = part(&doc, "SYN-BRKT-100");
+
+    let roles: Vec<(&str, Option<&str>, Option<&str>)> = part
+        .people
+        .iter()
+        .map(|p| {
+            (
+                p.role.as_str(),
+                p.person.as_deref(),
+                p.organisation.as_deref(),
+            )
+        })
+        .collect();
+    assert!(
+        roles.contains(&(
+            "design_owner",
+            Some("Sample, Ada"),
+            Some("Synthetic Engineering Works")
+        )),
+        "{roles:?}"
+    );
+    assert!(roles.contains(&(
+        "creator",
+        Some("Fixture, Bo"),
+        Some("Synthetic Engineering Works")
+    )));
+    assert!(roles.contains(&(
+        "design_supplier",
+        Some("Vendor, Cy"),
+        Some("Synthetic Castings Ltd")
+    )));
+
+    assert_eq!(part.approvals.len(), 1);
+    let a = &part.approvals[0];
+    assert_eq!(a.status, "approved");
+    assert_eq!(a.level.as_deref(), Some("Released for production"));
+    // CALENDAR_DATE is year, day, month: (2026,11,9) is 11 September.
+    assert_eq!(a.date.as_deref(), Some("2026-09-11"));
+    assert_eq!(a.by.len(), 1);
+    assert_eq!(a.by[0].role, "Authorise release");
+    assert_eq!(a.by[0].person.as_deref(), Some("Sample, Ada"));
+
+    let c = part.classification.as_ref().expect("a classification");
+    assert_eq!(c.level.as_deref(), Some("confidential"));
+    assert_eq!(c.purpose.as_deref(), Some("commercial in confidence"));
+    assert_eq!(part.categories, vec!["detail".to_string()]);
+}
+
+/// A real writer states the entities mostly empty: the classification
+/// has a level and no name or purpose, the people and organisations
+/// have roles and no names, the approval is `not_yet_approved` and its
+/// date is zeros. What is stated is kept, what is blank is absent, and
+/// a zeroed date is a blank rather than the first of January in year
+/// nought.
+#[test]
+fn a_mostly_blank_record_keeps_exactly_what_it_states() {
+    let doc = read("d2mi/827-9999-905.stp");
+    assert_eq!(doc.parts.len(), 1, "{:?}", doc.parts);
+    let part = &doc.parts[0];
+
+    let c = part.classification.as_ref().expect("the entity is stated");
+    assert_eq!(
+        c.level.as_deref(),
+        Some("confidential"),
+        "the level is stated"
+    );
+    assert_eq!(c.name, None, "the name is blank");
+    assert_eq!(c.purpose, None, "and so is the purpose");
+
+    let mut roles: Vec<&str> = part.people.iter().map(|p| p.role.as_str()).collect();
+    roles.sort();
+    roles.dedup();
+    assert_eq!(
+        roles,
+        vec![
+            "classification_officer",
+            "creator",
+            "design_owner",
+            "design_supplier"
+        ]
+    );
+    assert!(
+        part.people
+            .iter()
+            .all(|p| p.person.is_none() && p.organisation.is_none())
+    );
+
+    assert!(!part.approvals.is_empty());
+    assert!(
+        part.approvals
+            .iter()
+            .all(|a| a.status == "not_yet_approved")
+    );
+    assert!(
+        part.approvals.iter().all(|a| a.date.is_none()),
+        "a zeroed date is not a date: {:?}",
+        part.approvals
+    );
+}
+
+/// A file that states none of it says so by absence of the fields, and
+/// nothing is invented. Every NIST MBE model is such a file.
+#[test]
+fn a_file_stating_no_identity_invents_none() {
+    let doc = read("nist/nist_ctc_01_asme1_ap242-e1.stp");
+    let part = &doc.parts[0];
+    assert!(part.people.is_empty());
+    assert!(part.approvals.is_empty());
+    assert!(part.classification.is_none());
+}
+
+/// Both spellings of the assignments are one reader: the D2MI files use
+/// AP203's `CC_DESIGN_*`, the synthetic one AP242's `APPLIED_*`.
+#[test]
+fn both_assignment_spellings_are_read() {
+    let ap203 = read("d2mi/827-9999-907.stp");
+    let ap242 = read("synthetic/part_identity.stp");
+    assert!(!ap203.parts[0].people.is_empty(), "CC_DESIGN_* read");
+    assert!(!ap242.parts[0].people.is_empty(), "APPLIED_* read");
+}

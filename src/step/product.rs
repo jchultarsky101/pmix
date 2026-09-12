@@ -36,7 +36,8 @@ use crate::fingerprint::Scale;
 use crate::identity::triple;
 use crate::model::{ContentId, Direction, Placement};
 use crate::product::model::{
-    Diagnostic, Part, ProductDocument, Relation, SCHEMA_VERSION, Unattached,
+    Approval, Classification, Diagnostic, Involvement, Part, ProductDocument, Relation,
+    SCHEMA_VERSION, Unattached,
 };
 use crate::step::p21::{Exchange, Id, Instance, Parameter};
 
@@ -197,6 +198,8 @@ pub fn read(
     }
     tracing::debug!(count = parts.len(), "product definitions");
 
+    identity(ex, &referrers, &mut parts, &part_of);
+
     // A part with nothing to be called by has nothing to key on, so its
     // id falls back to an ordinal in file order — which is the one thing
     // an id must not rest on (ADR 0004). Files like this exist: one NIST
@@ -345,6 +348,10 @@ fn part_from(ex: &Exchange, pd: &Instance, ids: &mut ContentId) -> Part {
         description,
         revision,
         occurrences: 0,
+        people: Vec::new(),
+        approvals: Vec::new(),
+        classification: None,
+        categories: Vec::new(),
         bodies: Vec::new(),
         source_refs,
     }
@@ -481,6 +488,315 @@ fn placement_key(p: Option<&Placement>) -> String {
         axis(p.axis.as_ref()),
         axis(p.ref_direction.as_ref())
     )
+}
+
+/// The management data a file records against its products: who owns
+/// and made them, what was approved and when, how they are classified,
+/// and what category they fall in.
+///
+/// AP203 states these with `CC_DESIGN_*` assignments and AP242 with
+/// `APPLIED_*_ASSIGNMENT`; the shape is the same — the thing assigned,
+/// sometimes a role, and the items it is assigned to — so one reader
+/// takes both. An item is whatever the writer chose to hang the
+/// assignment on: the product, its formation, or its definition. All of
+/// them are resolved to the product, and the record goes on every part
+/// of that product.
+///
+/// A classification whose every field is blank is still a classification
+/// — real files write exactly that — and it is kept so that *stated but
+/// empty* is distinguishable from *not stated* (ADR 0014).
+fn identity(
+    ex: &Exchange,
+    referrers: &Referrers,
+    parts: &mut [Part],
+    part_of: &BTreeMap<Id, String>,
+) {
+    // Product id -> the part ids that realise it, so an assignment on a
+    // product reaches every definition of it.
+    let mut parts_of_product: BTreeMap<Id, Vec<String>> = BTreeMap::new();
+    for (pd, part_id) in part_of {
+        if let Some(product) = product_of_any(ex, *pd) {
+            parts_of_product
+                .entry(product)
+                .or_default()
+                .push(part_id.clone());
+        }
+    }
+    // An assignment's item is not always a product. The officer who
+    // classified a part is assigned to the *classification*, and an
+    // approver may be assigned to the *approval*; both are about the
+    // part those records sit on. So the records are mapped to their
+    // parts first, and an item that is one of them resolves through it.
+    let mut parts_of_record: BTreeMap<Id, Vec<String>> = BTreeMap::new();
+    for inst in ex.instances() {
+        let (record, items) = if is_a(inst, CLASSIFICATION_ASSIGNMENT) {
+            (
+                family_attr(inst, CLASSIFICATION_ASSIGNMENT, 0),
+                family_attr(inst, CLASSIFICATION_ASSIGNMENT, 1),
+            )
+        } else if is_a(inst, APPROVAL_ASSIGNMENT) {
+            (
+                family_attr(inst, APPROVAL_ASSIGNMENT, 0),
+                family_attr(inst, APPROVAL_ASSIGNMENT, 1),
+            )
+        } else {
+            continue;
+        };
+        let (Some(record), Some(items)) = (record.and_then(Parameter::as_ref), items) else {
+            continue;
+        };
+        let mut ids = Vec::new();
+        items.collect_refs(&mut ids);
+        for item in ids {
+            if let Some(ps) = product_of_any(ex, item).and_then(|p| parts_of_product.get(&p)) {
+                parts_of_record
+                    .entry(record)
+                    .or_default()
+                    .extend(ps.iter().cloned());
+            }
+        }
+    }
+    let targets = |items: &Parameter| -> Vec<String> {
+        let mut ids = Vec::new();
+        items.collect_refs(&mut ids);
+        let mut out = Vec::new();
+        for item in ids {
+            if let Some(ps) = product_of_any(ex, item).and_then(|p| parts_of_product.get(&p)) {
+                out.extend(ps.iter().cloned());
+            } else if let Some(ps) = parts_of_record.get(&item) {
+                out.extend(ps.iter().cloned());
+            }
+        }
+        out
+    };
+    let mut apply = |part_ids: Vec<String>, f: &mut dyn FnMut(&mut Part)| {
+        for part in parts.iter_mut() {
+            if part_ids.contains(&part.id) {
+                f(part);
+            }
+        }
+    };
+
+    for inst in ex.instances() {
+        if is_a(inst, PERSON_ASSIGNMENT) {
+            let Some(who) = family_attr(inst, PERSON_ASSIGNMENT, 0)
+                .and_then(Parameter::as_ref)
+                .and_then(|id| {
+                    involvement(
+                        ex,
+                        id,
+                        role_name(ex, family_attr(inst, PERSON_ASSIGNMENT, 1)),
+                    )
+                })
+            else {
+                continue;
+            };
+            let Some(items) = family_attr(inst, PERSON_ASSIGNMENT, 2) else {
+                continue;
+            };
+            apply(targets(items), &mut |p| p.people.push(who.clone()));
+        } else if is_a(inst, APPROVAL_ASSIGNMENT) {
+            let Some(approval) = family_attr(inst, APPROVAL_ASSIGNMENT, 0)
+                .and_then(Parameter::as_ref)
+                .and_then(|id| approval(ex, referrers, id))
+            else {
+                continue;
+            };
+            let Some(items) = family_attr(inst, APPROVAL_ASSIGNMENT, 1) else {
+                continue;
+            };
+            apply(targets(items), &mut |p| p.approvals.push(approval.clone()));
+        } else if is_a(inst, CLASSIFICATION_ASSIGNMENT) {
+            let Some(class) = family_attr(inst, CLASSIFICATION_ASSIGNMENT, 0)
+                .and_then(Parameter::as_ref)
+                .and_then(|id| ex.get(id))
+                .filter(|c| c.has_type("SECURITY_CLASSIFICATION"))
+            else {
+                continue;
+            };
+            let level = class
+                .attr("SECURITY_CLASSIFICATION", 2)
+                .and_then(Parameter::as_ref)
+                .and_then(|id| ex.get(id))
+                .and_then(|l| text(l.attr("SECURITY_CLASSIFICATION_LEVEL", 0)));
+            let stated = Classification {
+                level,
+                name: text(class.attr("SECURITY_CLASSIFICATION", 0)),
+                purpose: text(class.attr("SECURITY_CLASSIFICATION", 1)),
+            };
+            let Some(items) = family_attr(inst, CLASSIFICATION_ASSIGNMENT, 1) else {
+                continue;
+            };
+            // A part classified twice keeps the first; two markings on
+            // one part is a file problem this cannot settle.
+            apply(targets(items), &mut |p| {
+                p.classification.get_or_insert_with(|| stated.clone());
+            });
+        } else if inst.has_type("PRODUCT_RELATED_PRODUCT_CATEGORY") {
+            let Some(name) = text(inst.attr("PRODUCT_RELATED_PRODUCT_CATEGORY", 0)) else {
+                continue;
+            };
+            let Some(items) = inst.attr("PRODUCT_RELATED_PRODUCT_CATEGORY", 2) else {
+                continue;
+            };
+            apply(targets(items), &mut |p| p.categories.push(name.clone()));
+        }
+    }
+}
+
+/// The product a product-level entity belongs to, reading the
+/// formation under whichever name the file used.
+///
+/// Not [`product_at`]: that walk knows the plain
+/// `PRODUCT_DEFINITION_FORMATION` only, and the property reader shares
+/// it, so teaching it the subtype would move every property id in a
+/// file that uses one. This walk is private to the identity reader and
+/// reads the families, as the part reader does — and it has to, because
+/// the D2MI models state their formation as
+/// `..._WITH_SPECIFIED_SOURCE`, and under the exact-name walk every
+/// assignment in them reached no part at all.
+fn product_of_any(ex: &Exchange, target: Id) -> Option<Id> {
+    let mut at = target;
+    for _ in 0..4 {
+        let inst = ex.get(at)?;
+        if inst.has_type("PRODUCT") {
+            return Some(at);
+        }
+        at = if is_a(inst, DEFINITION) {
+            family_attr(inst, DEFINITION, 2)?.as_ref()?
+        } else if is_a(inst, FORMATION) {
+            family_attr(inst, FORMATION, 2)?.as_ref()?
+        } else if inst.has_type("PRODUCT_DEFINITION_SHAPE") {
+            inst.attr("PRODUCT_DEFINITION_SHAPE", 2)?.as_ref()?
+        } else {
+            return None;
+        };
+    }
+    None
+}
+
+/// The two spellings of each assignment: AP203's and AP242's.
+const PERSON_ASSIGNMENT: &[&str] = &[
+    "APPLIED_PERSON_AND_ORGANIZATION_ASSIGNMENT",
+    "CC_DESIGN_PERSON_AND_ORGANIZATION_ASSIGNMENT",
+];
+const APPROVAL_ASSIGNMENT: &[&str] = &["APPLIED_APPROVAL_ASSIGNMENT", "CC_DESIGN_APPROVAL"];
+const CLASSIFICATION_ASSIGNMENT: &[&str] = &[
+    "APPLIED_SECURITY_CLASSIFICATION_ASSIGNMENT",
+    "CC_DESIGN_SECURITY_CLASSIFICATION",
+];
+
+/// The name a role entity carries.
+fn role_name(ex: &Exchange, role: Option<&Parameter>) -> String {
+    role.and_then(Parameter::as_ref)
+        .and_then(|id| ex.get(id))
+        .and_then(|r| {
+            text(r.attr("PERSON_AND_ORGANIZATION_ROLE", 0))
+                .or_else(|| text(r.attr("APPROVAL_ROLE", 0)))
+        })
+        .unwrap_or_else(|| "unspecified".into())
+}
+
+/// A person-and-organisation, named.
+fn involvement(ex: &Exchange, id: Id, role: String) -> Option<Involvement> {
+    let pao = ex.get(id)?;
+    if !pao.has_type("PERSON_AND_ORGANIZATION") {
+        return None;
+    }
+    let person = pao
+        .attr("PERSON_AND_ORGANIZATION", 0)
+        .and_then(Parameter::as_ref)
+        .and_then(|id| ex.get(id))
+        .and_then(|p| {
+            // `Last, First`, or whichever of the two the file gives.
+            let last = text(p.attr("PERSON", 1));
+            let first = text(p.attr("PERSON", 2));
+            match (last, first) {
+                (Some(l), Some(f)) => Some(format!("{l}, {f}")),
+                (Some(l), None) => Some(l),
+                (None, Some(f)) => Some(f),
+                (None, None) => None,
+            }
+        });
+    let organisation = pao
+        .attr("PERSON_AND_ORGANIZATION", 1)
+        .and_then(Parameter::as_ref)
+        .and_then(|id| ex.get(id))
+        .and_then(|o| text(o.attr("ORGANIZATION", 1)).or_else(|| text(o.attr("ORGANIZATION", 0))));
+    Some(Involvement {
+        role,
+        organisation,
+        person,
+    })
+}
+
+/// An approval: its status and level, when it was given, and by whom.
+///
+/// The date and the approver both point *at* the approval rather than
+/// being pointed at by it, which is what the reverse index is for.
+fn approval(ex: &Exchange, referrers: &Referrers, id: Id) -> Option<Approval> {
+    let a = ex.get(id)?;
+    if !a.has_type("APPROVAL") {
+        return None;
+    }
+    let status = a
+        .attr("APPROVAL", 0)
+        .and_then(Parameter::as_ref)
+        .and_then(|id| ex.get(id))
+        .and_then(|s| text(s.attr("APPROVAL_STATUS", 0)))
+        .unwrap_or_else(|| "unspecified".into());
+    let level = text(a.attr("APPROVAL", 1));
+    let date = referrers
+        .to_any(ex, id, &["APPROVAL_DATE_TIME"])
+        .find_map(|adt| {
+            adt.attr("APPROVAL_DATE_TIME", 0)
+                .and_then(Parameter::as_ref)
+                .and_then(|id| calendar_date(ex, id))
+        });
+    let mut by: Vec<Involvement> = referrers
+        .to_any(ex, id, &["APPROVAL_PERSON_ORGANIZATION"])
+        .filter_map(|apo| {
+            let role = role_name(ex, apo.attr("APPROVAL_PERSON_ORGANIZATION", 2));
+            apo.attr("APPROVAL_PERSON_ORGANIZATION", 0)
+                .and_then(Parameter::as_ref)
+                .and_then(|id| involvement(ex, id, role))
+        })
+        .collect();
+    by.sort();
+    Some(Approval {
+        status,
+        level,
+        date,
+        by,
+    })
+}
+
+/// A date as `YYYY-MM-DD`, from a `DATE_AND_TIME` or a `CALENDAR_DATE`.
+///
+/// `CALENDAR_DATE` states year, **day**, month — in that order. It is
+/// easy to read the second field as the month, and a file dated the
+/// 17th of July then reads as the 7th of the seventeenth month.
+fn calendar_date(ex: &Exchange, id: Id) -> Option<String> {
+    let inst = ex.get(id)?;
+    let date = if inst.has_type("DATE_AND_TIME") {
+        inst.attr("DATE_AND_TIME", 0)
+            .and_then(Parameter::as_ref)
+            .and_then(|id| ex.get(id))?
+    } else {
+        inst
+    };
+    if !date.has_type("CALENDAR_DATE") {
+        return None;
+    }
+    let n = |i: usize| date.attr("CALENDAR_DATE", i).and_then(Parameter::as_i64);
+    let (year, day, month) = (n(0)?, n(1)?, n(2)?);
+    // A writer with no date to give fills the fields with zeros. That is
+    // a blank, and printing it as the first of January in year nought
+    // would present a placeholder as a fact.
+    if year <= 0 || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+    Some(format!("{year:04}-{month:02}-{day:02}"))
 }
 
 /// The product definition whose shape holds `shell`, if the file says.

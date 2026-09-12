@@ -638,7 +638,7 @@ is published; until then, `cargo doc --open` builds it locally.
 - [x] `pmix mcp`: serving the documents to a language model, so it can answer what the differences mean (ADR 0013)
 - [x] `pmix product`: parts, revisions, occurrences and their placements, from a STEP file's assembly structure (ADR 0014)
 - [x] Joining each body to the part it realises, so a shape has a part number beside it (ADR 0014)
-- [ ] Owning organisation, approval, and security classification, which no file in the public corpus states (ADR 0014)
+- [x] Owning organisation, approvals, and security classification, read from AP203 and AP242 alike; the marking sits beside the part number (ADR 0014)
 - [x] An envelope per body: how big it is, and whether that is a measurement or a lower bound (ADR 0014)
 - [x] Material, mass and volume promoted out of the properties that carry them, with disagreement stated rather than resolved (ADR 0014)
 - [x] `list_parts` and `describe_part` over the Model Context Protocol, and the caution that travels with them (ADR 0014)
