@@ -29,7 +29,7 @@ answering the question people actually bring to two CAD files: not
 whether they differ, but *how* — the same hole, bored wider; the
 mounting holes, five millimetres off.
 
-> **Status: 0.16.0.** `pmix` answers three questions about a STEP AP242
+> **Status: 0.16.1.** `pmix` answers three questions about a STEP AP242
 > or JT file. **What it says:** `pmix extract` emits the semantic layer
 > (units, features, dimensions with tolerances, geometric tolerances with
 > zones, modifiers and composites, datums with targets, datum reference

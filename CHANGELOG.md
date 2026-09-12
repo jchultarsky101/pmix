@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-09-12
+
+Documentation only. The MCP guide still said, in two places, that the
+JT scene graph's node hierarchy was unread — true until 0.14.0 and false
+since. A guide that describes a capability as absent is worse than one
+that omits it, because a reader acts on it.
+
 ### Changed
 
 - **`docs/mcp.md` no longer says the JT scene graph is unread.** Two
@@ -981,7 +988,8 @@ exports, and `pmix diff`.
 - Input format detection for STEP (`.stp`, `.step`, `.p21`) and JT (`.jt`).
 - Versioned JSON data model (`schema_version` 1) for extracted PMI.
 
-[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/jchultarsky101/pmix/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/jchultarsky101/pmix/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/jchultarsky101/pmix/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/jchultarsky101/pmix/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/jchultarsky101/pmix/compare/v0.14.0...v0.15.0
