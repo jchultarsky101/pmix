@@ -29,21 +29,25 @@ answering the question people actually bring to two CAD files: not
 whether they differ, but *how* — the same hole, bored wider; the
 mounting holes, five millimetres off.
 
-> **Status: 0.13.0.** `pmix extract` reads STEP AP242 and JT files and
-> emits the semantic layer (units, features, dimensions with tolerances,
-> geometric tolerances with zones, modifiers and composites, datums with
-> targets, datum reference frames), the presentation layer (annotations
-> with text, plane, leaders, style, geometry summary and links to the
-> semantic records; saved views), and the **metadata** each file carries
-> as named properties. It extracts every such entity in the NIST test
-> corpus, and `pmix diff` compares two or more models by identity. A JT
-> dimension is anchored on the B-rep faces and edges it applies to, by
-> the same recipe the STEP reader uses, and in millimetres whatever unit
-> the file states, so one design keys the same way however it was
-> exported. `pmix features` recognises holes, counterbores, countersinks,
-> bosses, fillets, rounds and chamfers from the B-rep of either format,
-> states their sizes and positions in millimetres, and lists every face
-> that went into none of them. See the [roadmap](#roadmap).
+> **Status: 0.15.1.** `pmix` answers three questions about a STEP AP242
+> or JT file. **What it says:** `pmix extract` emits the semantic layer
+> (units, features, dimensions with tolerances, geometric tolerances with
+> zones, modifiers and composites, datums with targets, datum reference
+> frames), the presentation layer (annotations with text, plane, leaders,
+> style, geometry summary and links to the semantic records; saved
+> views), and the metadata each file carries as named properties. It
+> extracts every such entity in the NIST corpus, and `pmix diff` compares
+> two models by identity. **What its shapes are:** `pmix features`
+> recognises holes, counterbores, countersinks, bosses, fillets, rounds
+> and chamfers from the B-rep of either format, the bolt circles, rows
+> and grids they form, and how big each body is, and lists every face
+> that went into none of them. **What it contains:** `pmix product` reads
+> the parts, revisions and occurrences, and `pmix describe` gathers all
+> three documents into one answer to "what is this part". Everything is
+> in millimetres and degrees whatever the file states, and ids are
+> derived from content, so one design keys the same way however it was
+> exported. `pmix mcp` serves the lot to a language model over the Model
+> Context Protocol. See the [roadmap](#roadmap).
 
 ## What pmix extracts
 

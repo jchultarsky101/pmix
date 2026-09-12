@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The README's status paragraph is current again.** It had sat at
+  0.13.0 for three releases, describing a tool that reads and compares
+  PMI and recognises features — and not one that reads product
+  structure, describes a part, recognises patterns, or serves any of it
+  over MCP. It is the first paragraph a reader meets, and it was three
+  releases out of date in substance as well as in its version number.
+  Bumping it is now step 1 of the release checklist, with a note to
+  check what it says rather than only the number.
+
 ## [0.15.1] - 2026-09-11
 
 Documentation only: no code changed and no output moved. Three of these
