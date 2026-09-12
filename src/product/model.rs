@@ -99,6 +99,27 @@ pub struct Part {
     /// either the assembly's root or a part the file states and never
     /// places.
     pub occurrences: usize,
+    /// Who is responsible for the part, by role: design owner, creator,
+    /// supplier, classification officer. Sorted by role then name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub people: Vec<Involvement>,
+    /// Approvals the file records against the part, sorted by status
+    /// then date.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approvals: Vec<Approval>,
+    /// The security classification, where the file states one.
+    ///
+    /// Present whenever the file states the entity, even with every
+    /// field blank — which real files do — so that *stated but empty*
+    /// can be told from *not stated*. It travels beside the part number
+    /// on purpose (ADR 0014): a reader must not be able to see the
+    /// number without seeing the marking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification: Option<Classification>,
+    /// Categories the file puts the product in — `detail`, `assembly`,
+    /// or whatever the writer chose. Sorted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<String>,
     /// The bodies this part is made of, by their ids in the features
     /// document, sorted. Empty for a subassembly, which has parts rather
     /// than geometry.
@@ -110,6 +131,49 @@ pub struct Part {
     pub bodies: Vec<String>,
     /// Source entities. Excluded from comparison.
     pub source_refs: Vec<String>,
+}
+
+/// A person or organisation and the role they hold.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Involvement {
+    /// The role as the file names it: `design_owner`, `creator`,
+    /// `design_supplier`, `classification_officer`, or an approval role.
+    pub role: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub organisation: Option<String>,
+    /// The person, as `Last, First`, where the file names one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub person: Option<String>,
+}
+
+/// One approval recorded against a part.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Approval {
+    /// `approved`, `not_yet_approved`, `rejected`, as the file states.
+    pub status: String,
+    /// What was approved, in the writer's words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    /// When, as `YYYY-MM-DD`, where the file dates it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+    /// Who authorised it, where the file says.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub by: Vec<Involvement>,
+}
+
+/// A security classification as the file states it.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct Classification {
+    /// The level — `unclassified`, `confidential`, or whatever the
+    /// writer's scheme uses. Absent when the entity is there and the
+    /// field is blank, which is stated rather than hidden.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
 }
 
 /// One use of one part inside another: a single occurrence.
@@ -169,6 +233,12 @@ impl ProductDocument {
             .collect();
         for part in &mut self.parts {
             part.bodies.sort();
+            part.people.sort();
+            part.people.dedup();
+            part.approvals.sort();
+            part.approvals.dedup();
+            part.categories.sort();
+            part.categories.dedup();
         }
         self.parts.sort_by(|a, b| a.id.cmp(&b.id));
         self.relations.sort_by(|a, b| a.id.cmp(&b.id));

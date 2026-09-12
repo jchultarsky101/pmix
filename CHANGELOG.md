@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Who owns a part, who approved it, and how it is classified** are
+  read into the product document (ADR 0014): people and organisations by
+  role, approvals with their status, date and approver, the security
+  classification, and the product category. AP203's `CC_DESIGN_*`
+  assignments and AP242's `APPLIED_*` are one reader, because they are
+  one shape. What a writer leaves blank stays absent and what it states
+  is kept, field by field — a classification with a level and no name
+  is exactly that — and `pmix describe` prints the marking directly
+  under the part number, or says `classification not stated`, every
+  time. A reader must not see the number without the marking.
+
+  `CALENDAR_DATE` states year, *day*, month, in that order, and a date
+  read the obvious way puts the 17th of July in the seventeenth month.
+  A date of zeros is a blank, not the first of January in year nought.
+
+  Two NIST D2MI models are committed under `tests/fixtures/d2mi/` —
+  public domain, mostly blank, which is what makes them the honest
+  test — and a synthetic fixture carries a full set of values.
+
 - **Thread designations are read out of a file's text** (ADR 0014):
   `M12x1.75-6H`, `1/4-20 UNC-2B`, `#10-32 UNF`, `1/2-14 NPT`, wherever
   they appear — a validation property, a note, a dimension's displayed

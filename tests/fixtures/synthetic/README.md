@@ -34,6 +34,12 @@ Both are written by hand rather than exported, which means they encode
 what the reader expects rather than confirming it against a real writer.
 Verify product-structure changes against real exports as well.
 
+## Identity
+
+| File | What it is for |
+| --- | --- |
+| `part_identity.stp` | One part with an owner, a creator, a supplier, a dated approval and a `confidential` classification, through the AP242 `APPLIED_*` assignments. The assignments hang off three different levels — definition, formation, product — and all must reach the one part. The public-domain files in `tests/fixtures/d2mi/` state the same entities through the AP203 `CC_DESIGN_*` forms with every value blank, so between the two both spellings and both halves are tested |
+
 ## Feature recognition
 
 One plate, and three single deliberate changes to it. Each is a question

@@ -190,7 +190,10 @@ Everything known about one part, gathered from all three documents.
 | `path` | required | A `.stp`, `.step`, or `.jt` file |
 | `part` | optional | Only this part, by its id or its number from `list_parts` |
 
-Identity and revision from the product document; each body's envelope,
+Identity and revision from the product document — and, where the file
+states them, who owns the part, who approved it and when, its product
+category, and its security classification, which is placed beside the
+number on purpose. Each body's envelope,
 recognised features and the patterns they form — bolt circles, rows,
 grids — from the features document; and `attributes`
 promoted out of the properties in the PMI document — material, mass,

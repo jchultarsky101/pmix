@@ -76,6 +76,17 @@ pub struct PartSummary {
     pub revision: Option<String>,
     /// How many times the file uses this part.
     pub occurrences: usize,
+    /// Who is responsible for it, by role.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub people: Vec<crate::product::Involvement>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub approvals: Vec<crate::product::Approval>,
+    /// The security classification, where the file states one. Beside
+    /// the part number on purpose (ADR 0014).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification: Option<crate::product::Classification>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<String>,
     /// The shapes it is made of.
     pub bodies: Vec<BodySummary>,
     /// Values lifted out of the file's own properties.
@@ -200,6 +211,10 @@ pub fn summarise(
                 description: part.description.clone(),
                 revision: part.revision.clone(),
                 occurrences: part.occurrences,
+                people: part.people.clone(),
+                approvals: part.approvals.clone(),
+                classification: part.classification.clone(),
+                categories: part.categories.clone(),
                 bodies,
                 attributes,
                 ambiguous,

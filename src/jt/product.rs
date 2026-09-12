@@ -252,6 +252,10 @@ fn build(
             description: None,
             revision: node_property(scene, node.id, "JT_PROP_REVISION"),
             occurrences: 0,
+            people: Vec::new(),
+            approvals: Vec::new(),
+            classification: None,
+            categories: Vec::new(),
             bodies: Vec::new(),
             source_refs: vec![format!("node {}", node.id)],
         });

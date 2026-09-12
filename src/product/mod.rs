@@ -15,7 +15,10 @@
 pub mod model;
 pub mod summary;
 
-pub use model::{Diagnostic, Part, ProductDocument, Relation, SCHEMA_VERSION, Unattached};
+pub use model::{
+    Approval, Classification, Diagnostic, Involvement, Part, ProductDocument, Relation,
+    SCHEMA_VERSION, Unattached,
+};
 pub use summary::{Ambiguity, Attribute, BodySummary, Candidate, PartSummary, summarise};
 
 use std::path::Path;

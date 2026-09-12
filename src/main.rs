@@ -531,6 +531,53 @@ fn render_parts(
         if let Some(d) = &part.description {
             let _ = writeln!(out, "  {d}");
         }
+        // The marking sits directly under the number, always: a reader
+        // must not see one without the other (ADR 0014).
+        match &part.classification {
+            Some(c) => {
+                let _ = writeln!(
+                    out,
+                    "  {:<14} {}{}",
+                    "classified",
+                    c.level.as_deref().unwrap_or("(level not stated)"),
+                    c.purpose
+                        .as_deref()
+                        .map(|p| format!(" — {p}"))
+                        .unwrap_or_default()
+                );
+            }
+            None => {
+                let _ = writeln!(out, "  {:<14} not stated", "classification");
+            }
+        }
+        if !part.categories.is_empty() {
+            let _ = writeln!(out, "  {:<14} {}", "category", part.categories.join(", "));
+        }
+        for who in &part.people {
+            let named = match (&who.organisation, &who.person) {
+                (Some(o), Some(p)) => format!("{p} ({o})"),
+                (Some(o), None) => o.clone(),
+                (None, Some(p)) => p.clone(),
+                (None, None) => "(unnamed)".into(),
+            };
+            let _ = writeln!(out, "  {:<14} {named}", who.role);
+        }
+        for a in &part.approvals {
+            let mut line = a.status.clone();
+            if let Some(d) = &a.date {
+                line.push_str(&format!(" on {d}"));
+            }
+            if let Some(l) = &a.level {
+                line.push_str(&format!(": {l}"));
+            }
+            for b in &a.by {
+                let named = b.person.clone().or_else(|| b.organisation.clone());
+                if let Some(n) = named {
+                    line.push_str(&format!(" — {n}, {}", b.role));
+                }
+            }
+            let _ = writeln!(out, "  {:<14} {line}", "approval");
+        }
         for a in &part.attributes {
             let unit = a.unit.as_deref().unwrap_or("");
             let _ = writeln!(

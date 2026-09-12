@@ -264,6 +264,31 @@ an open-ended wait, not a short one. And the designations that exist
 are text: one in the public corpus, and in real exports commonly inside
 the part's own name. Text is what this reader can work with now.
 
+### Amended 2026-09-12, on building the identity extras
+
+**Built after all, and against a public-domain file.** The objection
+that nothing in either corpus states these entities was true of the
+MBE PMI corpus and the real exports; it was not true of NIST's D2MI
+models, which state `APPROVAL`, `PERSON_AND_ORGANIZATION` and
+`SECURITY_CLASSIFICATION` with real roles and mostly blank values —
+unnamed people, empty organisations, a classification whose level says
+`confidential` and whose name says nothing, an approval dated with
+zeros. Two are committed. The blanks are the useful part: they are what
+a real writer does, and they force the reader to keep exactly what is
+stated field by field — the level without the name, the status without
+the date — rather than treat the record as all-or-nothing. A synthetic
+fixture carries a full set of values.
+
+**One reader for both spellings.** AP203 assigns with `CC_DESIGN_*` and
+AP242 with `APPLIED_*_ASSIGNMENT`; the shape is identical and so is the
+code, in the same way the formation subtypes were handled in stage 1.
+
+**The marking sits beside the number in text output too**, as the
+disclosure clause required. `pmix describe` prints either the level or
+`classification not stated` under every part, without exception, so
+that the absence of a marking is itself visible rather than being the
+absence of a line.
+
 ### Stage 3 — interface and class
 
 Two recognitions, both derived, both stated as recognitions.
