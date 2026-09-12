@@ -177,9 +177,15 @@ used four times is one shape used four times: one body, four
 occurrences. A reader that confuses them reports an assembly of four
 pins as an assembly of one.
 
-A JT file states its structure in the scene graph's node hierarchy,
-which this does not read yet; the document comes back empty and says so
-in `diagnostics`.
+A JT file states its structure in the scene graph's node hierarchy — a
+part node is a part, an instance node is an occurrence, a geometric
+transform says where — and the reader walks it, so a JT gives the same
+document a STEP does. Two things differ by format and are worth
+knowing. A JT part node carries its material and surface area but not
+its name; the name comes from the instance node above it, with the
+occurrence suffix a writer appends stripped off. And the scene graph's
+transforms are in the unit the file declares, not in JT's base unit of
+metres, which the topology table uses.
 
 ### `describe_part`
 
@@ -436,8 +442,10 @@ Everything the command line will not, since it is the same library:
 - **Detect a rotation** as a single fact; it reports the shapes as
   present and moved, and stops.
 - **Read a JT that carries no precise geometry.** It says so.
-- **Read a JT file's product structure.** It lives in the scene graph's
-  node hierarchy, which this does not parse yet. It says so.
+- **Read a JT whose precise geometry is Parasolid XT with no topology
+  table.** The table is an optional abstraction over the B-rep and the
+  only form this reads; it says how many B-rep segments it found and
+  that an exporter which writes the table makes the file readable.
 - **Compute a volume or a surface area.** Both need the trimmed patch of
   each face, which this reader does not hold; both are read where a file
   states them and absent where it does not
