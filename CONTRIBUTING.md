@@ -92,7 +92,11 @@ Once approved and green in CI, a maintainer will merge it.
 
 Releases are cut by the maintainers, in this order:
 
-1. Bump the version in `Cargo.toml`.
+1. Bump the version in `Cargo.toml`, and the `> **Status: X.Y.Z.**`
+   paragraph at the top of `README.md` — check that what it *says* is
+   still true, not only that the number matches. It sat at 0.13.0 for
+   three releases, describing a tool that had since grown two
+   subcommands.
 2. Move `## [Unreleased]` in `CHANGELOG.md` into a new dated section, with
    a short paragraph saying what the release is *for*, and add the
    comparison link at the foot of the file.
