@@ -110,9 +110,21 @@ command before building anything on it:
 pmix features candidate.jt
 ```
 
-It answers "the file holds no topology segment" when there is nothing
-there. See [ADR 0004](adr/0004-identity.md) for what the check would
-settle.
+It distinguishes the two cases, and the difference decides what to ask
+for. A file with **neither** a topology table nor a B-rep segment is
+tessellation-only and no export setting will save it. A file with B-rep
+segments but **no topology table** has its precise geometry — as
+Parasolid XT — and `pmix` cannot reach it: the table is described by the
+specification (section 11.14) as "a lightweight abstraction of the
+existing precise B-Rep data", and it is optional. That file does not
+need replacing, it needs re-exporting by something that writes the
+table.
+
+One of the JT files to hand is exactly that second case, which is why
+the distinction is worth stating: it looked like a tessellation-only
+export for months and is not one.
+
+See [ADR 0004](adr/0004-identity.md) for what the check would settle.
 
 **2. A model that states a thread.** Threads are the one thing a fastener
 is ordered by and nothing here carries them: one designation (`M12x1.75-6H`)

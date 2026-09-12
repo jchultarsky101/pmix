@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A JT with B-rep but no topology table is no longer reported as
+  having no precise geometry**, because it has some. The table is, in
+  the specification's words, "a lightweight abstraction of the existing
+  precise B-Rep data" — and an optional one, so a file can carry
+  Parasolid XT geometry and omit it. `pmix` reads only the table, and
+  told such a file's owner there was nothing there. It now says how many
+  B-rep segments it found and that an exporter which writes the table
+  makes the file readable, which is a different instruction: re-export
+  it, do not go looking for another file.
+
+### Changed
+
 - **The README's status paragraph is current again.** It had sat at
   0.13.0 for three releases, describing a tool that reads and compares
   PMI and recognises features — and not one that reads product

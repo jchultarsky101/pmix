@@ -152,10 +152,38 @@ pub fn from_jt(bytes: &[u8], file_name: &str) -> crate::Result<FeatureDocument> 
         }
     }
     if solids.is_empty() {
+        // Two different files reach here and they need different
+        // answers. The topology table is "a lightweight abstraction of
+        // the existing precise B-Rep data" (specification section
+        // 11.14) — an *optional* one. A file can carry precise geometry
+        // as Parasolid XT and omit the table, and telling its owner
+        // there is no precise geometry would be false: what is missing
+        // is the abstraction this reader reads, which an exporter can
+        // usually be asked for.
+        let precise = file
+            .segments()
+            .iter()
+            .filter(|s| {
+                matches!(
+                    s.kind,
+                    SegmentKind::XtBRep | SegmentKind::MultiXtBRep | SegmentKind::JtBRep
+                )
+            })
+            .count();
         diagnostics.push(Diagnostic {
-            message: "the file holds no topology segment, so there is no precise geometry to \
-                      recognise; a JT written without B-rep carries only tessellation"
-                .into(),
+            message: if precise > 0 {
+                format!(
+                    "the file holds {precise} B-rep segment(s) but no topology table, so its \
+                     precise geometry is there and this reader cannot reach it; the table is an \
+                     optional abstraction over the B-rep, and an exporter that writes it makes \
+                     the file readable"
+                )
+            } else {
+                "the file holds neither a topology table nor a B-rep segment, so there is no \
+                 precise geometry to recognise; a JT written without B-rep carries only \
+                 tessellation"
+                    .into()
+            },
         });
     }
     // The scene graph declares the units the file's own numbers are in.
